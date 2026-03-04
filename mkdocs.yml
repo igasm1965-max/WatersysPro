@@ -1,0 +1,23 @@
+site_name: WaterSysPro Docs
+site_url: ""
+
+docs_dir: docs
+
+nav:
+  - "Обзор прошивки": firmware_overview.md
+  - "Аппаратная часть": hardware_overview.md
+  - "FSM и аварии": firmware_fsm.md
+  - "IO (датчики, реле, дисплей)": firmware_io.md
+  - "Логирование и SD": firmware_logging.md
+  - "Web API": firmware_web_api.md
+  - "Backend": backend_overview.md
+  - "Мобильное приложение": mobile_overview.md
+  - "Развёртывание и эксплуатация": deployment_and_ops.md
+  - "SD интеграция": SD_INTEGRATION.md
+  - "Рефакторинг и smoke-тесты": REFRACTOR_AND_SMOKE_SUMMARY.md
+
+theme:
+  name: mkdocs
+
+plugins:
+  - search

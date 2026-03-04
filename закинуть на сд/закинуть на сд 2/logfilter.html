@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+<head>
+  <meta name=viewport content='width=device-width, initial-scale=1'>
+  <title>Event Log Settings</title>
+  <style>label{display:block;margin:6px 0}</style>
+</head>
+<body>
+  <h3>Event Log Settings</h3>
+  <div id=opts>Loading...</div>
+  <div id=msg style='color:green'></div>
+  <script>
+  async function loadOpts(){
+    const r = await fetch('/api/log_filter');
+    const j = await r.json();
+    const c = document.getElementById('opts');
+    c.innerHTML='';
+    j.options.forEach((o, idx)=>{
+      const cb = document.createElement('input'); cb.type='checkbox'; cb.id='o'+idx; cb.checked = o.on;
+      const lbl = document.createElement('label'); lbl.htmlFor = 'o'+idx; lbl.innerText = o.label;
+      lbl.prepend(cb);
+      c.appendChild(lbl);
+    });
+    const btn = document.createElement('button'); btn.innerText='Save (requires token)'; btn.onclick = save;
+    c.appendChild(btn);
+  }
+  async function save(){
+    const token = prompt('Admin token:'); if (!token) return; const r = await fetch('/api/log_filter'); const j = await r.json(); let mask = 0;
+    j.options.forEach((o, idx)=>{ const cb = document.getElementById('o'+idx); if (cb && cb.checked) mask |= o.bit; });
+    const resp = await fetch('/api/log_filter',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:token,mask:mask})}); const rr = await resp.json(); document.getElementById('msg').innerText = JSON.stringify(rr);
+  }
+  loadOpts();
+  </script>
+  </body>
+  </html>

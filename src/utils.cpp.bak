@@ -1,0 +1,502 @@
+/**
+ * @file utils.cpp
+ * @brief Реализация вспомогательных функций системы
+ * @details Функции отладки, диагностики и утилиты общего назначения
+ */
+
+#include "utils.h"
+#include "config.h"
+#include "structures.h"
+#include "timers.h"
+#include "event_logging.h"
+#include "sensors.h"
+#include "relay_control.h"
+#include "display.h"
+#include "esp_system.h"
+
+// helper for language selection
+static bool langInitialized = false;
+static bool langEnglish = true;
+
+bool isEnglish() {
+  if (!langInitialized) {
+    langInitialized = true;
+    extern Preferences preferences;
+    if (preferences.isKey(PREF_KEY_LANG_EN)) {
+      langEnglish = preferences.getBool(PREF_KEY_LANG_EN, true);
+    }
+  }
+  return langEnglish;
+}
+
+bool setLanguageEnglish(bool eng) {
+  bool old = isEnglish();
+  langEnglish = eng;
+  langInitialized = true;
+  extern Preferences preferences;
+  preferences.putBool(PREF_KEY_LANG_EN, eng);
+  return old;
+}
+
+// choose appropriate string depending on language flag
+static const char* tr(const char *en, const char *ru) {
+  return isEnglish() ? en : ru;
+}
+
+#include <SPI.h>
+#include <SD.h>
+
+// ============ FORWARD DECLARATIONS ============
+extern const char* getResetReason();
+
+// ============ ИНИЦИАЛИЗАЦИЯ И ДИАГНОСТИКА ============
+
+/// Инициализирует I2C шину
+void initI2C() {
+  // silent in production builds
+}
+
+/// Инициализация SD карты (SPI mode)
+// flag set by initSD and used elsewhere (status reporting etc)
+bool sdPresent = false;
+
+// spinlock used to serialize access to SD/SPIFFS from different tasks
+portMUX_TYPE sdMux = portMUX_INITIALIZER_UNLOCKED;
+
+// keep a persistent SPIClass for SD operations; local instances can be destroyed
+// by leaving the function, which would leave SD library holding a pointer to
+// freed memory (leading to crashes later when beginTransaction is called).
+static SPIClass sdSPI(VSPI);
+
+bool initSD() {
+  Serial.println(tr("[SD] Initialization (SPI)...", "[SD] Инициализация (SPI)..."));
+  // nothing needed for spinlock; sdMux already statically initialized
+  sdSPI.begin(SD_SCK_PIN, SD_MISO_PIN, SD_MOSI_PIN, SD_CS_PIN);
+  if (!SD.begin(SD_CS_PIN, sdSPI)) {
+    Serial.println(tr("[SD] mount failed (no card or wiring)", "[SD] монтаж не удался (нет карты или проводка)"));
+    sdPresent = false;
+    return false;
+  }
+  uint8_t t = SD.cardType();
+  Serial.printf(tr("[SD] card mounted, type=%u\n", "[SD] карта смонтирована, тип=%u\n"), t);
+  // migrate log format if the old binary file is still present on SPIFFS
+  // or SD itself
+  extern void migrateOldBinaryLog();
+  migrateOldBinaryLog();
+
+  // Try a small write/read test to verify filesystem
+  File f = SD.open("/sd_test.txt", FILE_WRITE);
+  if (f) {
+    f.printf("sd инициализация ок: %lu\n", millis());
+    f.close();
+    Serial.println(tr("[SD] test file written", "[SD] тестовый файл записан"));
+    sdPresent = true;
+  } else {
+    Serial.println(tr("[SD] test file write failed", "[SD] запись тестового файла не удалась"));
+    sdPresent = false;
+  }
+  // after successful initialization, attempt to copy UI assets so that
+  // they can later be served directly from the card and freed from SPIFFS.
+  if (sdPresent) {
+    migrateUiToSd();
+  }
+  return sdPresent;
+}
+
+/// Форматирует смонтированную SD карту.
+bool formatSDCard() {
+  if (!sdPresent) return false;
+  // naive format: delete every file/dir under root
+  File root = SD.open("/");
+  if (!root) return false;
+  bool success = true;
+  File file = root.openNextFile();
+  while (file) {
+    String name = String(file.name());
+    file.close();
+    if (!SD.remove(name)) {
+      Serial.printf(tr("[SD] failed to remove %s\n", "[SD] не удалось удалить %s\n"), name.c_str());
+      success = false;
+    }
+    file = root.openNextFile();
+  }
+  root.close();
+  if (success) Serial.println(tr("[SD] format (delete) successful", "[SD] форматирование (удаление) успешно"));
+  else Serial.println(tr("[SD] format (delete) had errors", "[SD] форматирование (удаление) с ошибками"));
+  return success;
+}
+
+/// Выполняет диагностику системы при загрузке
+void runSystemDiagnostics() {
+  // Diagnostics are performed silently; use event logs for persistent diagnostics
+}
+
+// ---------------------------------------------------------------------------
+// File migration helpers
+// ---------------------------------------------------------------------------
+
+/// Copy UI-related static files from SPIFFS to SD card if they are absent or
+/// outdated.  This allows the device to serve its web interface entirely from
+/// the removable card and eventually eliminate the SPIFFS image altogether.
+void migrateUiToSd() {
+  if (!sdPresent) return;
+
+  const char *files[] = {"/index.html", "/logfilter.html"};
+  for (auto path : files) {
+#if USE_SPIFFS
+    if (!SPIFFS.exists(path))
+      continue;
+
+    // determine if we should copy: always overwrite if sizes differ
+    size_t spiffsSize = 0;
+    File srcProbe = SPIFFS.open(path, "r");
+    if (srcProbe) {
+      spiffsSize = srcProbe.size();
+      srcProbe.close();
+    }
+    bool shouldCopy = true;
+    if (SD.exists(path)) {
+      File f = SD.open(path, "r");
+      if (f) {
+        size_t sdSize = f.size();
+        f.close();
+        if (sdSize == spiffsSize) {
+          shouldCopy = false; // same size, assume up-to-date
+        }
+      }
+    }
+
+    if (!shouldCopy) continue;
+
+    Serial.printf(tr("[SD] migrating %s from SPIFFS to SD (overwrite=%s)\n", "[SD] миграция %s из SPIFFS на SD (перезапись=%s)\n"), path, SD.exists(path) ? (isEnglish()?"yes":"да") : (isEnglish()?"no":"нет"));
+    File src = SPIFFS.open(path, "r");
+    File dst = SD.open(path, FILE_WRITE);
+    if (src && dst) {
+      if (dst.size() > 0) {
+        // clear existing content
+        SD.remove(path);
+        dst = SD.open(path, FILE_WRITE);
+      }
+      while (src.available()) {
+        dst.write(src.read());
+      }
+      dst.close();
+      src.close();
+    } else {
+      Serial.printf(tr("[SD] failed to open %s for migration\n", "[SD] не удалось открыть %s для миграции\n"), path);
+    }
+#endif
+  }
+}
+
+// ============ ПЕРЕЗАГРУЗКА СИСТЕМЫ ============
+
+/// Мягкий сброс без сохранения (вызывается из меню)
+void softReset() {
+  Serial.println("[INFO] Soft reset requested");
+  esp_restart();
+}
+
+
+// ============ УПРАВЛЕНИЕ LED/ИНДИКАТОРАМИ ============
+
+
+// ============ РАБОТА С ПАМЯТЬЮ ============
+
+/// Получает свободный объем памяти кучи (в байтах)
+uint32_t getFreeHeap() {
+  return esp_get_free_heap_size();
+}
+
+/// Получает размер наименьшего блока свободной памяти (в байтах)
+uint32_t getMinFreeHeap() {
+  return esp_get_minimum_free_heap_size();
+}
+
+/// Получает информацию о памяти в статическом буфере (без динамических String)
+const char* getMemoryInfo() {
+  static char buffer[100];
+  snprintf(buffer, sizeof(buffer), "Куча: %u байт (мин: %u)",
+           (unsigned) getFreeHeap(), (unsigned) getMinFreeHeap());
+  return buffer;
+}
+
+/// Выводит информацию о памяти в Serial
+void printMemoryInfo() {
+  Serial.print("[ПАМ] ");
+  Serial.println(getMemoryInfo());
+}
+
+/// Проверяет критически низкий объем памяти
+bool isMemoryCritical() {
+  return getFreeHeap() < 10000; // Менее 10KB
+}
+
+/// Удобная обёртка для проверки, истёк ли интервал от `start` (millis()).
+/// Защищает от переполнения millis() при вычитании.
+bool hasIntervalElapsed(unsigned long start, unsigned long intervalMs) {
+  return (unsigned long)(millis() - start) > intervalMs;
+}
+
+// ============ РАБОТА СО СТРОКАМИ ============
+
+/// Преобразует число в строку с лидирующими нулями
+String formatNumber(int number, int digits) {
+  String result = String(number);
+  while (result.length() < digits) {
+    result = "0" + result;
+  }
+  return result;
+}
+
+/// Преобразует число в время (MM:SS)
+String formatTimeMM_SS(uint32_t seconds) {
+  uint32_t minutes = seconds / 60;
+  uint32_t secs = seconds % 60;
+  
+  return formatNumber(minutes, 2) + ":" + formatNumber(secs, 2);
+}
+
+/// Преобразует число в время (HH:MM:SS)
+String formatTimeHH_MM_SS(uint32_t seconds) {
+  uint32_t hours = seconds / 3600;
+  uint32_t minutes = (seconds % 3600) / 60;
+  uint32_t secs = seconds % 60;
+  
+  return formatNumber(hours, 2) + ":" + formatNumber(minutes, 2) + ":" + formatNumber(secs, 2);
+}
+
+// ============ ОТЛАДКА И ЛОГИРОВАНИЕ ============
+
+/// Выводит информацию о версии системы
+void printSystemVersion() {
+  Serial.println(isEnglish() ? "\n=== System Information ===" : "\n=== Информация о системе ===");
+  Serial.println(isEnglish() ? "Product: Water purification system" : "Продукт: Система очистки воды");
+  Serial.println(isEnglish() ? "Version: 12.0" : "Версия: 12.0");
+  Serial.println(isEnglish() ? "Platform: ESP32" : "Платформа: ESP32");
+  Serial.print(isEnglish() ? "Build date: " : "Дата сборки: "); Serial.println(__DATE__ " " __TIME__);
+  Serial.println(isEnglish() ? "===========================\n" : "===========================\n");
+}
+
+/// Выводит информацию о системе (память, время работы)
+void printSystemStats() {
+  Serial.println(isEnglish() ? "\n=== System status ===" : "\n=== Статус системы ===");
+  printMemoryInfo();
+  Serial.printf(isEnglish() ? "[TIME] Uptime: %s\n" : "[ВРЕМЯ] Время работы: %s\n",
+    formatTimeHH_MM_SS(millis() / 1000).c_str());
+  Serial.println(isEnglish() ? "=====================\n" : "=====================\n");
+}
+
+/// Выводит конфигурацию системы
+void printConfiguration() {
+  Serial.println(isEnglish() ? "\n=== Configuration ===" : "\n=== Конфигурация ===");
+  Serial.printf(isEnglish() ? "Pins: PUMP=%d, PUMP2=%d, AERATION=%d\n" : "Пины: PUMP=%d, PUMP2=%d, AERATION=%d\n", PUMP_PIN, PUMP2_PIN, AERATION_PIN);
+  Serial.printf(isEnglish() ? "      OZONE=%d, FILTER=%d, BACKWASH=%d\n" : "      OZONE=%d, FILTER=%d, BACKWASH=%d\n", OZONE_PIN, FILTER_PIN, BACKWASH_PIN);
+  Serial.printf(isEnglish() ? "      ENCODER: CLK=%d, DT=%d, SW=%d\n" : "      ENCODER: CLK=%d, DT=%d, SW=%d\n", pinCLK, pinDT, pinSW);
+  Serial.printf(isEnglish() ? "      SENSORS: TRIG1=%d, ECHO1=%d, TRIG2=%d, ECHO2=%d\n" : "      SENSORS: TRIG1=%d, ECHO1=%d, TRIG2=%d, ECHO2=%d\n",
+    HC_TRIG1, HC_ECHO1, HC_TRIG2, HC_ECHO2);
+  Serial.printf(isEnglish() ? "LCD: Addr=0x%02X, Cols=%d, Rows=%d\n" : "LCD: Адрес=0x%02X, Столбцы=%d, Строки=%d\n", LCD_ADDR, LCD_COLS, LCD_ROWS);
+  Serial.println(isEnglish() ? "====================\n" : "====================\n");
+}
+
+/// Выводит все параметры системы для диагностики
+void dumpFullDiagnostics() {
+  printSystemVersion();
+  printSystemStats();
+  printConfiguration();
+  printResetReason();
+  // `printEventLogs()` удалена — для экспорта используйте exportEventsAsText()
+}
+
+// ============ УПРАВЛЕНИЕ ФЛАГАМИ И СОСТОЯНИЯМИ ============
+
+
+/// Выполняет валидацию состояния реле
+void validateRelayStates() {
+  // Проверяем, что состояния реле соответствуют флагам системы
+  // Это защита от "зависания" реле
+}
+
+
+// ============ ФОРМАТИРОВАНИЕ И ВЫВОД ============
+
+/// Форматирует и выводит логируемое сообщение
+void logMessage(const char* level, const char* message) {
+  extern RTC_DS3231 rtc;
+  DateTime now = rtc.now();
+  
+  char timestamp[20];
+  sprintf(timestamp, "[%02d:%02d:%02d] ",
+    now.hour(), now.minute(), now.second());
+  
+  Serial.print(timestamp);
+  Serial.print("[");
+  Serial.print(level);
+  Serial.print("] ");
+  Serial.println(message);
+}
+
+/// Выводит сообщение об ошибке
+void logError(const char* message) {
+  logMessage("ОШИБКА", message);
+}
+
+/// Выводит информационное сообщение
+void logInfo(const char* message) {
+  logMessage("ИНФО", message);
+}
+
+/// Выводит сообщение отладки
+void logDebug(const char* message) {
+  logMessage("ОТЛАДКА", message);
+}
+
+/// Выводит предупреждение
+void logWarning(const char* message) {
+  logMessage("ПРЕДУПРЕЖДЕНИЕ", message);
+}
+
+// ============ ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ============
+
+/// Заполняет массив `out[6]` байтами MAC (MSB-first)
+void getMacBytes(uint8_t out[6]) {
+  uint64_t mac = ESP.getEfuseMac();
+  out[0] = (uint8_t)(mac >> 40);
+  out[1] = (uint8_t)(mac >> 32);
+  out[2] = (uint8_t)(mac >> 24);
+  out[3] = (uint8_t)(mac >> 16);
+  out[4] = (uint8_t)(mac >> 8);
+  out[5] = (uint8_t)(mac);
+}
+
+/// Возвращает MAC-адрес устройства в виде строки (формат XX:XX:XX:XX:XX:XX)
+String getMacString() {
+  uint8_t b[6];
+  getMacBytes(b);
+  char buf[18];
+  sprintf(buf, "%02X:%02X:%02X:%02X:%02X:%02X", b[0], b[1], b[2], b[3], b[4], b[5]);
+  return String(buf);
+}
+
+
+/// Включение подсветки и дисплея (и сброс таймера простоя)
+void activateBacklight() {
+  extern SystemFlags flags;
+  extern SafeLCD lcd;
+  extern unsigned long lastActivityTime;
+  
+  lastActivityTime = millis();
+  if (!flags.displayOn) {
+    lcd.display();
+    flags.displayOn = 1;
+    flags.displayInitialized = 0;
+  }
+  if (!flags.backlightOn) {
+    lcd.backlight();
+    flags.backlightOn = 1;
+  }
+}
+
+/// Выключение только подсветки
+void deactivateBacklight() {
+  extern SystemFlags flags;
+  extern SafeLCD lcd;
+  
+  if (flags.backlightOn) {
+    lcd.noBacklight();
+    flags.backlightOn = 0;
+  }
+}
+
+/// Обновляет подсветку дисплея
+void updateBacklight() {
+  extern SystemFlags flags;
+  extern unsigned long backlightTimeout;
+  extern unsigned long lastActivityTime;
+  
+  unsigned long currentTime = millis();
+  
+  // В меню, в режиме инфо по фильтру и в аварии подсветку принудительно держим включённой
+  if (flags.inMenu || flags.inFilterWashInfo || flags.emergencyMode) {
+    activateBacklight();
+    return;
+  }
+  
+  // Если включен ночной режим и сейчас ночь, используем минимальный таймаут
+  unsigned long effectiveTimeout = backlightTimeout;
+  if (flags.nightModeEnabled && isNightMode() && backlightTimeout == 0) {
+    effectiveTimeout = 5 * 60 * 1000UL; // 5 минут в ночном режиме вместо 0
+  }
+  
+  // Если задан таймаут подсветки (>0)
+  if (effectiveTimeout > 0) {
+    if (flags.backlightOn && hasIntervalElapsed(lastActivityTime, effectiveTimeout))
+      deactivateBacklight();
+  } else {
+    // Если таймаут == 0, воспринимаем как «подсветка всегда включена»
+    if (!flags.backlightOn)
+      activateBacklight();
+  }
+}
+
+/// Проверяет расписание и ночной режим
+void checkSchedule() {
+  extern SystemFlags flags;
+  extern bool nightPauseActive;
+  extern bool timeoutWasSaved;
+  extern unsigned long savedBacklightTimeout;
+  extern unsigned long backlightTimeout;
+  extern bool isNightMode();
+  extern bool isWithinSchedule();
+
+  // Проверяем рабочее расписание
+  bool withinSchedule = !flags.scheduleEnabled || isWithinSchedule();
+  
+  // Проверяем ночной режим (применяется ТОЛЬКО вне рабочего расписания или если расписание выключено)
+  // Это предотвращает конфликт: ночной режим НЕ блокирует работу, если мы в рабочем расписании
+  bool isNight = false;
+  if (flags.nightModeEnabled && isNightMode()) {
+    // Ночной режим применяется только если:
+    // 1. Расписание выключено, ИЛИ
+    // 2. Мы вне рабочего расписания
+    isNight = !flags.scheduleEnabled || !withinSchedule;
+  }
+  
+  // Пауза активна, если: вне рабочего расписания ИЛИ (ночь И расписание не активно)
+  bool shouldPause = !withinSchedule || isNight;
+  
+  // Логируем изменение состояния паузы
+  static bool lastPauseState = false;
+  static bool lastNightState = false;
+  
+  if (shouldPause != lastPauseState || isNight != lastNightState) {
+    if (shouldPause) {
+      if (!withinSchedule) {
+        Serial.println("[РАСПИСАНИЕ] Вне рабочего времени — пауза");
+      } else if (isNight) {
+        Serial.println("[РАСПИСАНИЕ] Пауза ночного режима активирована");
+      }
+    } else {
+      Serial.println("[РАСПИСАНИЕ] Рабочее время возобновлено");
+    }
+    lastPauseState = shouldPause;
+    lastNightState = isNight;
+  }
+  
+  nightPauseActive = shouldPause;
+  
+  // Управление таймаутом подсветки в ночном режиме
+  // Применяем уменьшенный таймаут если ночь И (расписание выключено ИЛИ вне расписания)
+  if (flags.nightModeEnabled && isNightMode() && (!flags.scheduleEnabled || !withinSchedule)) {
+    if (!timeoutWasSaved) {
+      savedBacklightTimeout = backlightTimeout;
+      backlightTimeout = 30 * 1000UL; // 30 секунд в ночном режиме
+      timeoutWasSaved = true;
+    }
+  } else {
+    if (timeoutWasSaved) {
+      backlightTimeout = savedBacklightTimeout;
+      timeoutWasSaved = false;
+    }
+  }
+}

@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    restart: unless-stopped
+    ports:
+       - '1884:1883'
+       - '9001:9001'
+    volumes:
+      - ./mosquitto/config:/mosquitto/config:rw
+      - ./mosquitto/data:/mosquitto/data:rw
+      - ./mosquitto/log:/mosquitto/log:rw
+
+  postgres:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: watersys
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  backend:
+    build: ./backend
+    restart: on-failure
+    depends_on:
+      - mosquitto
+      - postgres
+    environment:
+      PORT: 3000
+      MQTT_BROKER: mqtt://mosquitto:1883
+      PGHOST: postgres
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: watersys
+      PGPORT: 5432
+    ports:
+      - '3000:3000'
+
+volumes:
+  pgdata:
