@@ -508,6 +508,11 @@
       display: inline-flex;
       align-items: center;
       gap: 6px;
+      outline: none;
+      user-select: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
     }
 
     button:hover {
@@ -516,6 +521,10 @@
 
     button:active {
       opacity: 0.7;
+    }
+
+    button:focus {
+      outline: none;
     }
 
     .section-footer-note {
