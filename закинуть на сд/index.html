@@ -163,6 +163,18 @@
       }
     }
 
+    .layout-grid-pair {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 14px;
+    }
+
+    @media (max-width: 900px) {
+      .layout-grid-pair {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
     .stack {
       display: flex;
       flex-direction: column;
@@ -765,143 +777,145 @@
       </section>
     </div>
 
-    <!-- Смена мастер токена -->
-    <section class="card">
-      <div class="card-inner">
-        <div class="card-header">
-          <div class="card-title-block">
-            <div class="card-title"><span class="dot"></span> Смена мастер токена</div>
-            <div class="card-subtitle">Изменение администраторского токена</div>
+    <!-- Смена мастер токена и Wi-Fi на одной строке -->
+    <div class="layout-grid-pair">
+      <section class="card">
+        <div class="card-inner">
+          <div class="card-header">
+            <div class="card-title-block">
+              <div class="card-title"><span class="dot"></span> Смена мастер токена</div>
+              <div class="card-subtitle">Изменение администраторского токена</div>
+            </div>
+            <div class="card-badge">Security</div>
           </div>
-          <div class="card-badge">Security</div>
+          <div class="card-body">
+            <div class="field-grid">
+              <div class="field-label">Current</div>
+              <div><input id="admin_current" type="password" placeholder="текущий токен"></div>
+
+              <div class="field-label">New (≤20)</div>
+              <div><input id="admin_new" type="text" placeholder="новый токен"></div>
+            </div>
+            <div class="btn-row">
+              <button class="btn-soft btn-sm" onclick="saveAdminToken()">Set admin token</button>
+            </div>
+            <div class="hint-text">Только латинские буквы и цифры, длина 1–20 символов.</div>
+          </div>
         </div>
-        <div class="card-body">
-          <div class="field-grid">
-            <div class="field-label">Current</div>
-            <div><input id="admin_current" type="password" placeholder="текущий токен"></div>
+      </section>
 
-            <div class="field-label">New (≤20)</div>
-            <div><input id="admin_new" type="text" placeholder="новый токен"></div>
+      <section class="card">
+        <div class="card-inner">
+          <div class="card-header">
+            <div class="card-title-block">
+              <div class="card-title"><span class="dot"></span> Wi‑Fi</div>
+              <div class="card-subtitle">Подключение устройства и токены</div>
+            </div>
+            <div class="card-badge">Network</div>
           </div>
-          <div class="btn-row">
-            <button class="btn-soft btn-sm" onclick="saveAdminToken()">Set admin token</button>
+          <div class="card-body">
+            <div class="field-grid">
+              <div class="field-label"><strong>SSID</strong></div>
+              <div><input id="ssid" type="text" placeholder="Wi‑Fi network name"></div>
+
+              <div class="field-label"><strong>Password</strong></div>
+              <div><input id="pass" type="password" placeholder="password"></div>
+
+              <div class="field-label"><strong>Device token</strong></div>
+              <div><input id="token" type="text" placeholder="access token"></div>
+
+              <div class="field-label"><strong>English output</strong></div>
+              <div><input id="lang_en" type="checkbox"></div>
+            </div>
+
+            <div class="btn-row">
+              <button class="btn-primary" onclick="saveWifi()">Save Wi‑Fi</button>
+            </div>
+
+            <div class="section-footer-note">После изменения настроек устройство может перезапустить соединение.</div>
           </div>
-          <div class="hint-text">Только латинские буквы и цифры, длина 1–20 символов.</div>
         </div>
-      </div>
-    </section>
+      </section>
+    </div>
 
-    <!-- Логи и SD -->
-    <section class="card">
-      <div class="card-inner">
-        <div class="card-header">
-          <div class="card-title-block">
-            <div class="card-title"><span class="dot"></span> Логи / SD</div>
-            <div class="card-subtitle">Работа с логами и картой памяти</div>
+    <!-- MQTT и Логи/SD на одной строке -->
+    <div class="layout-grid-pair">
+      <section class="card">
+        <div class="card-inner">
+          <div class="card-header">
+            <div class="card-title-block">
+              <div class="card-title"><span class="dot"></span> MQTT</div>
+              <div class="card-subtitle">Отправка телеметрии в брокер</div>
+            </div>
+            <div class="card-badge">Messaging</div>
           </div>
-          <div class="card-badge">Diagnostics</div>
+          <div class="card-body">
+            <div class="field-grid">
+              <div class="field-label"><strong>Status</strong></div>
+              <div><span id="mqtt_status" class="status-pill"><span class="status-dot sd-unknown"></span>unknown</span></div>
+
+              <div class="field-label"><strong>Broker</strong></div>
+              <div><input id="mqtt_broker" type="text" placeholder="broker.local"></div>
+
+              <div class="field-label"><strong>Port</strong></div>
+              <div><input id="mqtt_port" type="number" style="max-width: 120px" placeholder="1883"></div>
+
+              <div class="field-label"><strong>User</strong></div>
+              <div><input id="mqtt_user" type="text" placeholder="username"></div>
+
+              <div class="field-label"><strong>Password</strong></div>
+              <div><input id="mqtt_pass" type="password" placeholder="password"></div>
+
+              <div class="field-label"><strong>Client ID</strong></div>
+              <div><input id="mqtt_client_id" type="text" placeholder="auto-generated"></div>
+
+              <div class="field-label"><strong>Topic base</strong></div>
+              <div><input id="mqtt_topic_base" type="text" placeholder="watersystem"></div>
+
+              <div class="field-label"><strong>Interval (s)</strong></div>
+              <div><input id="mqtt_interval" type="number" style="max-width: 120px" placeholder="10"></div>
+
+              <div class="field-label"><strong>Will message</strong></div>
+              <div><input id="mqtt_will" type="checkbox"></div>
+
+              <div class="field-label"><strong>Enabled</strong></div>
+              <div><input id="mqtt_enabled" type="checkbox"></div>
+            </div>
+
+            <div class="btn-row">
+              <button class="btn-primary" onclick="saveMqtt()">Save MQTT</button>
+              <span id="mqttMsg"></span>
+            </div>
+
+            <div class="section-footer-note">После сохранения устройство может переподключиться к брокеру.</div>
+          </div>
         </div>
-        <div class="card-body">
-          <div class="btn-row-wrap">
-            <button class="btn-outline btn-sm" onclick="downloadLogs()">Download logs</button>
-            <button class="btn-warning btn-sm" onclick="viewLogs()">View logs</button>
-            <button class="btn-soft btn-sm" onclick="exportLogs()">Export to SD</button>
-            <button class="btn-soft btn-sm" onclick="listSdFiles()">List SD files</button>
-            <button class="btn-danger btn-sm" onclick="clearLogs()">Clear logs</button>
+      </section>
+
+      <section class="card">
+        <div class="card-inner">
+          <div class="card-header">
+            <div class="card-title-block">
+              <div class="card-title"><span class="dot"></span> Логи / SD</div>
+              <div class="card-subtitle">Работа с логами и картой памяти</div>
+            </div>
+            <div class="card-badge">Diagnostics</div>
           </div>
-          <pre id="logMsg"></pre>
-          <pre id="logView" style="display:none;"></pre>
-          <pre id="sdList" style="display:none;"></pre>
+          <div class="card-body">
+            <div class="btn-row-wrap">
+              <button class="btn-outline btn-sm" onclick="downloadLogs()">Download logs</button>
+              <button class="btn-warning btn-sm" onclick="viewLogs()">View logs</button>
+              <button class="btn-soft btn-sm" onclick="exportLogs()">Export to SD</button>
+              <button class="btn-soft btn-sm" onclick="listSdFiles()">List SD files</button>
+              <button class="btn-danger btn-sm" onclick="clearLogs()">Clear logs</button>
+            </div>
+            <pre id="logMsg"></pre>
+            <pre id="logView" style="display:none;"></pre>
+            <pre id="sdList" style="display:none;"></pre>
+          </div>
         </div>
-      </div>
-    </section>
-
-    <!-- Wi-Fi -->
-    <section class="card">
-      <div class="card-inner">
-        <div class="card-header">
-          <div class="card-title-block">
-            <div class="card-title"><span class="dot"></span> Wi‑Fi</div>
-            <div class="card-subtitle">Подключение устройства и токены</div>
-          </div>
-          <div class="card-badge">Network</div>
-        </div>
-        <div class="card-body">
-          <div class="field-grid">
-            <div class="field-label"><strong>SSID</strong></div>
-            <div><input id="ssid" type="text" placeholder="Wi‑Fi network name"></div>
-
-            <div class="field-label"><strong>Password</strong></div>
-            <div><input id="pass" type="password" placeholder="password"></div>
-
-            <div class="field-label"><strong>Device token</strong></div>
-            <div><input id="token" type="text" placeholder="access token"></div>
-
-            <div class="field-label"><strong>English output</strong></div>
-            <div><input id="lang_en" type="checkbox"></div>
-          </div>
-
-          <div class="btn-row">
-            <button class="btn-primary" onclick="saveWifi()">Save Wi‑Fi</button>
-          </div>
-
-          <div class="section-footer-note">После изменения настроек устройство может перезапустить соединение.</div>
-        </div>
-      </div>
-    </section>
-
-    <!-- MQTT в самый низ -->
-    <section class="card">
-      <div class="card-inner">
-        <div class="card-header">
-          <div class="card-title-block">
-            <div class="card-title"><span class="dot"></span> MQTT</div>
-            <div class="card-subtitle">Отправка телеметрии в брокер</div>
-          </div>
-          <div class="card-badge">Messaging</div>
-        </div>
-        <div class="card-body">
-          <div class="field-grid">
-            <div class="field-label"><strong>Status</strong></div>
-            <div><span id="mqtt_status" class="status-pill"><span class="status-dot sd-unknown"></span>unknown</span></div>
-
-            <div class="field-label"><strong>Broker</strong></div>
-            <div><input id="mqtt_broker" type="text" placeholder="broker.local"></div>
-
-            <div class="field-label"><strong>Port</strong></div>
-            <div><input id="mqtt_port" type="number" style="max-width: 120px" placeholder="1883"></div>
-
-            <div class="field-label"><strong>User</strong></div>
-            <div><input id="mqtt_user" type="text" placeholder="username"></div>
-
-            <div class="field-label"><strong>Password</strong></div>
-            <div><input id="mqtt_pass" type="password" placeholder="password"></div>
-
-            <div class="field-label"><strong>Client ID</strong></div>
-            <div><input id="mqtt_client_id" type="text" placeholder="auto-generated"></div>
-
-            <div class="field-label"><strong>Topic base</strong></div>
-            <div><input id="mqtt_topic_base" type="text" placeholder="watersystem"></div>
-
-            <div class="field-label"><strong>Interval (s)</strong></div>
-            <div><input id="mqtt_interval" type="number" style="max-width: 120px" placeholder="10"></div>
-
-            <div class="field-label"><strong>Will message</strong></div>
-            <div><input id="mqtt_will" type="checkbox"></div>
-
-            <div class="field-label"><strong>Enabled</strong></div>
-            <div><input id="mqtt_enabled" type="checkbox"></div>
-          </div>
-
-          <div class="btn-row">
-            <button class="btn-primary" onclick="saveMqtt()">Save MQTT</button>
-            <span id="mqttMsg"></span>
-          </div>
-
-          <div class="section-footer-note">После сохранения устройство может переподключиться к брокеру.</div>
-        </div>
-      </div>
-    </section>
+      </section>
+    </div>
 
     <div id="msg"></div>
 
