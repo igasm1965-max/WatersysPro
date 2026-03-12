@@ -1,0 +1,283 @@
+/**
+ * @file config.h
+ * @brief Конфигурация системы: пины, константы, макросы для ESP32
+ * @details Содержит определения пинов, таймаутов, кодов событий и настроек
+ */
+
+#ifndef CONFIG_H
+#define CONFIG_H
+
+// ============ ВКЛЮЧЕНИЯ БИБЛИОТЕК ============
+#include <Wire.h>
+#include <Preferences.h>
+#include <LiquidCrystal_I2C.h>
+using SafeLCD = LiquidCrystal_I2C;
+#include "RTClib.h"
+#include <string.h>
+#include "esp_task_wdt.h"
+#include "rom/rtc.h"
+#include <esp32-hal-timer.h>
+// removed SPIFFS-specific code
+
+// removed SPIFFS-specific code
+
+// ============ РЕЖИМ РАЗРАБОТКИ ============
+#define BARE_BOARD_MODE false  ///< true = голая плата (без модулей), false = с модулями
+
+// ============ WIFI ОПЦИЯ ============
+#define ENABLE_WIFI true
+#ifdef ENABLE_WIFI
+  #include <WiFi.h>
+  // Leave SSID/PASS empty by default for final builds; use /api/wifi or engineer menu to set credentials
+  static const char* WIFI_SSID = "";
+  static const char* WIFI_PASSWORD = "";
+
+  // WSS support: set to true to enable building with TLS (requires additional libraries/config)
+  // WARNING: enabling requires mbedTLS/AsyncWebServerSecure and thorough testing
+  #define ENABLE_WSS false
+#endif
+
+// ============ MONITORING DEFAULTS ============
+#define DEFAULT_PUMP_DRY_TIMEOUT_SECONDS 30   ///< Seconds to wait before declaring potential dry run
+#define DEFAULT_PUMP_MIN_LEVEL_DELTA_CM 2     ///< Minimum level change (cm) expected when pump runs
+#define DEFAULT_PUMP_DRY_CONSECUTIVE_CHECKS 3 ///< Number of consecutive failing checks before triggering dry-run
+
+// Default sensor polling (filtering removed — kept for compatibility)
+#define DEFAULT_SENSOR_POLL_PERIOD 2           ///< Default sensor poll period (seconds)
+// ============ КОДЫ СОБЫТИЙ ============
+/// Событие: начало промывки фильтра
+#define EVENT_FILTER_WASH_START 1
+/// Событие: аварийное состояние
+#define EVENT_EMERGENCY 2
+/// Событие: старт системы
+#define EVENT_SYSTEM_START 3
+/// Событие: остановка системы
+#define EVENT_SYSTEM_STOP 4
+/// Событие: очистка статистики
+#define EVENT_STATS_CLEAR 5
+/// Событие: изменение настроек
+#define EVENT_SETTINGS_CHANGE 6
+/// Событие: смена состояния системы
+#define EVENT_SYSTEM_STATE_CHANGE 7
+/// Событие: ручное управление
+#define EVENT_MANUAL_OPERATION 8
+/// Событие: действие в меню
+#define EVENT_MENU_ACTION 9
+/// Событие: сброс watchdog
+#define EVENT_WATCHDOG_RESET 10
+/// Событие: потеря питания RTC
+#define EVENT_RTC_LOST_POWER 11
+/// Событие: ошибка датчика
+#define EVENT_SENSOR_ERROR 12
+/// Событие: неожиданный переход состояния
+#define EVENT_UNEXPECTED_STATE_CHANGE 13
+/// Событие: восстановление состояния после перезагрузки
+#define EVENT_RUNTIME_STATE_RESTORED 14
+#define EVENT_PUMP1_DRYRUN 15  ///< Событие: сухой ход насоса 1
+#define EVENT_PUMP2_DRYRUN 16  ///< Событие: сухой ход насоса 2
+#define EVENT_WIFI_CONNECTED 17 ///< Событие: Wi-Fi подключено (STA)
+#define EVENT_WIFI_AP_STARTED 18 ///< Событие: Wi-Fi AP (fallback) запущена
+
+// ============ PREFERENCES KEYS ============
+#define PREF_KEY_LANG_EN "lang_en"  ///< bool: true=English output, false=Русский
+
+// ============ КОДЫ НАСТРОЕК ============
+#define SETTING_TIMER_SETLING 0
+#define SETTING_TIMER_AERATION 1
+#define SETTING_TIMER_OZONATION 2
+#define SETTING_TIMER_FILTER_WASH 3
+#define SETTING_TIMER_BACKLIGHT 4
+#define SETTING_FILTER_PERIOD 5
+#define SETTING_TANK1_MIN 6
+#define SETTING_TANK1_MAX 7
+#define SETTING_TANK2_MIN 8
+#define SETTING_TANK2_MAX 9
+#define SETTING_SCHEDULE_START 10
+#define SETTING_SCHEDULE_END 11
+#define SETTING_SCHEDULE_TOGGLE 12
+#define SETTING_NIGHT_START 13
+#define SETTING_NIGHT_END 14
+#define SETTING_NIGHT_TOGGLE 15
+#define SETTING_RTC_DATE 16
+#define SETTING_RTC_TIME 17
+#define SETTING_TIMER_FILLING 18
+#define SETTING_TIMER_FILTRATION 19
+#define SETTING_PUMP_DRY_TIMEOUT 20
+#define SETTING_PUMP_MIN_DELTA 21
+#define SETTING_PUMP_DRY_CONSEC 22
+#define SETTING_WATCHDOG_TOGGLE 24
+#define SETTING_TIMER_BACKWASH 25
+
+// ============ КОДЫ РУЧНЫХ ОПЕРАЦИЙ ============
+#define MANUAL_PUMP1_ON 1
+#define MANUAL_PUMP1_OFF 2
+#define MANUAL_PUMP2_ON 3
+#define MANUAL_PUMP2_OFF 4
+#define MANUAL_AERATION_ON 5
+#define MANUAL_AERATION_OFF 6
+#define MANUAL_OZONE_ON 7
+#define MANUAL_OZONE_OFF 8
+#define MANUAL_FILTER_ON 9
+#define MANUAL_FILTER_OFF 10
+#define MANUAL_BACKWASH_ON 11
+#define MANUAL_BACKWASH_OFF 12
+
+// ============ КОДЫ ДЕЙСТВИЙ МЕНЮ ============
+#define MENU_ENTER 1
+#define MENU_EXIT 2
+#define MENU_ITEM_SELECT 3
+
+// ============ СОСТОЯНИЯ ЭНКОДЕРА ============
+enum eEncoderState {
+  eNone,    ///< Нет действие
+  eLeft,    ///< Вращение влево
+  eRight,   ///< Вращение вправо
+  eButton   ///< Нажата кнопка
+};
+
+// ============ КОНСТАНТЫ ДИСПЛЕЯ И УПРАВЛЕНИЯ ============
+#define CONFIRM_SCREEN_DELAY 3000        ///< Задержка подтверждения на экране (мс)
+#define MAX_MENU_TIME 30000              ///< Максимальное время в меню без действий (мс)
+#define ENCODER_DEBOUNCE 100             ///< Антидребезг энкодера (мс)
+#define ENCODER_POLL_MS 15                ///< Период опроса энкодера в loop (мс) — уменьшён с 30ms до 10-20ms
+#define EEPROM_WRITE_MIN_INTERVAL 2000   ///< Минимальный интервал записи (мс)
+#define TANK_HYSTERESIS 5                ///< Гистерезис для определения пустоты бака (см)
+#define TANK_MAX_SENSOR_DISTANCE 400     ///< Максимальное расстояние датчика (см) - для инверсии
+#define MAX_LOOP_TIME 2000               ///< Максимальное время выполнения loop (мс)
+#define EMERGENCY_CHECK_INTERVAL 5000    ///< Интервал проверки аварий (мс)
+#define EMERGENCY_PUMP_TIMEOUT 120000    ///< Таймаут насоса 1 (мс)
+#define EMERGENCY_PUMP2_TIMEOUT 120000   ///< Таймаут насоса 2 (мс)
+#define EMERGENCY_LEVEL_CHANGE_THRESHOLD 5 ///< Минимальное изменение уровня (см)
+
+// ============ ИНЖЕНЕРНОЕ МЕНЮ ============
+#define ENGINEER_PASSWORD 123456         ///< Пароль для инженерного меню (по умолчанию 6 цифр)
+#define PASSWORD_DIGITS 6                ///< Количество цифр в пароле (поддержка 6-значного пароля)
+#define PASSWORD_TIMEOUT 60000           ///< Таймаут ввода пароля (мс)
+
+// ============ ТАЙМАУТЫ БЕЗОПАСНОСТИ ПО УМОЛЧАНИЮ (минуты) ============
+#define DEFAULT_TIMEOUT_FILLING 30       ///< Таймаут заполнения (мин)
+#define DEFAULT_TIMEOUT_OZONATION 120    ///< Таймаут озонации (мин)
+#define DEFAULT_TIMEOUT_AERATION 120     ///< Таймаут аэрации (мин)
+#define DEFAULT_TIMEOUT_SETTLING 1440    ///< Таймаут отстаивания (мин) = 24ч
+#define DEFAULT_TIMEOUT_FILTRATION 120   ///< Таймаут фильтрации (мин)
+#define DEFAULT_TIMEOUT_BACKWASH 30      ///< Таймаут промывки (мин)
+
+// ============ КОНСТАНТЫ WATCHDOG ДЛЯ ESP32 ============
+#define WDT_TIMEOUT_SECONDS 4
+#define WATCHDOG_ENABLED false  ///< ОТКЛЮЧЕНО ДЛЯ ОТЛАДКИ
+/// Сброс watchdog таймера
+#define WDT_RESET() { if (WATCHDOG_ENABLED) esp_task_wdt_reset(); }
+/// Включение watchdog
+#define WDT_ENABLE() { \
+  if (WATCHDOG_ENABLED) { \
+    esp_task_wdt_config_t _wdt_cfg = { .timeout_ms = (WDT_TIMEOUT_SECONDS * 1000), .idle_core_mask = 0, .trigger_panic = true }; \
+    esp_task_wdt_init(&_wdt_cfg); \
+    esp_task_wdt_add(NULL); \
+  } \
+}
+/// Отключение watchdog
+#define WDT_DISABLE() { if (WATCHDOG_ENABLED) esp_task_wdt_deinit(); }
+
+// ============ ПИНЫ ESP32 ============
+// Энкодер (S1=CLK, S2=DT, KEY=SW) - CLK и DT поменяны для инверсии направления
+#define pinCLK 35    ///< GPIO35 - S2 (DT) энкодера - инвертировано
+#define pinDT 34     ///< GPIO34 - S1 (CLK) энкодера - инвертировано
+#define pinSW 32     ///< GPIO32 - KEY (кнопка) энкодера
+
+// Реле управления
+#define PUMP_PIN 13      ///< GPIO13 - насос 1 (наполнение)
+#define PUMP2_PIN 12     ///< GPIO12 - насос 2 (фильтрация)
+#define AERATION_PIN 14  ///< GPIO14 - аэрация
+#define OZONE_PIN 27     ///< GPIO27 - озонатор
+#define FILTER_PIN 26    ///< GPIO26 - фильтр
+#define BACKWASH_PIN 25  ///< GPIO25 - обратная промывка
+
+// Ультразвуковые датчики
+#define HC_TRIG1 16  ///< GPIO16 - триггер датчика 1 (бак 1)
+#define HC_ECHO1 17  ///< GPIO17 - эхо датчика 1 (бак 1)
+#define HC_TRIG2 5   ///< GPIO5 - триггер датчика 2 (бак 2)
+#define HC_ECHO2 18  ///< GPIO18 - эхо датчика 2 (бак 2)
+
+// I2C шина
+#define I2C_SDA 21  ///< GPIO21 - SDA для LCD и RTC
+#define I2C_SCL 22  ///< GPIO22 - SCL для LCD и RTC
+
+// SD (SPI mode) - recommended pins (change if your board conflicts)
+#define SD_SCK_PIN  4   ///< GPIO4  - SD SCK
+#define SD_MISO_PIN 19  ///< GPIO19 - SD MISO
+#define SD_MOSI_PIN 23  ///< GPIO23 - SD MOSI
+#define SD_CS_PIN   33  ///< GPIO33 - SD CS (chip select)
+#define SD_CD_PIN   39  ///< GPIO39 - SD card detect (optional, input-only)
+
+// Встроенный LED
+#define LED_BUILTIN 2  ///< Встроенный светодиод ESP32
+
+// ============ ПАРАМЕТРЫ ДИСПЛЕЯ ============
+#define LCD_COLS 20  ///< Количество колонок дисплея
+#define LCD_ROWS 4   ///< Количество строк дисплея
+#define LCD_ADDR 0x27 ///< I2C адрес LCD дисплея
+
+// Screen/page constants
+#define SCREEN_WIDTH LCD_COLS   ///< Ширина экрана (символов)
+#define INFO_SCREEN_PAGES 3     ///< Количество информационных страниц (Info screens)
+
+// ============ КЛЮЧИ PREFERENCES ============
+#define PREF_NAMESPACE "water_sys"
+#define PREF_KEY_SETLING "setling"
+#define PREF_KEY_AERATION "aeration"
+#define PREF_KEY_OZONATION "ozonation"
+#define PREF_KEY_FILTER "filter"
+#define PREF_KEY_BACKLIGHT "backlight"
+#define PREF_KEY_FILTER_PERIOD "filter_per"
+#define PREF_KEY_ADMIN_TOKEN "admin_tok"
+#define DEFAULT_ADMIN_TOKEN "A7b9K3mN4pQrT6vX2zY8"
+#define ADMIN_TOKEN_MAX_LEN 20  ///< Максимальная длина admin token (используется по всему коду)
+#define PREF_KEY_WIFI_SSID "wifi_ssid"
+#define PREF_KEY_WIFI_PASS "wifi_pass"
+
+// ============ MQTT PREFERENCES ============
+#define PREF_KEY_MQTT_ENABLED "mqtt_en"
+#define PREF_KEY_MQTT_BROKER "mqtt_broker"
+#define PREF_KEY_MQTT_PORT "mqtt_port"
+#define PREF_KEY_MQTT_USER "mqtt_user"
+#define PREF_KEY_MQTT_PASS "mqtt_pass"
+#define PREF_KEY_MQTT_CLIENT_ID "mqtt_cid"
+#define PREF_KEY_MQTT_TOPIC_BASE "mqtt_base"
+#define PREF_KEY_MQTT_PUB_INTERVAL "mqtt_int"
+#define DEFAULT_MQTT_PORT 1883
+#define DEFAULT_MQTT_ENABLED 0
+#define DEFAULT_MQTT_TOPIC_BASE "watersystem"
+
+#define PREF_KEY_TANK1_MIN "t1min"
+#define PREF_KEY_TANK1_MAX "t1max"
+#define PREF_KEY_TANK2_MIN "t2min"
+#define PREF_KEY_TANK2_MAX "t2max"
+
+// WQTT (dash.wqtt.ru) integration (optional)
+#define PREF_KEY_WQTT_TOKEN "wqtt_tok"
+#define PREF_KEY_WQTT_AUTO "wqtt_auto"
+#define DEFAULT_WQTT_AUTO 0
+
+// ============ LOGGING FILTERS FOR SPIFFS ============
+#define LOG_FILTER_WIFI           (1UL << 0)  ///< Wi-Fi/connect events
+#define LOG_FILTER_MANUAL         (1UL << 1)  ///< Manual operations
+#define LOG_FILTER_EMERGENCY      (1UL << 2)  ///< Emergency events
+#define LOG_FILTER_WATCHDOG       (1UL << 3)  ///< Watchdog resets
+#define LOG_FILTER_SENSOR         (1UL << 4)  ///< Sensor errors
+#define LOG_FILTER_SETTINGS       (1UL << 5)  ///< Settings changes
+#define LOG_FILTER_WEB            (1UL << 6)  ///< Web/API errors and actions
+#define LOG_FILTER_STATECHANGE    (1UL << 7)  ///< State transitions
+#define LOG_FILTER_ERRORS         (1UL << 8)  ///< Any LOG_ERROR-level events
+
+#define PREF_KEY_LOG_FILTER "log_filter"
+#define PREF_KEY_LOG_FILTER_DEFAULT (LOG_FILTER_EMERGENCY | LOG_FILTER_WATCHDOG | LOG_FILTER_SENSOR | LOG_FILTER_ERRORS)
+
+// ============ КОНСТАНТЫ РЕЛЕ ============
+#define RELAY_PUMP1 0       ///< Реле насоса 1
+#define RELAY_PUMP2 1       ///< Реле насоса 2
+#define RELAY_AERATION 2    ///< Реле аэрации
+#define RELAY_OZONE 3       ///< Реле озонатора
+#define RELAY_FILTER 4      ///< Реле фильтра
+#define RELAY_BACKWASH 5    ///< Реле обратной промывки
+
+#endif // CONFIG_H

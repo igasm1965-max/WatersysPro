@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "WaterControlApp",
+    "slug": "watersys-mobile",
+    "version": "1.0.0",
+    "sdkVersion": "48.0.0",
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "816cc62e-feb1-40a0-b830-acef64ff4bae"
+      }
+    },
+    "android": {
+      "package": "com.igas65.watersysmobile"
+    }
+  }
+}

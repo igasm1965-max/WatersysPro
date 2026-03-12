@@ -1,0 +1,301 @@
+<!doctype html><html><head><meta name=viewport content='width=device-width, initial-scale=1'>
+<title>WSystem</title><style>button{padding:10px;margin:5px} .section{margin-top:12px;padding:8px;border:1px solid #ccc;border-radius:4px}</style></head><body>
+<h3>ESP32 Water System</h3>
+<div id=info>Loading...</div>
+<div id=controls></div>
+<div id=msg style="margin-top:8px;color:green"></div>
+<div style="margin-top:8px"><a href="/legacy">Legacy UI (no JavaScript)</a></div>
+<noscript>
+  <div style="margin-top:8px;color:orange">JavaScript is disabled or not supported by your browser. Use the <a href="/legacy">Legacy UI</a>.</div>
+</noscript>
+
+<div class="section">
+<strong>Admin Token</strong> (используется для всех настроек)<br>
+<input id=token placeholder="default: A7b9K3mN4pQrT6vX2zY8" style="width:250px">
+<span id="tokenHint" style="font-size:smaller;color:gray"></span>
+  <div style="margin-top:4px"><strong>Change token:</strong>
+    Current: <input id="admin_current" type=password placeholder="current" style="width:120px"> 
+    New: <input id="admin_new" placeholder="new (≤20)" style="width:120px"> 
+    <button onclick="saveAdminToken()">Set</button>
+  </div>
+</div>
+
+<div class="section"><strong>Wi-Fi</strong><br>
+SSID: <input id=ssid><br>
+Pass: <input id=pass type=password><br>
+<button onclick="saveWifi()">Save Wi-Fi</button>
+</div>
+
+<div class="section"><strong>MQTT</strong><br>
+Status: <span id="mqtt_status">unknown</span><br>
+Broker: <input id=mqtt_broker placeholder="broker.local"><br>
+Port: <input id=mqtt_port style="width:80px" placeholder="1883"><br>
+User: <input id=mqtt_user><br>
+Pass: <input id=mqtt_pass type=password><br>
+Client ID: <input id=mqtt_client_id placeholder="auto-generated"><br>
+Topic base: <input id=mqtt_topic_base placeholder="watersystem"><br>
+Interval (s): <input id=mqtt_interval style="width:80px" placeholder="10"><br>
+Enabled: <input id=mqtt_enabled type=checkbox><br>
+<button onclick="saveMqtt()">Save MQTT</button>
+<span id="mqttMsg" style="margin-left:8px;color:green"></span>
+</div>
+
+<div style="margin-top:12px">
+  <strong>Logs</strong><br>
+  <button onclick="downloadLogs()">Download Logs</button>
+  <button onclick="rotateLogs()">Rotate Logs</button>
+  <button onclick="exportLogs()">Export to SD</button>
+  <button onclick="listSdFiles()">List SD files</button>
+  <button onclick="clearLogs()">Clear Logs</button>
+  <button onclick="pruneLogs()">Prune Old Logs</button>
+  <button onclick="formatSd()">Format SD</button>
+  <pre id="logMsg" style="margin-left:8px;color:green;white-space:pre-wrap"></pre>
+</div>
+
+<script>
+// Admin token: stored in localStorage for convenience
+function getToken() {
+  let t = document.getElementById('token').value.trim();
+  if (t) { localStorage.setItem('admin_token', t); return t; }
+  t = localStorage.getItem('admin_token') || '';
+  if (t) document.getElementById('token').value = t;
+  return t;
+}
+// Restore token on page load
+(function(){ let t = localStorage.getItem('admin_token'); if(t) document.getElementById('token').value = t; })();
+// Save token to localStorage on input
+document.getElementById('token').addEventListener('input', function(){ if(this.value.trim()) localStorage.setItem('admin_token', this.value.trim()); });
+
+var pollingEnabled = true;
+function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function renderStatus(j) {
+  try {
+    let s = 'IP:' + escapeHtml(j.ip || '') + '<br>MAC:' + escapeHtml(j.mac || '') + '<br>Uptime:' + (j.uptime || 0) + 's';
+    // MQTT status
+    if (j.mqtt) {
+      let ms = 'MQTT: ' + (j.mqtt.enabled ? 'enabled' : 'disabled') + ' - ' + (j.mqtt.connected ? 'connected' : 'offline');
+      if (j.mqtt.broker) ms += ' @ ' + escapeHtml(j.mqtt.broker);
+      s += '<br><b>' + ms + '</b>';
+      document.getElementById('mqtt_status').innerText = (j.mqtt.connected ? 'connected' : (j.mqtt.enabled ? 'offline' : 'disabled'));
+    }
+    s += '<br><b>Relays:</b><br>';
+    for (let i in j.relays) { s += escapeHtml(i) + ': ' + (j.relays[i] ? 'ON' : 'OFF') + '<br>'; }
+    document.getElementById('info').innerHTML = s;
+    let controls = '';
+    for (let k in j.relays) { controls += '<button onclick="control(\'' + k + '\',\'toggle\')">' + escapeHtml(k) + '</button>'; }
+    document.getElementById('controls').innerHTML = controls;
+  } catch (e) {
+    console.warn('renderStatus error', e);
+  }
+}
+
+// WebSocket receiver (preferred, more efficient than polling)
+var wsClient = null;
+if ('WebSocket' in window) {
+  try {
+    wsClient = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
+    wsClient.onmessage = function(evt) {
+      try { var j = JSON.parse(evt.data);
+        if (j.meta) {
+          const msg = document.getElementById('msg');
+          msg.innerText = 'Clients:' + j.wsClients + ' Heap:' + j.freeHeap;
+          setTimeout(()=>{ msg.innerText = ''; }, 3000);
+        } else if (j.responseTo) {
+          const msg = document.getElementById('msg');
+          msg.innerText = (j.message ? j.message : JSON.stringify(j));
+          setTimeout(()=>{ msg.innerText = ''; }, 3000);
+        } else {
+          renderStatus(j);
+        }
+      } catch(e) { console.warn('ws parse', e); }
+    };
+    // When WS opens — sync UI. When it closes/errors — fall back to polling and clear wsClient.
+    wsClient.onopen = function(){ console.log('WS connected'); fetchStatus(); };
+    wsClient.onclose = function(){ console.log('WS disconnected'); wsClient = null; fetchStatus(); };
+    wsClient.onerror = function(err){ console.warn('WS error', err); wsClient = null; fetchStatus(); };
+  } catch(e) {
+    wsClient = null;
+  }
+}
+
+// Polling fallback (chained, single outstanding request only)
+async function fetchStatus(){
+  if (!pollingEnabled) { setTimeout(fetchStatus, 2000); return; }
+  try {
+    const r = await fetch('/status');
+    const j = await r.json();
+    renderStatus(j);
+  } catch (e) {
+    console.warn('fetchStatus error', e);
+  }
+  setTimeout(fetchStatus, 2000);
+}
+
+// Prefer WebSocket for controls when available
+// control() implemented later in the script to avoid duplicate definitions.
+
+// Pause polling when tab not visible (saves CPU and network)
+document.addEventListener('visibilitychange', function() {
+  pollingEnabled = !document.hidden;
+  if (pollingEnabled) fetchStatus();
+});
+
+function control(name,op){
+  // If WebSocket is available, send via WS (optimistic update will be handled on WS message). Otherwise use HTTP and fetch status quickly.
+  if (wsClient && wsClient.readyState === WebSocket.OPEN) {
+    wsClient.send(JSON.stringify({type:'control', name:name, op:op}));
+  } else {
+    fetch('/control?name='+name+'&op='+op).then(()=>{ if (pollingEnabled) setTimeout(fetchStatus,50); }).catch(e=>console.warn(e));
+  }
+}
+
+function saveWifi(){
+  const tok = getToken();
+  if (!tok) { document.getElementById('msg').innerText = 'Enter admin token above'; setTimeout(()=>{ document.getElementById('msg').innerText=''; }, 3000); return; }
+  const payload = { ssid: document.getElementById('ssid').value, pass: document.getElementById('pass').value, token: tok };
+  fetch('/api/wifi', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)})
+    .then(r=>r.json())
+    .then(j=>{
+      const msg = document.getElementById('msg');
+      msg.innerText = JSON.stringify(j);
+      setTimeout(()=>{ msg.innerText = ''; }, 3000);
+    }).catch(e=>{ console.warn('saveWifi error', e); });
+}
+
+// MQTT functions
+async function loadMqtt(){
+  try {
+    const r = await fetch('/api/mqtt');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json();
+    document.getElementById('mqtt_broker').value = j.broker || '';
+    document.getElementById('mqtt_port').value = j.port || '';
+    document.getElementById('mqtt_user').value = j.user || '';
+    document.getElementById('mqtt_client_id').value = j.client_id || '';
+    document.getElementById('mqtt_topic_base').value = j.topic_base || '';
+    document.getElementById('mqtt_interval').value = j.interval || '';
+    document.getElementById('mqtt_enabled').checked = !!j.enabled;
+  } catch(e) { console.warn('loadMqtt error', e); }
+}
+
+function saveMqtt(){
+  const tok = getToken();
+  if (!tok) { document.getElementById('mqttMsg').innerText = 'Enter admin token above'; setTimeout(()=>{ document.getElementById('mqttMsg').innerText=''; }, 3000); return; }
+  const payload = {
+    enabled: document.getElementById('mqtt_enabled').checked,
+    broker: document.getElementById('mqtt_broker').value,
+    port: parseInt(document.getElementById('mqtt_port').value) || 1883,
+    user: document.getElementById('mqtt_user').value,
+    pass: document.getElementById('mqtt_pass').value,
+    client_id: document.getElementById('mqtt_client_id').value,
+    topic_base: document.getElementById('mqtt_topic_base').value,
+    interval: parseInt(document.getElementById('mqtt_interval').value) || 10,
+    token: tok
+  };
+  fetch('/api/mqtt', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)})
+    .then(r=>r.json())
+    .then(j=>{
+      const msg = document.getElementById('mqttMsg'); msg.innerText = JSON.stringify(j); setTimeout(()=>{ msg.innerText=''; }, 3000);
+      // Clear password input after save for safety
+      document.getElementById('mqtt_pass').value = '';
+    }).catch(e=>{ console.warn('saveMqtt error', e); });
+}
+
+async function saveAdminToken(){
+  const m = document.getElementById('msg');
+  const current = (document.getElementById('admin_current').value || getToken() || '').trim();
+  const newToken = (document.getElementById('admin_new').value || '').trim();
+  if (!current) { if (m) { m.innerText = 'Current token required'; setTimeout(()=>{ m.innerText=''; }, 3000); } return; }
+  const maxTokenLen = 20;
+  const re = new RegExp('^[A-Za-z0-9]{1,' + maxTokenLen + '}$');
+  if (!re.test(newToken)) { if (m) { m.innerText = 'New token must be 1-' + maxTokenLen + ' alphanumeric chars'; setTimeout(()=>{ m.innerText=''; }, 3000); } return; }
+  const payload = { token_admin: current, new_token: newToken };
+  try{
+    const r = await fetch('/api/admin_token',{method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+    const j = await r.json();
+    if (j.ok) { 
+      if (m) m.innerText = 'Admin token updated'; 
+      // Update the main token field and localStorage with the new token
+      document.getElementById('token').value = newToken;
+      localStorage.setItem('admin_token', newToken);
+    } else { 
+      if (m) m.innerText = 'Error: '+(j.error||JSON.stringify(j)); 
+    }
+    setTimeout(()=>{ if (m) m.innerText=''; }, 3000);
+    document.getElementById('admin_current').value = '';
+    document.getElementById('admin_new').value = '';
+  }catch(e){ console.warn('saveAdminToken error', e); }
+}
+
+// Load MQTT settings on page load
+// If WebSocket is not available/open, start polling fallback so UI stays in sync.
+if (!(wsClient && wsClient.readyState === WebSocket.OPEN)) { fetchStatus(); loadMqtt(); } else { loadMqtt(); }
+
+// Download readable logs and trigger file save
+async function downloadLogs(){
+  try {
+    const r = await fetch('/logs.txt');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const txt = await r.text();
+    const blob = new Blob([txt], {type:'text/plain'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const name = 'events-' + new Date().toISOString().slice(0,10) + '.txt';
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    console.warn('downloadLogs error', e);
+    const lm = document.getElementById('logMsg'); lm.innerText = 'Download failed'; setTimeout(()=>{ lm.innerText=''; }, 3000);
+  }
+}
+
+// Rotate logs (archive) - requires admin token
+async function rotateLogs(){
+  const token = prompt('Admin token:'); if (!token) return;
+  if (!confirm('Rotate (archive) logs?')) return;
+  try {
+    const resp = await fetch('/api/logs', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({token: token, action: 'rotate'}) });
+    const j = await resp.json();
+    const lm = document.getElementById('logMsg'); lm.innerText = JSON.stringify(j); setTimeout(()=>{ lm.innerText=''; }, 3000);
+  } catch(e) { console.warn('rotateLogs error', e); }
+}
+
+// Clear logs (requires admin token)
+async function exportLogs(){
+  try {
+    const r = await fetch('/api/export_logs');
+    const j = await r.json();
+    const msg = document.getElementById('logMsg');
+    msg.innerText = j.ok ? 'Exported to SD' : 'Export failed';
+    setTimeout(()=>{ msg.innerText=''; },3000);
+    if (pollingEnabled) setTimeout(fetchStatus,50);
+  } catch(e){ console.warn('exportLogs', e); }
+}
+
+async function listSdFiles(){
+  try {
+    const r = await fetch('/api/sd_files');
+    const j = await r.json();
+    const msg = document.getElementById('logMsg');
+    msg.innerText = j.files.join('\n');
+    setTimeout(()=>{ msg.innerText=''; },5000);
+  } catch(e){ console.warn('listSdFiles', e); }
+}
+
+async function clearLogs(){
+  const token = prompt('Admin token:'); if (!token) return;
+  if (!confirm('Clear all logs? This cannot be undone.')) return;
+  try {
+    const resp = await fetch('/api/logs', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({token: token, action: 'clear'}) });
+    const j = await resp.json();
+    const lm = document.getElementById('logMsg'); lm.innerText = JSON.stringify(j); setTimeout(()=>{ lm.innerText=''; }, 3000);
+  } catch(e) { console.warn('clearLogs error', e); }
+}
+
+// Start polling only if WebSocket not available
+if (!wsClient) fetchStatus();
+</script></body></html>
