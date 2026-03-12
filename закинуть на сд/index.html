@@ -290,13 +290,18 @@
     }
 
     #controls {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 8px;
       margin-top: 6px;
     }
 
-    .chart-card {
+    /* Relay control buttons: green when ON, red when OFF */
+    .relay-btn {
+      width: 100%;
+      justify-content: center;
+      font-weight: 600;
+    }
       padding: 9px 10px;
       border-radius: var(--radius-md);
       background: radial-gradient(circle at top, rgba(30, 64, 175, 0.28), transparent 55%),
@@ -516,14 +521,13 @@
       box-shadow: none;
     }
 
-    /* Relay control buttons: green when ON, red when OFF */
-    .relay-btn {
-      min-width: 90px;
-      justify-content: center;
-      font-weight: 600;
+    .section-footer-note {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 4px;
     }
 
-    .relay-btn .relay-state-label {
+    .relay-state-label {
       font-size: 0.75rem;
       opacity: 0.9;
     }
@@ -979,7 +983,7 @@
       }
       // Add reset emergency button if there's an active emergency
       if (j.emergency && j.emergency.active) {
-        controls += '<button class="btn-danger" style="min-width:120px;" onclick="resetEmergency()">Сброс аварии</button>';
+        controls += '<button class="btn-danger" onclick="resetEmergency()">Сброс аварии</button>';
       }
       document.getElementById('controls').innerHTML = controls;
       // Emergency indicator
