@@ -811,7 +811,7 @@
               <div class="card-title"><span class="dot"></span> Wi‑Fi</div>
               <div class="card-subtitle">Подключение устройства и токены</div>
             </div>
-            <div class="card-badge">Network</div>
+            <span id="wifiIndicator" class="status-pill"><span class="status-dot sd-unknown"></span>unknown</span>
           </div>
           <div class="card-body">
             <div class="field-grid">
@@ -847,13 +847,10 @@
               <div class="card-title"><span class="dot"></span> MQTT</div>
               <div class="card-subtitle">Отправка телеметрии в брокер</div>
             </div>
-            <div class="card-badge">Messaging</div>
+            <span id="mqttIndicator" class="status-pill"><span class="status-dot sd-unknown"></span>unknown</span>
           </div>
           <div class="card-body">
             <div class="field-grid">
-              <div class="field-label"><strong>Status</strong></div>
-              <div><span id="mqtt_status" class="status-pill"><span class="status-dot sd-unknown"></span>unknown</span></div>
-
               <div class="field-label"><strong>Broker</strong></div>
               <div><input id="mqtt_broker" type="text" placeholder="broker.local"></div>
 
@@ -942,8 +939,28 @@
         let ms = 'MQTT: ' + (j.mqtt.enabled ? 'enabled' : 'disabled') + ' - ' + (j.mqtt.connected ? 'connected' : 'offline');
         if (j.mqtt.broker) ms += ' @ ' + escapeHtml(j.mqtt.broker);
         s += '<br><b>' + ms + '</b>';
-        document.getElementById('mqtt_status').innerText = (j.mqtt.connected ? 'connected' : (j.mqtt.enabled ? 'offline' : 'disabled'));
+        
+        // Update MQTT indicator
+        const mqttIndicatorEl = document.getElementById('mqttIndicator');
+        if (mqttIndicatorEl) {
+          if (j.mqtt.connected) {
+            mqttIndicatorEl.innerHTML = '<span class="status-dot sd-ok"></span>connected';
+          } else if (j.mqtt.enabled) {
+            mqttIndicatorEl.innerHTML = '<span class="status-dot sd-missing"></span>offline';
+          } else {
+            mqttIndicatorEl.innerHTML = '<span class="status-dot sd-unknown"></span>disabled';
+          }
+        }
       }
+      
+      // Update Wi-Fi indicator
+      const wifiIndicatorEl = document.getElementById('wifiIndicator');
+      if (wifiIndicatorEl && j.ip) {
+        wifiIndicatorEl.innerHTML = '<span class="status-dot sd-ok"></span>connected';
+      } else if (wifiIndicatorEl) {
+        wifiIndicatorEl.innerHTML = '<span class="status-dot sd-missing"></span>disconnected';
+      }
+      
       document.getElementById('info').innerHTML = s;
 
       // Relay controls: colored buttons instead of text status
