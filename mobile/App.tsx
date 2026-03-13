@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import DashboardScreen from './src/screens/DashboardScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
+import LoginScreen from './src/screens/LoginScreen';
 import ApiService from './src/services/api';
 
 Notifications.setNotificationHandler({

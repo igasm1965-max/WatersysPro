@@ -4,6 +4,8 @@
     "slug": "watersys-mobile",
     "version": "1.0.0",
     "sdkVersion": "48.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
     "platforms": [
       "ios",
       "android",
@@ -15,7 +17,13 @@
       }
     },
     "android": {
-      "package": "com.igas65.watersysmobile"
+      "package": "com.igas65.watersysmobile",
+      "versionCode": 1,
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "CHANGE_NETWORK_STATE"
+      ]
     }
   }
 }

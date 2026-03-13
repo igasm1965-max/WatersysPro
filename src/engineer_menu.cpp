@@ -841,8 +841,8 @@ void showWiFiSetup() {
 
 void showMqttSetup() {
   flags.displayLocked = 1;
-  const char* items[] = { "Enable/Disable", "Broker", "Port", "User", "Pass", "Client ID", "Topic base", "Interval (s)", "Test publish", "Clear MQTT", "Back" };
-  int itemCount = 11;
+  const char* items[] = { "Enable/Disable", "Broker", "Port", "TLS Enable", "TLS Port", "User", "Pass", "Client ID", "Topic base", "Interval (s)", "Test publish", "Clear MQTT", "Back" };
+  int itemCount = 13;
   int selected = 0;
   bool exitMenu = false;
   int lastSelected = -1;
@@ -871,14 +871,16 @@ void showMqttSetup() {
         case 0: toggleMqttEnabled(); break;
         case 1: editMqttBroker(); break;
         case 2: editMqttPort(); break;
-        case 3: editMqttUser(); break;
-        case 4: editMqttPass(); break;
-        case 5: editMqttClientId(); break;
-        case 6: editMqttTopicBase(); break;
-        case 7: editMqttInterval(); break;
-        case 8: testMqttPublish(); break;
-        case 9: clearMqttSettings(); break;
-        case 10: exitMenu = true; break;
+        case 3: toggleMqttTls(); break;
+        case 4: editMqttTlsPort(); break;
+        case 5: editMqttUser(); break;
+        case 6: editMqttPass(); break;
+        case 7: editMqttClientId(); break;
+        case 8: editMqttTopicBase(); break;
+        case 9: editMqttInterval(); break;
+        case 10: testMqttPublish(); break;
+        case 11: clearMqttSettings(); break;
+        case 12: exitMenu = true; break;
       }
     }
 
@@ -906,6 +908,21 @@ void editMqttPort() {
   uint16_t tmp = preferences.getUInt(PREF_KEY_MQTT_PORT, DEFAULT_MQTT_PORT);
   editValue("MQTT Port", &tmp, 1, 65535, 1, "");
   preferences.putUInt(PREF_KEY_MQTT_PORT, tmp);
+  initVQTT();
+}
+
+void toggleMqttTls() {
+  bool v = preferences.getBool(PREF_KEY_MQTT_SECURE, DEFAULT_MQTT_SECURE);
+  preferences.putBool(PREF_KEY_MQTT_SECURE, !v);
+  lcd.clear(); lcd.setCursor(0,1); lcd.print("TLS "); lcd.print(!v?"ENABLED":"DISABLED");
+  initVQTT();
+  delay(1000);
+}
+
+void editMqttTlsPort() {
+  uint16_t tmp = preferences.getUInt(PREF_KEY_MQTT_TLS_PORT, DEFAULT_MQTT_TLS_PORT);
+  editValue("MQTT TLS Port", &tmp, 1, 65535, 1, "");
+  preferences.putUInt(PREF_KEY_MQTT_TLS_PORT, tmp);
   initVQTT();
 }
 
@@ -944,6 +961,8 @@ void clearMqttSettings() {
   preferences.remove(PREF_KEY_MQTT_CLIENT_ID);
   preferences.remove(PREF_KEY_MQTT_TOPIC_BASE);
   preferences.remove(PREF_KEY_MQTT_PUB_INTERVAL);
+  preferences.remove(PREF_KEY_MQTT_SECURE);
+  preferences.remove(PREF_KEY_MQTT_TLS_PORT);
   preferences.putBool(PREF_KEY_MQTT_ENABLED, false);
   lcd.clear(); lcd.setCursor(0,1); lcd.print("MQTT cleared");
   initVQTT();

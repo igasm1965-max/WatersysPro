@@ -2,13 +2,14 @@ import axios from 'axios';
 
 const API_URL = 'http://192.168.3.13:80/api'; // <-- ESP32 device
 
+const api = axios.create({ baseURL: API_URL, timeout: 8000 });
+
 // Attach JWT token to requests when available
 api.interceptors.request.use(async (config) => {
   const token = await (global as any).authToken;
   if (token && config.headers) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
-const api = axios.create({ baseURL: API_URL, timeout: 8000 });
 
 export default {
   async getDevices() { const r = await api.get('/devices'); return r.data; },

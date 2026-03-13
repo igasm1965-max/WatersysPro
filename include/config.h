@@ -244,9 +244,15 @@ enum eEncoderState {
 #define PREF_KEY_MQTT_CLIENT_ID "mqtt_cid"
 #define PREF_KEY_MQTT_TOPIC_BASE "mqtt_base"
 #define PREF_KEY_MQTT_PUB_INTERVAL "mqtt_int"
+#define PREF_KEY_MQTT_SECURE "mqtt_tls"         // TLS/SSL enabled flag
+#define PREF_KEY_MQTT_TLS_PORT "mqtt_tlsp"      // TLS port (e.g., 19161)
+#define PREF_KEY_MQTT_INSECURE "mqtt_insec"     // Skip TLS certificate verification
 #define DEFAULT_MQTT_PORT 1883
+#define DEFAULT_MQTT_TLS_PORT 8883               // Standard MQTT TLS port (can be overridden)
 #define DEFAULT_MQTT_ENABLED 0
 #define DEFAULT_MQTT_TOPIC_BASE "watersystem"
+#define DEFAULT_MQTT_SECURE 0                    // TLS disabled by default
+#define DEFAULT_MQTT_INSECURE 0                  // Validate certificates by default
 
 #define PREF_KEY_TANK1_MIN "t1min"
 #define PREF_KEY_TANK1_MAX "t1max"

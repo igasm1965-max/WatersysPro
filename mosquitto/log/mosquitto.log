@@ -89,3 +89,44 @@
 1773201706: mosquitto version 2.0.22 running
 1773203507: Saving in-memory database to /mosquitto/data//mosquitto.db.
 1773205308: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1773309045: mosquitto version 2.0.22 starting
+1773309045: Config loaded from /mosquitto/config/mosquitto.conf.
+1773309045: Opening ipv4 listen socket on port 1883.
+1773309045: Opening ipv6 listen socket on port 1883.
+1773309045: Opening websockets listen socket on port 9001.
+1773309045: mosquitto version 2.0.22 running
+1773309425: mosquitto version 2.0.22 terminating
+1773309425: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1773309474: mosquitto version 2.0.22 starting
+1773309474: Config loaded from /mosquitto/config/mosquitto.conf.
+1773309474: Opening ipv4 listen socket on port 1883.
+1773309474: Opening ipv6 listen socket on port 1883.
+1773309474: Opening websockets listen socket on port 9001.
+1773309474: mosquitto version 2.0.22 running
+1773311275: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1773313076: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1773314280: New connection from 172.18.0.1:56886 on port 1883.
+1773314280: Client <unknown> disconnected due to protocol error.
+1773314290: New connection from 172.18.0.1:37068 on port 1883.
+1773314290: Client <unknown> disconnected due to protocol error.
+1773314293: New connection from 172.18.0.1:37082 on port 1883.
+1773314293: New client connected from 172.18.0.1:37082 as user_c7d5b9fb_F4E9 (p2, c1, k15).
+1773314877: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1773316678: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1773318478: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1773319293: Client user_c7d5b9fb_F4E9 closed its connection.
+1773320279: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1773320884: New connection from 172.18.0.1:33400 on port 1883.
+1773320884: Bad socket read/write on client <unknown>: Malformed UTF-8
+1773320946: New connection from 172.18.0.1:33024 on port 1883.
+1773320946: Client <unknown> disconnected due to protocol error.
+1773372488: mosquitto version 2.0.22 starting
+1773372488: Config loaded from /mosquitto/config/mosquitto.conf.
+1773372488: Opening ipv4 listen socket on port 1883.
+1773372488: Opening ipv6 listen socket on port 1883.
+1773372488: Opening websockets listen socket on port 9001.
+1773372488: mosquitto version 2.0.22 running
+1773372508: New connection from 172.18.0.1:37686 on port 1883.
+1773372508: New client connected from 172.18.0.1:37686 as user_c7d5b9fb_F4E9 (p2, c1, k15).
+1773373207: mosquitto version 2.0.22 terminating
+1773373207: Saving in-memory database to /mosquitto/data//mosquitto.db.

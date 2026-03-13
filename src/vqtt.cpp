@@ -9,150 +9,49 @@
 #include "relay_control.h"
 #include "state_machine.h"
 
+#include <PubSubClient.h>
+#include <ArduinoJson.h>
+#include <WiFi.h>
+#include <NetworkClientSecure.h>
+
 extern Preferences preferences;
 
-// helper to avoid Preferences errors when a key is absent
+// Externs from main and other modules
+extern int tank1Level;
+extern int tank2Level;
+extern String wifi_getIP();
+
+// ============ PubSubClient MQTT Client ============
+WiFiClient wifiClient;           // For plain MQTT
+NetworkClientSecure wifiClientSecure; // For TLS/MQTT
+PubSubClient mqttClient(wifiClient);
+PubSubClient mqttClientSecure(wifiClientSecure);
+
+// Pointer to active client
+PubSubClient* activeMqtt = NULL;
+
+static bool mqttConnected = false;
+static bool wifiWasConnected = false;  // Track WiFi connection changes
+static unsigned long lastTelemetryMs = 0;
+static unsigned long pubIntervalMs = 10000;
+static String mqttTopicBase = DEFAULT_MQTT_TOPIC_BASE;
+static String mqttClientId;
+static unsigned long lastConnectAttempt = 0;
+static unsigned long reconnectIntervalMs = 5000;
+
+// Helper function
 static String safeGetPref(const char *key, const String &def = "") {
     if (preferences.isKey(key)) {
         return preferences.getString(key, def);
     }
     return def;
 }
-#endif
 
-// Externs from main and other modules
-extern int tank1Level;
-extern int tank2Level;
-// FSM state accessed via systemContext
-extern String wifi_getIP();
-
-#ifdef ENABLE_WIFI
-#include "prefs.h"
-#include "event_logging.h"
-#include "sensors.h"
-#include "relay_control.h"
-#include "state_machine.h"
-
-#include <AsyncMqttClient.h>
-#include <ArduinoJson.h>
-#include <WiFi.h>
-
-extern Preferences preferences;
-
-static AsyncMqttClient mqttClient;
-static bool mqttConnected = false;
-static unsigned long lastTelemetryMs = 0;
-static unsigned long pubIntervalMs = 10000; // default 10s
-static String mqttTopicBase;
-static String mqttClientId;
-
-static String makeDeviceId() {
-  uint64_t mac = ESP.getEfuseMac();
-  char id[32];
-  sprintf(id, "user_c7d5b9fb_%02X%02X", (uint8_t)(mac>>16), (uint8_t)(mac>>8));
-  return String(id);
-}
-
-static void connectToBroker() {
-  if (!preferences.getBool(PREF_KEY_MQTT_ENABLED, DEFAULT_MQTT_ENABLED)) {
-    Serial.println("[VQTT] MQTT disabled, skipping broker connect");
-    return;
-  }
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("[VQTT] WiFi not connected, skipping broker connect");
-    return;
-  }
-  String broker = safeGetPref(PREF_KEY_MQTT_BROKER, "");
-  uint32_t port = preferences.getUInt(PREF_KEY_MQTT_PORT, DEFAULT_MQTT_PORT);
-  if (broker.length() == 0) {
-    Serial.println("[VQTT] No broker configured, skipping connect");
-    return;
-  }
-  
-  Serial.printf("[VQTT] Configuring MQTT client: broker=%s, port=%u, clientId=%s\n", 
-                broker.c_str(), (unsigned int)port, mqttClientId.c_str());
-  
-  mqttClient.setServer(broker.c_str(), (uint16_t)port);
-  mqttClient.setClientId(mqttClientId.c_str());  // ← ВАЖНО: установить Client ID
-  
-  const String user = safeGetPref(PREF_KEY_MQTT_USER, "");
-  const String pass = safeGetPref(PREF_KEY_MQTT_PASS, "");
-  if (user.length() > 0) {
-    Serial.printf("[VQTT] Setting credentials for user: %s\n", user.c_str());
-    mqttClient.setCredentials(user.c_str(), pass.c_str());
-  } else {
-    Serial.println("[VQTT] No credentials configured (anonymous connection)");
-  }
-  
-  // LWT (Last Will and Testament) - отправляет offline при разрыве
-  String statusTopic = mqttTopicBase + "/status";
-  mqttClient.setWill(statusTopic.c_str(), 0, true, "offline");
-  
-  Serial.printf("[VQTT] Attempting to connect to %s:%u\n", broker.c_str(), (unsigned int)port);
-  mqttClient.connect();
-}
-
-static void onMqttConnect(bool sessionPresent) {
-  Serial.printf("[VQTT] Connected to broker (sessionPresent=%d)\n", sessionPresent);
-  mqttConnected = true;
-  saveEventLog(LOG_INFO, EVENT_SETTINGS_CHANGE, 0);
-  
-  // Subscribe to command namespace
-  String cmdTopic = mqttTopicBase + "/cmd/#";
-  Serial.printf("[VQTT] Subscribing to: %s\n", cmdTopic.c_str());
-  mqttClient.subscribe(cmdTopic.c_str(), 0);
-  
-  // Publish availability
-  String statusTopic = mqttTopicBase + "/status";
-  Serial.printf("[VQTT] Publishing online status to: %s\n", statusTopic.c_str());
-  mqttClient.publish(statusTopic.c_str(), 0, true, "online");
-  
-  // Publish initial state
-  vqtt_publishState();
-  vqtt_publishTelemetry();
-}
-
-static void onMqttDisconnect(AsyncMqttClientDisconnectReason reason) {
-  mqttConnected = false;
-  
-  const char* reasonStr = "UNKNOWN";
-  switch(reason) {
-    case AsyncMqttClientDisconnectReason::TCP_DISCONNECTED:
-      reasonStr = "TCP connection lost";
-      break;
-    case AsyncMqttClientDisconnectReason::MQTT_UNACCEPTABLE_PROTOCOL_VERSION:
-      reasonStr = "Unacceptable protocol version";
-      break;
-    case AsyncMqttClientDisconnectReason::MQTT_IDENTIFIER_REJECTED:
-      reasonStr = "Identifier rejected (Client ID conflict?)";
-      break;
-    case AsyncMqttClientDisconnectReason::MQTT_SERVER_UNAVAILABLE:
-      reasonStr = "Server unavailable";
-      break;
-    case AsyncMqttClientDisconnectReason::MQTT_MALFORMED_CREDENTIALS:
-      reasonStr = "Malformed credentials";
-      break;
-    case AsyncMqttClientDisconnectReason::MQTT_NOT_AUTHORIZED:
-      reasonStr = "Not authorized (check username/password)";
-      break;
-    case AsyncMqttClientDisconnectReason::ESP8266_NOT_ENOUGH_SPACE:
-      reasonStr = "Not enough space";
-      break;
-    case AsyncMqttClientDisconnectReason::TLS_BAD_FINGERPRINT:
-      reasonStr = "TLS bad fingerprint (SSL/TLS error)";
-      break;
-    default:
-      reasonStr = "Unable to determine reason";
-  }
-  
-  Serial.printf("[VQTT] MQTT Disconnected (%d): %s\n", (int)reason, reasonStr);
-}
-
-static void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total) {
-  // Build strings
+// MQTT Callback handler
+static void onMqttMessage(char* topic, byte* payload, unsigned int length) {
   String t(topic);
-  String p(payload, len);
-  Serial.printf("[VQTT] MSG topic=%s payload=%s\n", t.c_str(), p.c_str());
+  String p((char*)payload, length);
+  Serial.printf("[VQTT] Message received: topic=%s payload=%s\n", t.c_str(), p.c_str());
   saveEventLog(LOG_INFO, EVENT_MANUAL_OPERATION, 0);
 
   // Strip base
@@ -160,7 +59,7 @@ static void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProp
   if (!t.startsWith(prefix)) return;
   String cmd = t.substring(prefix.length());
 
-  // support simple commands: pump1, pump2, aeration, ozone, filter, backwash
+  // Handle commands
   if (cmd == "pump1") {
     if (p == "on") turnOnPump1(); else if (p == "off") turnOffPump1();
   } else if (cmd == "pump2") {
@@ -173,108 +72,215 @@ static void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProp
     if (p == "on") turnOnFilter(); else if (p == "off") turnOffFilter();
   } else if (cmd == "backwash") {
     if (p == "on") turnOnBackwash(); else if (p == "off") turnOffBackwash();
-  } else if (cmd == "state") {
-    // state change requests currently not supported via MQTT - log request
-    saveEventLog(LOG_INFO, EVENT_MANUAL_OPERATION, 0);
   }
-
-  // Publish immediate state after handling
-  vqtt_publishState();
 }
 
-void initVQTT() {
-  mqttClient.onConnect(onMqttConnect);
-  mqttClient.onDisconnect(onMqttDisconnect);
-  mqttClient.onMessage(onMqttMessage);
-  
-  // Load Client ID: either custom from prefs, or auto-generated
-  String customClientId = safeGetPref(PREF_KEY_MQTT_CLIENT_ID, "");
-  if (customClientId.length() > 0) {
-    mqttClientId = customClientId;
-  } else {
-    mqttClientId = makeDeviceId();
-  }
-  
-  mqttTopicBase = safeGetPref(PREF_KEY_MQTT_TOPIC_BASE, DEFAULT_MQTT_TOPIC_BASE);
-  uint32_t intervalSec = preferences.getUInt(PREF_KEY_MQTT_PUB_INTERVAL, 10);
-  pubIntervalMs = (intervalSec > 0) ? intervalSec * 1000UL : 10000UL;
+// Generate unique device ID
+static String makeDeviceId() {
+  uint64_t mac = ESP.getEfuseMac();
+  uint32_t random = esp_random();
+  char id[32];
+  sprintf(id, "w_sys_%02X%02X_%08X", (uint8_t)(mac>>16), (uint8_t)(mac>>8), random);
+  return String(id);
+}
 
-  // If MQTT disabled, ensure disconnect
+// MQTT Connection routine
+static void connectToBroker() {
   if (!preferences.getBool(PREF_KEY_MQTT_ENABLED, DEFAULT_MQTT_ENABLED)) {
-    if (mqttClient.connected()) mqttClient.disconnect();
-    mqttConnected = false;
+    Serial.println("[VQTT] MQTT disabled");
+    return;
+  }
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("[VQTT] WiFi not connected");
     return;
   }
 
-  // Attempt connect if Wi-Fi is up
-  connectToBroker();
+  String broker = safeGetPref(PREF_KEY_MQTT_BROKER, "");
+  if (broker.length() == 0) {
+    Serial.println("[VQTT] No broker configured");
+    return;
+  }
+
+  bool useTLS = preferences.getBool(PREF_KEY_MQTT_SECURE, DEFAULT_MQTT_SECURE);
+  uint32_t port = useTLS ? preferences.getUInt(PREF_KEY_MQTT_TLS_PORT, DEFAULT_MQTT_TLS_PORT)
+                         : preferences.getUInt(PREF_KEY_MQTT_PORT, DEFAULT_MQTT_PORT);
+
+  Serial.printf("[VQTT] Configuring MQTT: broker=%s, port=%u, TLS=%s, clientId=%s\n",
+                broker.c_str(), (unsigned int)port, useTLS ? "ON" : "OFF", mqttClientId.c_str());
+
+  // DNS resolution
+  IPAddress brokerIP;
+  if (!WiFi.hostByName(broker.c_str(), brokerIP)) {
+    Serial.printf("[VQTT] ERROR: DNS failed for %s\n", broker.c_str());
+    return;
+  }
+  Serial.printf("[VQTT] DNS resolved: %s -> %s\n", broker.c_str(), brokerIP.toString().c_str());
+
+  // Select client and configure
+  if (useTLS) {
+    Serial.println("[VQTT] Configuring TLS client");
+    wifiClientSecure.setInsecure(); // Skip cert verification
+    mqttClientSecure.setServer(broker.c_str(), port);
+    mqttClientSecure.setCallback(onMqttMessage);
+    activeMqtt = &mqttClientSecure;
+  } else {
+    mqttClient.setServer(broker.c_str(), port);
+    mqttClient.setCallback(onMqttMessage);
+    activeMqtt = &mqttClient;
+  }
+
+  // Attempt connect
+  Serial.printf("[VQTT] Connecting to %s:%u (TLS=%s)...\n", broker.c_str(), (unsigned int)port, useTLS ? "ON" : "OFF");
+  
+  const String user = safeGetPref(PREF_KEY_MQTT_USER, "");
+  const String pass = safeGetPref(PREF_KEY_MQTT_PASS, "");
+  
+  bool connectOk = false;
+  if (user.length() > 0) {
+    Serial.printf("[VQTT] Using credentials: user=%s\n", user.c_str());
+    connectOk = activeMqtt->connect(mqttClientId.c_str(), user.c_str(), pass.c_str());
+  } else {
+    connectOk = activeMqtt->connect(mqttClientId.c_str());
+  }
+  
+  if (connectOk) {
+    Serial.println("[VQTT] ✓ Connected to broker!");
+    mqttConnected = true;
+    saveEventLog(LOG_INFO, EVENT_SETTINGS_CHANGE, 0);
+    
+    // Subscribe to commands
+    String cmdTopic = mqttTopicBase + "/cmd/#";
+    activeMqtt->subscribe(cmdTopic.c_str());
+    Serial.printf("[VQTT] Subscribed to: %s\n", cmdTopic.c_str());
+    
+    // Publish online status
+    String statusTopic = mqttTopicBase + "/status";
+    activeMqtt->publish(statusTopic.c_str(), "online", true);
+    Serial.printf("[VQTT] Published status: %s = online\n", statusTopic.c_str());
+    
+    // Publish initial telemetry
+    vqtt_publishTelemetry();
+    vqtt_publishState();
+  } else {
+    Serial.printf("[VQTT] Connection FAILED (state=%d)\n", activeMqtt->state());
+    mqttConnected = false;
+  }
+}
+
+void initVQTT() {
+  // Load Client ID
+  String customClientId = safeGetPref(PREF_KEY_MQTT_CLIENT_ID, "");
+  mqttClientId = (customClientId.length() > 0) ? customClientId : makeDeviceId();
+  
+  // Load topic base
+  mqttTopicBase = safeGetPref(PREF_KEY_MQTT_TOPIC_BASE, DEFAULT_MQTT_TOPIC_BASE);
+  
+  // Load publish interval
+  uint32_t intervalSec = preferences.getUInt(PREF_KEY_MQTT_PUB_INTERVAL, 10);
+  pubIntervalMs = (intervalSec > 0) ? intervalSec * 1000UL : 10000UL;
+  
+  Serial.printf("[VQTT] Initialized: clientId=%s, topic_base=%s, interval=%lums\n",
+                mqttClientId.c_str(), mqttTopicBase.c_str(), pubIntervalMs);
+  
+  // Initialize default MQTT client (will switch to TLS if needed)
+  mqttClient.setServer("", 0);
+  mqttClient.setCallback(onMqttMessage);
+  activeMqtt = &mqttClient;
+  
+  // Initial connection attempt only if WiFi is ready
+  if (preferences.getBool(PREF_KEY_MQTT_ENABLED, DEFAULT_MQTT_ENABLED) && 
+      WiFi.status() == WL_CONNECTED) {
+    connectToBroker();
+  }
 }
 
 void loopVQTT() {
-  // Called regularly from main loop
   if (!preferences.getBool(PREF_KEY_MQTT_ENABLED, DEFAULT_MQTT_ENABLED)) return;
-  if (WiFi.status() != WL_CONNECTED) return;
+  if (!activeMqtt) return;
+
+  bool wifiConnected = (WiFi.status() == WL_CONNECTED);
   
-  // Static reconnect state (declared outside if blocks for proper scope)
-  static unsigned long lastConnectAttempt = 0;
-  static unsigned long reconnectIntervalMs = 5000; // 5 seconds between attempts
-  static bool wasConnected = false;
+  // Detect WiFi connection changes
+  if (wifiConnected && !wifiWasConnected) {
+    Serial.println("[VQTT] WiFi connected, initiating MQTT connection...");
+    wifiWasConnected = true;
+    lastConnectAttempt = 0;  // Force immediate connection
+    connectToBroker();
+    return;
+  }
   
-  if (!mqttClient.connected()) {
-    // attempt to reconnect
+  // Detect WiFi disconnection
+  if (!wifiConnected && wifiWasConnected) {
+    Serial.println("[VQTT] WiFi disconnected");
+    wifiWasConnected = false;
+  }
+  
+  if (!wifiConnected) return;
+
+  // Process any pending MQTT messages
+  activeMqtt->loop();
+
+  // Reconnect if needed
+  if (!activeMqtt->connected()) {
     unsigned long now = millis();
     
     if (now - lastConnectAttempt >= reconnectIntervalMs) {
-      Serial.printf("[VQTT] Attempting reconnect (WiFi=%s)...\n", 
-                    WiFi.isConnected() ? "OK" : "DOWN");
+      Serial.printf("[VQTT] Reconnecting (wifi=%s)...\n", wifiConnected ? "OK" : "DOWN");
       connectToBroker();
       lastConnectAttempt = now;
       
-      // Exponential backoff: increase interval up to 60 seconds
+      // Exponential backoff
       if (reconnectIntervalMs < 60000) {
         reconnectIntervalMs = (reconnectIntervalMs * 2 > 60000) ? 60000 : (reconnectIntervalMs * 2);
       }
     }
-    wasConnected = false;
     return;
   }
-  
-  // Reset reconnect interval on successful connection
-  if (mqttClient.connected() && !wasConnected) {
-    wasConnected = true;
-    // Reset backoff on successful connection
+
+  // Reset backoff on successful connection
+  if (reconnectIntervalMs > 5000) {
     reconnectIntervalMs = 5000;
   }
 
-  // Periodic telemetry
+  // Periodic telemetry publish
   if (millis() - lastTelemetryMs >= pubIntervalMs) {
     lastTelemetryMs = millis();
     vqtt_publishTelemetry();
   }
 }
 
-bool vqtt_isConnected() { return mqttClient.connected(); }
+bool vqtt_isConnected() {
+  return activeMqtt ? activeMqtt->connected() : false;
+}
 
-String vqtt_getBroker() { return safeGetPref(PREF_KEY_MQTT_BROKER, ""); }
+String vqtt_getBroker() {
+  return safeGetPref(PREF_KEY_MQTT_BROKER, "");
+}
 
-String vqtt_getTopicBase() { return mqttTopicBase; }
+String vqtt_getTopicBase() {
+  return mqttTopicBase;
+}
 
 bool vqtt_testPublish(const char* payload) {
-  if (!mqttClient.connected()) return false;
+  if (!activeMqtt || !activeMqtt->connected()) return false;
   String topic = mqttTopicBase + "/test";
-  // Fire-and-forget publish (QoS 0)
-  int msgId = mqttClient.publish(topic.c_str(), 0, false, payload);
-  Serial.printf("[VQTT] Test publish to %s msgId=%d payload=%s\n", topic.c_str(), msgId, payload);
-  return (msgId > 0);
+  bool ok = activeMqtt->publish(topic.c_str(), payload);
+  Serial.printf("[VQTT] Test publish to %s: %s\n", topic.c_str(), ok ? "OK" : "FAILED");
+  return ok;
 }
 
 void vqtt_publishTelemetry() {
-  if (!mqttClient.connected()) return;
+  if (!activeMqtt || !activeMqtt->connected()) {
+    Serial.println("[VQTT] Not connected, skipping telemetry");
+    return;
+  }
+  
   DynamicJsonDocument doc(256);
   doc["uptime"] = millis() / 1000;
   doc["ip"] = wifi_getIP();
   doc["tank1"] = tank1Level;
   doc["tank2"] = tank2Level;
+  
   JsonObject rel = doc.createNestedObject("relays");
   rel["pump1"] = getRelayState(RELAY_PUMP1) ? 1 : 0;
   rel["pump2"] = getRelayState(RELAY_PUMP2) ? 1 : 0;
@@ -282,19 +288,33 @@ void vqtt_publishTelemetry() {
   rel["ozone"] = getRelayState(RELAY_OZONE) ? 1 : 0;
   rel["filter"] = getRelayState(RELAY_FILTER) ? 1 : 0;
   rel["backwash"] = getRelayState(RELAY_BACKWASH) ? 1 : 0;
-  String out; serializeJson(doc, out);
+  
+  String out;
+  serializeJson(doc, out);
   String topic = mqttTopicBase + "/telemetry";
-  mqttClient.publish(topic.c_str(), 0, false, out.c_str());
+  
+  bool ok = activeMqtt->publish(topic.c_str(), out.c_str());
+  Serial.printf("[VQTT] Published telemetry to %s (%d bytes): %s\n", 
+                topic.c_str(), out.length(), ok ? "OK" : "FAILED");
 }
 
 void vqtt_publishState() {
-  if (!mqttClient.connected()) return;
+  if (!activeMqtt || !activeMqtt->connected()) {
+    Serial.println("[VQTT] Not connected, skipping state");
+    return;
+  }
+  
   DynamicJsonDocument doc(192);
   doc["state"] = (int)systemContext.currentState;
-  doc["flags"] = 0; // add flags if needed
-  String out; serializeJson(doc, out);
+  doc["flags"] = 0;
+  
+  String out;
+  serializeJson(doc, out);
   String topic = mqttTopicBase + "/state";
-  mqttClient.publish(topic.c_str(), 0, false, out.c_str());
+  
+  bool ok = activeMqtt->publish(topic.c_str(), out.c_str());
+  Serial.printf("[VQTT] Published state to %s (%d bytes): %s\n",
+                topic.c_str(), out.length(), ok ? "OK" : "FAILED");
 }
 
 #endif // ENABLE_WIFI

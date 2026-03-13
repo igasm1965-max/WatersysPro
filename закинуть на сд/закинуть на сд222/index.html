@@ -30,11 +30,13 @@ Pass: <input id=pass type=password><br>
 Status: <span id="mqtt_status">unknown</span><br>
 Broker: <input id=mqtt_broker placeholder="broker.local"><br>
 Port: <input id=mqtt_port style="width:80px" placeholder="1883"><br>
+TLS Port: <input id=mqtt_tls_port style="width:80px" placeholder="8883"><br>
 User: <input id=mqtt_user><br>
 Pass: <input id=mqtt_pass type=password><br>
 Client ID: <input id=mqtt_client_id placeholder="auto-generated"><br>
 Topic base: <input id=mqtt_topic_base placeholder="watersystem"><br>
 Interval (s): <input id=mqtt_interval style="width:80px" placeholder="10"><br>
+TLS Enable: <input id=mqtt_secure type=checkbox><br>
 Enabled: <input id=mqtt_enabled type=checkbox><br>
 <button onclick="saveMqtt()">Save MQTT</button>
 <span id="mqttMsg" style="margin-left:8px;color:green"></span>
@@ -174,6 +176,8 @@ async function loadMqtt(){
     document.getElementById('mqtt_client_id').value = j.client_id || '';
     document.getElementById('mqtt_topic_base').value = j.topic_base || '';
     document.getElementById('mqtt_interval').value = j.interval || '';
+    document.getElementById('mqtt_secure').checked = !!j.secure;
+    document.getElementById('mqtt_tls_port').value = j.tls_port || '';
     document.getElementById('mqtt_enabled').checked = !!j.enabled;
   } catch(e) { console.warn('loadMqtt error', e); }
 }
@@ -190,6 +194,8 @@ function saveMqtt(){
     client_id: document.getElementById('mqtt_client_id').value,
     topic_base: document.getElementById('mqtt_topic_base').value,
     interval: parseInt(document.getElementById('mqtt_interval').value) || 10,
+    secure: document.getElementById('mqtt_secure').checked,
+    tls_port: parseInt(document.getElementById('mqtt_tls_port').value) || 8883,
     token: tok
   };
   fetch('/api/mqtt', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)})

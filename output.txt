@@ -1,0 +1,155 @@
+--- Terminal on COM5 | 115200 8-N-1
+--- Available filters and text transformations: debug, default, direct, esp32_exception_decoder, hexlify, log2file, nocontrol, printable, send_on_enter, time
+--- More details at https://bit.ly/pio-monitor-filters
+--- Quit: Ctrl+C | Menu: Ctrl+T | Help: Ctrl+T followed by Ctrl+H
+ets Jul 29 2019 12:21:46
+
+rst:0x1 (POWERON_RESET),boot:0x17 (SPI_FAST_FLASH_BOOT)
+configsip: 0, SPIWP:0xee
+clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00
+mode:DIO, clock div:2
+load:0x3fff0030,len:4688
+load:0x40078000,len:15448
+load:0x40080400,len:4
+ho 8 tail 4 room 4
+load:0x40080404,len:3196
+entry 0x400805a4
+
+
+=== ESP32 Water System v12.0 ===
+Build: Mar 13 2026 11:24:01
+Initializing...
+
+[SD] Initialization (SPI)...
+[SD] card mounted, type=3
+[SD] test file written
+[INFO] Admin token preserved
+[WiFi] Starting connect attempt 1 to 'Keenetic-NCC'...
+[Web] Async server started on port 80
+[VQTT] Initialized: clientId=w_sys_F4E9_78AA0BD3, topic_base=watersystem, interval=10000ms
+[INFO] Filter timer: no saved timestamp, starting fresh
+[EventLog] saved to RAM idx=63 type=3 level=1 param=0 src=0
+[DEBUG] Event 3 skipped by log filter
+[WiFi] STA got IP: 192.168.3.13
+[SENSOR] raw1=4 raw2=7 -> tank1=4 tank2=7
+[WiFi] Connected, IP: 192.168.3.13 RSSI: -53 dBm
+[EventLog] saved to RAM idx=64 type=17 level=1 param=0 src=0
+[DEBUG] Event 17 skipped by log filter
+[VQTT] WiFi connected, initiating MQTT connection...
+[VQTT] Configuring MQTT: broker=m1.wqtt.ru, port=19161, TLS=ON, clientId=w_sys_F4E9_78AA0BD3
+[VQTT] DNS resolved: m1.wqtt.ru -> 212.67.17.19
+[VQTT] Configuring TLS client
+[VQTT] Connecting to m1.wqtt.ru:19161 (TLS=ON)...
+[VQTT] Using credentials: user=REDACTED_MQTT_USER
+[VQTT] ✓ Connected to broker!
+[EventLog] saved to RAM idx=65 type=6 level=1 param=0 src=0
+[DEBUG] Event 6 skipped by log filter
+[VQTT] Subscribed to: watersystem/cmd/#
+[VQTT] Published status: watersystem/status = online
+[VQTT] Published telemetry to watersystem/telemetry (130 bytes): OK
+[VQTT] Published state to watersystem/state (21 bytes): OK
+[SENSOR] raw1=4 raw2=7 -> tank1=4 tank2=7
+[FSM] State change: 0 -> 0
+[FSM] currentState=0, tank1Level=4, tank2Level=7, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=7 -> tank1=4 tank2=7
+[FSM] currentState=0, tank1Level=4, tank2Level=7, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=7 -> tank1=4 tank2=7
+[SENSOR] raw1=4 raw2=7 -> tank1=4 tank2=7
+[FSM] currentState=0, tank1Level=4, tank2Level=7, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=7 -> tank1=4 tank2=7
+[FSM] currentState=0, tank1Level=4, tank2Level=7, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=7 -> tank1=4 tank2=7
+[FSM] currentState=0, tank1Level=4, tank2Level=7, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=7 -> tank1=4 tank2=7
+[FSM] currentState=0, tank1Level=4, tank2Level=7, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=7 -> tank1=4 tank2=7
+[FSM] currentState=0, tank1Level=4, tank2Level=7, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=9 -> tank1=4 tank2=9
+[FSM] currentState=0, tank1Level=4, tank2Level=9, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=9 -> tank1=4 tank2=9
+[FSM] currentState=0, tank1Level=4, tank2Level=9, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=9 -> tank1=4 tank2=9
+[FSM] currentState=0, tank1Level=4, tank2Level=9, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=6 -> tank1=4 tank2=6
+[FSM] currentState=0, tank1Level=4, tank2Level=6, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=9 -> tank1=4 tank2=9
+[FSM] currentState=0, tank1Level=4, tank2Level=9, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=9 -> tank1=4 tank2=9
+[FSM] currentState=0, tank1Level=4, tank2Level=9, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=6 -> tank1=4 tank2=6
+[FSM] currentState=0, tank1Level=4, tank2Level=6, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=9 -> tank1=4 tank2=9
+[FSM] currentState=0, tank1Level=4, tank2Level=9, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=9 -> tank1=4 tank2=9
+[SENSOR] raw1=4 raw2=9 -> tank1=4 tank2=9
+[FSM] currentState=0, tank1Level=4, tank2Level=9, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=7 -> tank1=4 tank2=7
+[FSM] currentState=0, tank1Level=4, tank2Level=7, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=7 -> tank1=4 tank2=7
+[FSM] currentState=0, tank1Level=4, tank2Level=7, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=7 -> tank1=4 tank2=7
+[FSM] currentState=0, tank1Level=4, tank2Level=7, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=9 -> tank1=4 tank2=9
+[FSM] currentState=0, tank1Level=4, tank2Level=9, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=7 -> tank1=4 tank2=7
+[FSM] currentState=0, tank1Level=4, tank2Level=7, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=9 -> tank1=4 tank2=9
+[FSM] currentState=0, tank1Level=4, tank2Level=9, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=6 -> tank1=4 tank2=6
+[FSM] currentState=0, tank1Level=4, tank2Level=6, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=6 -> tank1=4 tank2=6
+[FSM] currentState=0, tank1Level=4, tank2Level=6, tank1Empty=0, tank2Empty=0
+[WebMon] freeHeap=130928 maxAlloc=77812 ws_clients=0 wifi_state=2 rssi=-53
+[VQTT] Published telemetry to watersystem/telemetry (131 bytes): OK
+[SENSOR] raw1=4 raw2=6 -> tank1=4 tank2=6
+[FSM] currentState=0, tank1Level=4, tank2Level=6, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=9 -> tank1=4 tank2=9
+[FSM] currentState=0, tank1Level=4, tank2Level=9, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=9 -> tank1=4 tank2=9
+[FSM] currentState=0, tank1Level=4, tank2Level=9, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=9 -> tank1=4 tank2=9
+[FSM] currentState=0, tank1Level=4, tank2Level=9, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=9 -> tank1=4 tank2=9
+[SENSOR] raw1=4 raw2=7 -> tank1=4 tank2=7
+[FSM] currentState=0, tank1Level=4, tank2Level=7, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=7 -> tank1=4 tank2=7
+[FSM] currentState=0, tank1Level=4, tank2Level=7, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=6 -> tank1=4 tank2=6
+[FSM] currentState=0, tank1Level=4, tank2Level=6, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=6 -> tank1=4 tank2=6
+[FSM] currentState=0, tank1Level=4, tank2Level=6, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=7 -> tank1=4 tank2=7
+[FSM] currentState=0, tank1Level=4, tank2Level=7, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=7 -> tank1=4 tank2=7
+[FSM] currentState=0, tank1Level=4, tank2Level=7, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=9 -> tank1=4 tank2=9
+[FSM] currentState=0, tank1Level=4, tank2Level=9, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=9 -> tank1=4 tank2=9
+[FSM] currentState=0, tank1Level=4, tank2Level=9, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=6 -> tank1=4 tank2=6
+[FSM] currentState=0, tank1Level=4, tank2Level=6, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=7 -> tank1=4 tank2=7
+[FSM] currentState=0, tank1Level=4, tank2Level=7, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=7 -> tank1=4 tank2=7
+[FSM] currentState=0, tank1Level=4, tank2Level=7, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=6 -> tank1=4 tank2=6
+[FSM] currentState=0, tank1Level=4, tank2Level=6, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=9 -> tank1=4 tank2=9
+[FSM] currentState=0, tank1Level=4, tank2Level=9, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=9 -> tank1=4 tank2=9
+[SENSOR] raw1=4 raw2=9 -> tank1=4 tank2=9
+[FSM] currentState=0, tank1Level=4, tank2Level=9, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=7 -> tank1=4 tank2=7
+[FSM] currentState=0, tank1Level=4, tank2Level=7, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=6 -> tank1=4 tank2=6
+[FSM] currentState=0, tank1Level=4, tank2Level=6, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=7 -> tank1=4 tank2=7
+[FSM] currentState=0, tank1Level=4, tank2Level=7, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=6 -> tank1=4 tank2=6
+[FSM] currentState=0, tank1Level=4, tank2Level=6, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=7 -> tank1=4 tank2=7
+[FSM] currentState=0, tank1Level=4, tank2Level=7, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=7 -> tank1=4 tank2=7
+[FSM] currentState=0, tank1Level=4, tank2Level=7, tank1Empty=0, tank2Empty=0
+[SENSOR] raw1=4 raw2=6 -> tank1=4 tank2=6
+[FSM] currentState=0, tank1Level=4, tank2Level=6, tank1Empty=0, tank2Empty=0

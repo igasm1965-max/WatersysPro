@@ -750,6 +750,8 @@ static void handleGetMqtt(AsyncWebServerRequest* request) {
   doc["client_id"] = safeGetPref(PREF_KEY_MQTT_CLIENT_ID, "");
   doc["topic_base"] = safeGetPref(PREF_KEY_MQTT_TOPIC_BASE, DEFAULT_MQTT_TOPIC_BASE);
   doc["interval"] = preferences.getUInt(PREF_KEY_MQTT_PUB_INTERVAL, 10);
+  doc["secure"] = preferences.getBool(PREF_KEY_MQTT_SECURE, DEFAULT_MQTT_SECURE);
+  doc["tls_port"] = preferences.getUInt(PREF_KEY_MQTT_TLS_PORT, DEFAULT_MQTT_TLS_PORT);
   String out;
   serializeJson(doc, out);
   request->send(200, "application/json", out);
@@ -783,6 +785,8 @@ static void handlePostMqttBody(AsyncWebServerRequest* request, uint8_t* data, si
   const char* client_id = doc["client_id"] | "";
   const char* topic_base = doc["topic_base"] | DEFAULT_MQTT_TOPIC_BASE;
   int interval = doc["interval"] | 10;
+  bool secure = doc["secure"] | false;
+  int tls_port = doc["tls_port"] | DEFAULT_MQTT_TLS_PORT;
   preferences.putBool(PREF_KEY_MQTT_ENABLED, enabled);
   preferences.putString(PREF_KEY_MQTT_BROKER, broker);
   preferences.putUInt(PREF_KEY_MQTT_PORT, (uint32_t)port);
@@ -792,6 +796,8 @@ static void handlePostMqttBody(AsyncWebServerRequest* request, uint8_t* data, si
   preferences.putString(PREF_KEY_MQTT_CLIENT_ID, client_id);
   preferences.putString(PREF_KEY_MQTT_TOPIC_BASE, topic_base);
   preferences.putUInt(PREF_KEY_MQTT_PUB_INTERVAL, (uint32_t)interval);
+  preferences.putBool(PREF_KEY_MQTT_SECURE, secure);
+  preferences.putUInt(PREF_KEY_MQTT_TLS_PORT, (uint32_t)tls_port);
   saveEventLog(LOG_INFO, EVENT_SETTINGS_CHANGE, 0);
   request->send(200, "application/json", "{\"ok\":true}\n");
   // Re-init VQTT so new settings are applied immediately

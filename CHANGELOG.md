@@ -1,5 +1,115 @@
 # Changelog
 
+## [1.1.0] - 2026-03-13
+
+### Major Features
+- **MQTT TLS Support**: Complete migration from AsyncMqttClient to PubSubClient v2.8.0 with full TLS/SSL support
+- **Mobile App Ready**: Full React Native Android application created and ready for APK building
+- **Memory Optimization**: Flash usage reduced from 99.8% to 94.6% through aggressive compilation flags
+
+### Added (Firmware)
+- **MQTT Enhancements**:
+  - TLS/SSL encryption support for secure MQTT connections (port 19161 tested with m1.wqpt.ru)
+  - Dual MQTT port configuration (plain and TLS)
+  - Web API for MQTT configuration: `/api/mqtt` (GET/POST)
+  - MQTT menu items in engineer menu: TLS Enable, TLS Port
+  - Automatic TLS client selection based on configuration
+  - WiFi state change detection for proper MQTT initialization
+  - Exponential backoff reconnection (5s → 60s)
+  - Certificate verification skip support via `setInsecure()`
+
+- **Configuration**:
+  - New preferences keys: `PREF_KEY_MQTT_SECURE`, `PREF_KEY_MQTT_TLS_PORT`, `PREF_KEY_MQTT_INSECURE`
+  - Default TLS port: 8883
+  - Persistent storage of all MQTT settings
+
+- **Web Interface**:
+  - Two HTML versions: main interface and simplified version
+  - Both updated with TLS Port and TLS Enable fields
+  - Form-based MQTT configuration in web UI
+  - Live MQTT status display
+
+### Added (Mobile App)
+- **Complete React Native Application**:
+  - LoginScreen: Authentication (login/register)
+  - DashboardScreen: Real-time device monitoring
+  - SettingsScreen: User settings and preferences
+  - Complete API service integration
+  - WebSocket support for live updates
+  - Push notification support
+  - Bottom Tab Navigation
+
+- **Documentation** (7 comprehensive guides):
+  - START_HERE.md: Quick 5-minute overview
+  - QUICK_START_BUILD.md: Step-by-step APK building
+  - BUILD_APK_GUIDE.md: Complete build documentation
+  - CHECKLIST.md: Pre-build verification checklist
+  - DEVICE_CONTROL_GUIDE.md: Application usage guide
+  - README_BUILD.md: Build summary
+  - FINAL_SUMMARY.md: Final overview
+
+- **Build Scripts**:
+  - build-apk.bat: Windows batch script for APK building
+  - build-apk.sh: Linux/Mac bash script
+  - COMMANDS.sh: Copy-paste command reference
+
+- **Configuration Updates**:
+  - app.json: Android configuration with permissions
+  - eas.json: EAS build configuration
+  - tsconfig.json: TypeScript configuration
+
+### Improved (Firmware)
+- **Compilation Optimization**:
+  - Changed optimization from `-Os` to `-Oz` (aggressive size reduction)
+  - Added function/data sections: `-ffunction-sections -fdata-sections`
+  - Removed exceptions and RTTI: `-fno-exceptions -fno-rtti`
+  - Added link-time GC and stripping: `-Wl,--gc-sections -Wl,--strip-all`
+  - Result: Freed 68 KB of flash memory
+
+- **MQTT Code**:
+  - Complete rewrite of vqtt.cpp (~400 lines)
+  - Synchronous PubSubClient API (simpler than async)
+  - Better error messages and logging
+  - Device ID format: `w_sys_XXXX_YYYYYYYY` (WiFi MAC + random)
+  - Proper WiFi/MQTT state synchronization
+
+- **Engineer Menu**:
+  - Added TLS Enable/Disable toggle
+  - Added TLS Port editing
+  - Integrated with existing MQTT settings
+  - Clear MQTT now removes all TLS settings
+
+### Fixed (Firmware)
+- **Critical MQTT Bug**: Fixed null pointer crash when WiFi not connected during initVQTT()
+  - Now initializes default client unconditionally
+  - Only connects when WiFi transitions to connected state
+- **LTO Incompatibility**: Removed Link-Time Optimization due to linker conflicts
+  - Switched to manual section stripping instead
+  - Maintains similar memory savings without errors
+
+### Tested
+- ✅ Plain MQTT: Connected to m1.wqpt.ru:19160 with credentials REDACTED_MQTT_USER/REDACTED_MQTT_PASS
+- ✅ TLS MQTT: Connected to m1.wqpt.ru:19161 (TLS verified working)
+- ✅ Telemetry publishing: JSON format with all metrics (uptime, IP, tank levels, relay states)
+- ✅ Command subscription: MQTT→device relay control working
+- ✅ Web API: /api/mqtt endpoint functional
+- ✅ Automatic reconnection: Exponential backoff verified
+- ✅ WiFi state changes: Proper MQTT initialization on reconnection
+
+### Device Status
+- IP Address: 192.168.3.13 (discovered)
+- Flash Usage: 94.6% (1,240,256 bytes) - safe operating range
+- RAM Usage: 16.3% (53,540 bytes)  
+- Free Heap: ~172 KB during operation
+- MQTT Status: Both plain and TLS modes operational
+
+### Cleanup
+- Removed AsyncMqttClient library dependency
+- Deleted old MQTT implementation references
+- Cleaned up compilation flags (removed failed LTO)
+
+---
+
 ## [1.0.0] - 2026-03-12
 
 ### Major Changes
