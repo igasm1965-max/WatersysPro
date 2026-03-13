@@ -2,6 +2,7 @@
 #include "prefs.h"
 #include "event_logging.h"
 #include "config.h"
+#include "timers.h"
 
 extern Preferences preferences;
 
@@ -28,6 +29,7 @@ static const unsigned long WIFI_ATTEMPT_TIMEOUT_MS = 10000;
 static const int WIFI_MAX_ATTEMPTS = 5;
 
 static unsigned long lastProcessTime = 0;
+static bool needsNTPSync = false;
 
 static String makeApName() {
   uint64_t mac = ESP.getEfuseMac();
@@ -120,12 +122,19 @@ static const char *reasonToString(uint8_t r) {
   }
 }
 
+// Forward declaration for NTP sync function
+extern void syncTimeWithNTP();
+
 static void registerStaEventHandlers() {
   // Log connection/disconnection events and reason codes to help
   // diagnose failures (password wrong, band unsupported, etc.).
   WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info){
     if (event == ARDUINO_EVENT_WIFI_STA_GOT_IP) {
       Serial.printf("[WiFi] STA got IP: %s\n", WiFi.localIP().toString().c_str());
+      
+      // Установляем флаг для синхронизации NTP в главном loop (избегаем проблем TCPIP блокировки)
+      Serial.println("[WiFi] Запланирована синхронизация времени по NTP...");
+      needsNTPSync = true;
     }
   }, ARDUINO_EVENT_WIFI_STA_GOT_IP);
 
@@ -227,3 +236,11 @@ WifiState wifi_getState() { return wifiState; }
 String wifi_getSSID() { return cachedSsid; }
 int wifi_getAttemptCount() { return attemptCount; }
 String wifi_getIP() { return (WiFi.status() == WL_CONNECTED) ? WiFi.localIP().toString() : WiFi.softAPIP().toString(); }
+
+bool wifi_needsNTPSync() {
+  return needsNTPSync;
+}
+
+void wifi_clearNTPSyncFlag() {
+  needsNTPSync = false;
+}

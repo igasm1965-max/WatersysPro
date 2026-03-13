@@ -77,9 +77,13 @@ using SafeLCD = LiquidCrystal_I2C;
 #define EVENT_PUMP2_DRYRUN 16  ///< Событие: сухой ход насоса 2
 #define EVENT_WIFI_CONNECTED 17 ///< Событие: Wi-Fi подключено (STA)
 #define EVENT_WIFI_AP_STARTED 18 ///< Событие: Wi-Fi AP (fallback) запущена
+#define EVENT_NTP_SYNC_SUCCESS 19 ///< Событие: Успешная синхронизация времени через NTP
+#define EVENT_NTP_SYNC_FAILED 20 ///< Событие: Ошибка синхронизации времени через NTP
+#define EVENT_TIMEZONE_CHANGED 21 ///< Событие: Часовой пояс изменен
 
 // ============ PREFERENCES KEYS ============
 #define PREF_KEY_LANG_EN "lang_en"  ///< bool: true=English output, false=Русский
+#define PREF_KEY_TIMEZONE "timezone"  ///< int8: часовой пояс в часах от UTC
 
 // ============ КОДЫ НАСТРОЕК ============
 #define SETTING_TIMER_SETLING 0

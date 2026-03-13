@@ -97,6 +97,9 @@ enum MenuItem {
 
   // engineer menu: log filter configuration
   mkEventLogSettings = 334,
+  
+  // Time zone settings
+  mkSetTimeZone = 35,
 };
 
 // ============ СТРУКТУРЫ ДАННЫХ ============
@@ -208,6 +211,9 @@ struct SafetySettings {
 
   // Настройки опроса датчиков (фильтрация удалена — используется только период опроса)
   uint16_t sensorPollPeriod;      ///< Период опроса датчиков в секундах
+  
+  // Настройки часового пояса
+  int8_t timeZoneOffset;          ///< Смещение часового пояса в часах от UTC (-12 до +14)
 };
 
 /// Контекст системы — используется для поэтапной миграции глобалов

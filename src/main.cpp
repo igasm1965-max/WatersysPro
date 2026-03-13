@@ -53,6 +53,7 @@ extern bool loadRuntimeState();
 extern void runSystemDiagnostics();
 extern void restoreBackwashTimer();
 extern void loadSafetySettings();
+extern void loadTimeZoneSetting();
 
 // ============ ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ (ОБЪЕКТЫ) ============
 
@@ -386,6 +387,7 @@ void setup() {
   initializePreferences();
   loadAllSettings();
   loadSafetySettings();  // Загрузка настроек безопасности (инженерное меню)
+  loadTimeZoneSetting();  // Загрузка часового пояса
 
   #ifdef ENABLE_WIFI
     // Инициализируем RTC до модулей, которые логируют события (предотвращает crash при rtc.now())
@@ -519,6 +521,17 @@ void loopESP32() {
   // Background Wi-Fi and web server periodic tasks
   #ifdef ENABLE_WIFI
     loopWifiManager();
+    
+    // Синхронизация NTP если WiFi только что подключился
+    extern bool wifi_needsNTPSync();
+    extern void wifi_clearNTPSyncFlag();
+    extern void syncTimeWithNTP();
+    
+    if (wifi_needsNTPSync()) {
+      syncTimeWithNTP();
+      wifi_clearNTPSyncFlag();
+    }
+    
     webServerPeriodic();
     // Handle MQTT client periodic tasks
     loopVQTT();

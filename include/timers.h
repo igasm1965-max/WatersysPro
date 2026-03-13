@@ -14,6 +14,9 @@
 /// Инициализация RTC модуля
 void initRTC();
 
+/// Синхронизация времени через NTP сервер
+void syncTimeWithNTP();
+
 /// Инициализация Watchdog
 void initWatchdog();
 
