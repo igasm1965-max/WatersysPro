@@ -89,9 +89,12 @@ void syncTimeWithNTP() {
   Serial.println("[NTP] Requesting time synchronization...");
   
   // Строим строку часового пояса на основе safetySettings.timeZoneOffset
+  // ВАЖНО: RTC хранит UTC время, часовой пояс нужен только для отображения
   char tzString[32];
   
-  if (safetySettings.timeZoneOffset >= 0) {
+  if (safetySettings.timeZoneOffset == 0) {
+    strcpy(tzString, "UTC0");  // Special case для UTC (UTC+0 может не работать)
+  } else if (safetySettings.timeZoneOffset > 0) {
     snprintf(tzString, sizeof(tzString), "UTC+%d", safetySettings.timeZoneOffset);
   } else {
     snprintf(tzString, sizeof(tzString), "UTC%d", safetySettings.timeZoneOffset);
@@ -103,30 +106,42 @@ void syncTimeWithNTP() {
   configTzTime(tzString, "pool.ntp.org", "time.nist.gov", "time.google.com");
   
   // Даем время SNTP клиенту на синхронизацию (макс 30 сек)
-  time_t now = time(nullptr);
+  time_t nowUtc = time(nullptr);  // UTC время из NTP
   int attempts = 0;
   const int maxAttempts = 60; // 30 сек при 500 мс задержке
   
-  while (now < 24 * 3600 && attempts < maxAttempts) {
+  while (nowUtc < 24 * 3600 && attempts < maxAttempts) {
     delay(500);
-    time(&now);
+    time(&nowUtc);
     attempts++;
   }
   
-  if (now > 24 * 3600) {
-    // Время успешно синхронизировано с учетом часового пояса
-    struct tm timeinfo = *localtime(&now);
-    Serial.printf("[NTP] Time synchronized: %04d-%02d-%02d %02d:%02d:%02d (TZ: %+d)\n",
-                  timeinfo.tm_year + 1900,
-                  timeinfo.tm_mon + 1,
-                  timeinfo.tm_mday,
-                  timeinfo.tm_hour,
-                  timeinfo.tm_min,
-                  timeinfo.tm_sec,
+  if (nowUtc > 24 * 3600) {
+    // Время успешно синхронизировано
+    // nowUtc содержит UTC время
+    // Получим локальное время для отображения в логах
+    struct tm timeinfo_utc = *gmtime(&nowUtc);  // UTC для RTC
+    struct tm timeinfo_local = *localtime(&nowUtc);  // Локальное для логов
+    
+    Serial.printf("[NTP] UTC time: %04d-%02d-%02d %02d:%02d:%02d\n",
+                  timeinfo_utc.tm_year + 1900,
+                  timeinfo_utc.tm_mon + 1,
+                  timeinfo_utc.tm_mday,
+                  timeinfo_utc.tm_hour,
+                  timeinfo_utc.tm_min,
+                  timeinfo_utc.tm_sec);
+    
+    Serial.printf("[NTP] Local time: %04d-%02d-%02d %02d:%02d:%02d (TZ: %+d)\n",
+                  timeinfo_local.tm_year + 1900,
+                  timeinfo_local.tm_mon + 1,
+                  timeinfo_local.tm_mday,
+                  timeinfo_local.tm_hour,
+                  timeinfo_local.tm_min,
+                  timeinfo_local.tm_sec,
                   safetySettings.timeZoneOffset);
     
-    // Обновляем RTC модуль синхронизированным временем (уже с учетом часового пояса)
-    rtc.adjust(DateTime(now));
+    // Обновляем RTC только UTC временем! (не локальным)
+    rtc.adjust(DateTime(nowUtc));
     saveEventLog(LOG_INFO, EVENT_NTP_SYNC_SUCCESS, safetySettings.timeZoneOffset + 128);  // +128 для сохранения отрицательных значений
   } else {
     Serial.println("[NTP] Time synchronization failed");
