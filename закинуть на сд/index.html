@@ -867,6 +867,9 @@
               <div class="field-label"><strong>Port</strong></div>
               <div><input id="mqtt_port" type="number" style="max-width: 120px" placeholder="1883"></div>
 
+              <div class="field-label"><strong>TLS Port</strong></div>
+              <div><input id="mqtt_tls_port" type="number" style="max-width: 120px" placeholder="8883"></div>
+
               <div class="field-label"><strong>User</strong></div>
               <div><input id="mqtt_user" type="text" placeholder="username"></div>
 
@@ -881,6 +884,9 @@
 
               <div class="field-label"><strong>Interval (s)</strong></div>
               <div><input id="mqtt_interval" type="number" style="max-width: 120px" placeholder="10"></div>
+
+              <div class="field-label"><strong>TLS Enable</strong></div>
+              <div><input id="mqtt_secure" type="checkbox"></div>
 
               <div class="field-label"><strong>Will message</strong></div>
               <div><input id="mqtt_will" type="checkbox"></div>
@@ -1281,6 +1287,8 @@
       document.getElementById('mqtt_client_id').value = j.client_id || '';
       document.getElementById('mqtt_topic_base').value = j.topic_base || '';
       document.getElementById('mqtt_interval').value = j.interval || '';
+      document.getElementById('mqtt_secure').checked = !!j.secure;
+      document.getElementById('mqtt_tls_port').value = j.tls_port || '';
       document.getElementById('mqtt_will').checked = !!j.will;
       document.getElementById('mqtt_enabled').checked = !!j.enabled;
     } catch(e) { console.warn('loadMqtt error', e); }
@@ -1296,6 +1304,8 @@
       client_id: document.getElementById('mqtt_client_id').value,
       topic_base: document.getElementById('mqtt_topic_base').value,
       interval: parseInt(document.getElementById('mqtt_interval').value) || 10,
+      secure: document.getElementById('mqtt_secure').checked,
+      tls_port: parseInt(document.getElementById('mqtt_tls_port').value) || 8883,
       will: document.getElementById('mqtt_will').checked
     // no admin token field anymore
     };

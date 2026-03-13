@@ -4,8 +4,9 @@ import { TextInput, Button, Title } from 'react-native-paper';
 import ApiService from '../services/api';
 
 export default function LoginScreen({ navigation, onLogin }: any) {
-  const [email, setEmail] = useState('admin@example.com');
-  const [password, setPassword] = useState('password');
+  const [email, setEmail] = useState('your_email@example.com');
+  const [password, setPassword] = useState('your_password');
+  const [isRegistering, setIsRegistering] = useState(false);
 
   const login = async () => {
     try {
@@ -16,12 +17,26 @@ export default function LoginScreen({ navigation, onLogin }: any) {
     } catch (err) { alert('Login failed'); }
   };
 
+  const register = async () => {
+    try {
+      const r = await ApiService.register(email, password);
+      (global as any).authToken = r.token;
+      alert('Registered successfully');
+      if (onLogin) onLogin(r.token);
+    } catch (err) { alert('Registration failed'); }
+  };
+
   return (
     <View style={{flex:1,justifyContent:'center',padding:16}}>
-      <Title style={{marginBottom:16}}>Login</Title>
+      <Title style={{marginBottom:16}}>{isRegistering ? 'Register' : 'Login'}</Title>
       <TextInput label="Email" value={email} onChangeText={setEmail} mode="outlined" />
       <TextInput label="Password" value={password} onChangeText={setPassword} secureTextEntry mode="outlined" style={{marginTop:8}} />
-      <Button mode="contained" onPress={login} style={{marginTop:16}}>Login</Button>
+      <Button mode="contained" onPress={isRegistering ? register : login} style={{marginTop:16}}>
+        {isRegistering ? 'Register' : 'Login'}
+      </Button>
+      <Button mode="text" onPress={() => setIsRegistering(!isRegistering)} style={{marginTop:8}}>
+        {isRegistering ? 'Already have account? Login' : "Don't have account? Register"}
+      </Button>
     </View>
   );
 }

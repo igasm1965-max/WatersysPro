@@ -89,6 +89,8 @@ void showMqttSetup();
 void toggleMqttEnabled();
 void editMqttBroker();
 void editMqttPort();
+void toggleMqttTls();
+void editMqttTlsPort();
 void editMqttUser();
 void editMqttPass();
 void editMqttClientId();

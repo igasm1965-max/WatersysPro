@@ -28,7 +28,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
 const PORT = process.env.PORT || 3000;
-const MQTT_BROKER = process.env.MQTT_BROKER || 'mqtt://localhost:1883';
+const MQTT_BROKER = process.env.MQTT_BROKER || 'mqtts://esp32:Miv18072026@8bbebf26c27f4745a2dd39059872f9c3.s1.eu.hivemq.cloud:8883';
 const JWT_SECRET = process.env.JWT_SECRET || 'change_this_secret';
 
 

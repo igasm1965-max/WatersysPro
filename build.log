@@ -1,0 +1,161 @@
+Processing esp32dev (platform: espressif32; board: esp32dev; framework: arduino)
+--------------------------------------------------------------------------------
+Library Manager: Installing marcoschwartz/LiquidCrystal_I2C @ ^1.1.4
+Unpacking 0% 10% 20% 30% 40% 50% 60% 70% 80% 90%
+Library Manager: LiquidCrystal_I2C@1.1.4 has been installed!
+Library Manager: Installing adafruit/RTClib @ ^2.0.0
+Unpacking 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
+Library Manager: RTClib@2.1.4 has been installed!
+Library Manager: Resolving dependencies...
+Library Manager: Installing Adafruit BusIO
+Unpacking 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
+Library Manager: Adafruit BusIO@1.17.4 has been installed!
+Library Manager: Installing knolleary/PubSubClient @ ^2.8
+Unpacking 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
+Library Manager: PubSubClient@2.8.0 has been installed!
+Library Manager: Installing teckel12/NewPing @ ^1.9.7
+Unpacking 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
+Library Manager: NewPing@1.9.7 has been installed!
+Library Manager: Installing bblanchon/ArduinoJson @ ^6.18.5
+Unpacking 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
+Library Manager: ArduinoJson@6.21.6 has been installed!
+Library Manager: Installing me-no-dev/ESPAsyncWebServer @ ^3.6.0
+Unpacking 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
+Library Manager: ESPAsyncWebServer@3.6.0 has been installed!
+Library Manager: Resolving dependencies...
+Library Manager: Installing ESP32Async/AsyncTCP @ ^3.3.2
+Unpacking 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
+Library Manager: AsyncTCP@3.4.10 has been installed!
+Verbose mode can be enabled via `-v, --verbose` option
+CONFIGURATION: https://docs.platformio.org/page/boards/espressif32/esp32dev.html
+PLATFORM: Espressif 32 (53.3.11) > Espressif ESP32 Dev Module
+HARDWARE: ESP32 240MHz, 320KB RAM, 4MB Flash
+DEBUG: Current (cmsis-dap) External (cmsis-dap, esp-bridge, esp-prog, iot-bus-jtag, jlink, minimodule, olimex-arm-usb-ocd, olimex-arm-usb-ocd-h, olimex-arm-usb-tiny-h, olimex-jtag-tiny, tumpa)
+PACKAGES: 
+ - framework-arduinoespressif32 @ 3.1.1 
+ - framework-arduinoespressif32-libs @ 5.3.0+sha.cfea4f7c98 
+ - tool-esptoolpy @ 4.8.5 
+ - tool-mkfatfs @ 2.0.1 
+ - tool-mklittlefs @ 3.2.0 
+ - tool-mkspiffs @ 2.230.0 (2.30) 
+ - tool-riscv32-esp-elf-gdb @ 14.2.0+20240403 
+ - tool-xtensa-esp-elf-gdb @ 14.2.0+20240403 
+ - toolchain-xtensa-esp-elf @ 13.2.0+20240530
+LDF: Library Dependency Finder -> https://bit.ly/configure-pio-ldf
+LDF Modes: Finder ~ chain, Compatibility ~ soft
+Found 49 compatible libraries
+Scanning dependencies...
+Dependency Graph
+|-- LiquidCrystal_I2C @ 1.1.4
+|-- RTClib @ 2.1.4
+|-- PubSubClient @ 2.8.0
+|-- NewPing @ 1.9.7
+|-- ArduinoJson @ 6.21.6
+|-- ESPAsyncWebServer @ 3.6.0
+|-- WiFi @ 3.1.1
+|-- SD @ 3.1.1
+|-- SPI @ 3.1.1
+|-- AsyncTCP @ 3.4.10
+|-- Preferences @ 3.1.1
+|-- Wire @ 3.1.1
+Building in release mode
+Compiling .pio\build\esp32dev\src\display.cpp.o
+Compiling .pio\build\esp32dev\src\emergency.cpp.o
+Compiling .pio\build\esp32dev\src\encoder.cpp.o
+Compiling .pio\build\esp32dev\src\engineer_menu.cpp.o
+Compiling .pio\build\esp32dev\src\event_logging.cpp.o
+Compiling .pio\build\esp32dev\src\main.cpp.o
+Compiling .pio\build\esp32dev\src\menu.cpp.o
+Compiling .pio\build\esp32dev\src\menu_data.cpp.o
+Compiling .pio\build\esp32dev\src\network_stubs.cpp.o
+Compiling .pio\build\esp32dev\src\preferences.cpp.o
+Compiling .pio\build\esp32dev\src\relay_control.cpp.o
+Compiling .pio\build\esp32dev\src\sensors.cpp.o
+Compiling .pio\build\esp32dev\src\state_machine.cpp.o
+Compiling .pio\build\esp32dev\src\timers.cpp.o
+Compiling .pio\build\esp32dev\src\utils.cpp.o
+Compiling .pio\build\esp32dev\src\vqtt.cpp.o
+Compiling .pio\build\esp32dev\src\vqtt_new.cpp.o
+Compiling .pio\build\esp32dev\src\web_server.cpp.o
+Compiling .pio\build\esp32dev\src\wifi_manager.cpp.o
+Building .pio\build\esp32dev\bootloader.bin
+Generating partitions .pio\build\esp32dev\partitions.bin
+esptool.py v4.8.5
+Creating esp32 image...
+Merged 2 ELF sections
+Successfully created esp32 image.
+Compiling .pio\build\esp32dev\lib28b\Wire\Wire.cpp.o
+Compiling .pio\build\esp32dev\liba0c\LiquidCrystal_I2C\LiquidCrystal_I2C.cpp.o
+Compiling .pio\build\esp32dev\lib6dc\SPI\SPI.cpp.o
+src/vqtt.cpp:25:1: error: 'WiFiClientSecure' does not name a type; did you mean 'WiFiClient'?
+   25 | WiFiClientSecure wifiClientSecure; // For TLS/MQTT
+      | ^~~~~~~~~~~~~~~~
+      | WiFiClient
+src/vqtt.cpp:27:31: error: 'wifiClientSecure' was not declared in this scope; did you mean 'mqttClientSecure'?
+   27 | PubSubClient mqttClientSecure(wifiClientSecure);
+      |                               ^~~~~~~~~~~~~~~~
+      |                               mqttClientSecure
+src/vqtt.cpp: In function 'void connectToBroker()':
+src/vqtt.cpp:120:5: error: 'wifiClientSecure' was not declared in this scope; did you mean 'mqttClientSecure'?
+  120 |     wifiClientSecure.setInsecure(); // Skip cert verification
+      |     ^~~~~~~~~~~~~~~~
+      |     mqttClientSecure
+src/vqtt.cpp:135:17: error: 'class PubSubClient' has no member named 'setCredential'
+  135 |     activeMqtt->setCredential(user.c_str(), pass.c_str());
+      |                 ^~~~~~~~~~~~~
+Compiling .pio\build\esp32dev\lib783\Adafruit BusIO\Adafruit_BusIO_Register.cpp.o
+Compiling .pio\build\esp32dev\lib783\Adafruit BusIO\Adafruit_GenericDevice.cpp.o
+Compiling .pio\build\esp32dev\lib783\Adafruit BusIO\Adafruit_I2CDevice.cpp.o
+Compiling .pio\build\esp32dev\lib783\Adafruit BusIO\Adafruit_SPIDevice.cpp.o
+Compiling .pio\build\esp32dev\libc5b\RTClib\RTC_DS1307.cpp.o
+*** [.pio\build\esp32dev\src\vqtt.cpp.o] Error 1
+In file included from .pio/libdeps/esp32dev/LiquidCrystal_I2C/LiquidCrystal_I2C.cpp:3:
+.pio/libdeps/esp32dev/LiquidCrystal_I2C/LiquidCrystal_I2C.cpp: In member function 'virtual size_t LiquidCrystal_I2C::write(uint8_t)':
+.pio/libdeps/esp32dev/LiquidCrystal_I2C/LiquidCrystal_I2C.h:53:12: warning: 'B00000001' is deprecated: use 0b00000001 instead [-Wdeprecated-declarations]
+   53 | #define Rs B00000001  // Register select bit
+      |            ^~~~~~~~~
+.pio/libdeps/esp32dev/LiquidCrystal_I2C/LiquidCrystal_I2C.cpp:11:21: note: in expansion of macro 'Rs'
+   11 |         send(value, Rs);
+      |                     ^~
+In file included from C:/Users/miv65/.platformio/packages/framework-arduinoespressif32@src-77c8e93767360b28deee4aedf5d0a1ab/cores/esp32/Arduino.h:41,
+                 from .pio/libdeps/esp32dev/LiquidCrystal_I2C/LiquidCrystal_I2C.cpp:7:
+C:/Users/miv65/.platformio/packages/framework-arduinoespressif32@src-77c8e93767360b28deee4aedf5d0a1ab/cores/esp32/binary.h:53:3: note: declared here
+   53 |   B00000001 DEPRECATED(0b00000001) = 1,
+      |   ^~~~~~~~~
+.pio/libdeps/esp32dev/LiquidCrystal_I2C/LiquidCrystal_I2C.cpp: In member function 'void LiquidCrystal_I2C::pulseEnable(uint8_t)':
+.pio/libdeps/esp32dev/LiquidCrystal_I2C/LiquidCrystal_I2C.h:51:12: warning: 'B00000100' is deprecated: use 0b00000100 instead [-Wdeprecated-declarations]
+   51 | #define En B00000100  // Enable bit
+      |            ^~~~~~~~~
+.pio/libdeps/esp32dev/LiquidCrystal_I2C/LiquidCrystal_I2C.cpp:274:31: note: in expansion of macro 'En'
+  274 |         expanderWrite(_data | En);      // En high
+      |                               ^~
+C:/Users/miv65/.platformio/packages/framework-arduinoespressif32@src-77c8e93767360b28deee4aedf5d0a1ab/cores/esp32/binary.h:73:3: note: declared here
+   73 |   B00000100 DEPRECATED(0b00000100) = 4,
+      |   ^~~~~~~~~
+.pio/libdeps/esp32dev/LiquidCrystal_I2C/LiquidCrystal_I2C.h:51:12: warning: 'B00000100' is deprecated: use 0b00000100 instead [-Wdeprecated-declarations]
+   51 | #define En B00000100  // Enable bit
+      |            ^~~~~~~~~
+.pio/libdeps/esp32dev/LiquidCrystal_I2C/LiquidCrystal_I2C.cpp:277:32: note: in expansion of macro 'En'
+  277 |         expanderWrite(_data & ~En);     // En low
+      |                                ^~
+C:/Users/miv65/.platformio/packages/framework-arduinoespressif32@src-77c8e93767360b28deee4aedf5d0a1ab/cores/esp32/binary.h:73:3: note: declared here
+   73 |   B00000100 DEPRECATED(0b00000100) = 4,
+      |   ^~~~~~~~~
+src/vqtt_new.cpp:25:1: error: 'WiFiClientSecure' does not name a type; did you mean 'WiFiClient'?
+   25 | WiFiClientSecure wifiClientSecure; // For TLS/MQTT
+      | ^~~~~~~~~~~~~~~~
+      | WiFiClient
+src/vqtt_new.cpp:27:31: error: 'wifiClientSecure' was not declared in this scope; did you mean 'mqttClientSecure'?
+   27 | PubSubClient mqttClientSecure(wifiClientSecure);
+      |                               ^~~~~~~~~~~~~~~~
+      |                               mqttClientSecure
+src/vqtt_new.cpp: In function 'void connectToBroker()':
+src/vqtt_new.cpp:120:5: error: 'wifiClientSecure' was not declared in this scope; did you mean 'mqttClientSecure'?
+  120 |     wifiClientSecure.setInsecure(); // Skip cert verification
+      |     ^~~~~~~~~~~~~~~~
+      |     mqttClientSecure
+src/vqtt_new.cpp:135:17: error: 'class PubSubClient' has no member named 'setCredential'
+  135 |     activeMqtt->setCredential(user.c_str(), pass.c_str());
+      |                 ^~~~~~~~~~~~~
+*** [.pio\build\esp32dev\src\vqtt_new.cpp.o] Error 1
+========================= [FAILED] Took 23.92 seconds =========================
