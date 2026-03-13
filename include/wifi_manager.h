@@ -18,4 +18,8 @@ String wifi_getSSID();
 int wifi_getAttemptCount();
 String wifi_getIP();
 
+// NTP synchronization flag
+bool wifi_needsNTPSync();
+void wifi_clearNTPSyncFlag();
+
 #endif // WIFI_MANAGER_H

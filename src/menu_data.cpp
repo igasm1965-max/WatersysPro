@@ -52,6 +52,7 @@ sMenuItem mainMenu[] = {
   // Дата и время
   { mkSetCurrentTime, mkDateTimeSettings, "Set Current Time", DateTimeSettingsHandler },
   { mkSetCurrentDate, mkDateTimeSettings, "Set Current Date", DateTimeSettingsHandler },
+  { mkSetTimeZone, mkDateTimeSettings, "Set Time Zone", editTimeZone },
   { mkViewDateTime, mkDateTimeSettings, "View Date/Time", DateTimeSettingsHandler },
   { mkBack, mkDateTimeSettings, "Back", NULL },
 

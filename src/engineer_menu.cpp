@@ -1359,6 +1359,9 @@ void saveSafetySettings() {
   // Sensor filter settings
   // sensor filter settings removed; keep poll period only
   preferences.putUShort("sf_sen_poll", safetySettings.sensorPollPeriod);
+  
+  // Time zone offset
+  preferences.putChar("sf_tz", safetySettings.timeZoneOffset);
 
 }
 
@@ -1379,5 +1382,89 @@ void loadSafetySettings() {
   // Sensor filter settings
   safetySettings.sensorPollPeriod = preferences.getUShort("sf_sen_poll", DEFAULT_SENSOR_POLL_PERIOD);
   
+  // Time zone offset
+  safetySettings.timeZoneOffset = preferences.getChar("sf_tz", 0);  // Default: UTC
 
+}
+
+/// Редактирует часовой пояс (смещение от UTC в часах)
+void editTimeZone() {
+  extern SafeLCD lcd;
+  extern SystemFlags flags;
+  extern SafetySettings safetySettings;
+  
+  uint16_t value = safetySettings.timeZoneOffset + 12;  // Смещение от -12 до +14, приводим к 0-26
+  const uint16_t minVal = 0;   // -12 часов
+  const uint16_t maxVal = 26;  // +14 часов
+  
+  flags.displayLocked = 1;
+  unsigned long lastTime = millis();
+  bool needsRedraw = true;
+  uint16_t lastDisplayValue = 0xFFFF;
+  
+  while (true) {
+    // Сброс watchdog
+    esp_task_wdt_reset();
+    
+    // Обработка энкодера
+    eEncoderState action = getEncoderState();
+    
+    if (action == eRight) {
+      lastTime = millis();
+      if (value < maxVal) {
+        value++;
+        needsRedraw = true;
+      }
+    } else if (action == eLeft) {
+      lastTime = millis();
+      if (value > minVal) {
+        value--;
+        needsRedraw = true;
+      }
+    } else if (action == eButton) {
+      // Сохраняем значение
+      safetySettings.timeZoneOffset = (int8_t)(value - 12);
+      saveSafetySettings();
+      
+      Serial.printf("[Engineer] TimeZone set to %+d hours\n", safetySettings.timeZoneOffset);
+      saveEventLog(LOG_INFO, EVENT_TIMEZONE_CHANGED, safetySettings.timeZoneOffset + 128);  // +128 для сохранения отрицательных значений
+      
+      flags.displayLocked = 0;
+      return;
+    }
+    
+    // Проверка таймаута неактивности (30 сек)
+    if (millis() - lastTime > 30000) {
+      flags.displayLocked = 0;
+      return;
+    }
+    
+    // Отрисовка дисплея (только при изменении)
+    if (needsRedraw || value != lastDisplayValue) {
+      needsRedraw = false;
+      lastDisplayValue = value;
+      
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("Set Time Zone");
+      
+      lcd.setCursor(0, 1);
+      int8_t tzOffset = (int8_t)(value - 12);
+      if (tzOffset >= 0) {
+        lcd.print("UTC+");
+        lcd.print(tzOffset);
+      } else {
+        lcd.print("UTC");
+        lcd.print(tzOffset);
+      }
+      
+      lcd.setCursor(0, 2);
+      lcd.print("Turn: select");
+      
+      lcd.setCursor(0, 3);
+      lcd.print("Click: save");
+    }
+    
+    delay(10);
+  }
 }

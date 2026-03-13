@@ -550,3 +550,26 @@ void saveFilterCleaningPeriod(uint32_t days) {
   Serial.print(days);
   Serial.println(" days");
 }
+
+/// Загружает часовой пояс из памяти
+void loadTimeZoneSetting() {
+  extern SafetySettings safetySettings;
+  extern Preferences preferences;
+  
+  if (preferences.isKey(PREF_KEY_TIMEZONE)) {
+    safetySettings.timeZoneOffset = preferences.getChar(PREF_KEY_TIMEZONE, 0);
+  } else {
+    safetySettings.timeZoneOffset = 0; // UTC по умолчанию
+  }
+  
+  Serial.printf("[Preferences] Timezone loaded: %d hours\\n", safetySettings.timeZoneOffset);
+}
+
+/// Сохраняет часовой пояс в память
+void saveTimeZoneSetting() {
+  extern SafetySettings safetySettings;
+  extern Preferences preferences;
+  
+  preferences.putChar(PREF_KEY_TIMEZONE, safetySettings.timeZoneOffset);
+  Serial.printf("[Preferences] Timezone saved: %d hours\\n", safetySettings.timeZoneOffset);
+}

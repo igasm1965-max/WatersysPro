@@ -67,6 +67,12 @@ void saveScheduleSettings();
 /// Сохранение периода очистки фильтра
 void saveFilterCleaningPeriod(uint32_t days);
 
+/// Загрузка часового пояса из памяти
+void loadTimeZoneSetting();
+
+/// Сохраняет часовой пояс в память
+void saveTimeZoneSetting();
+
 /// Сохранение timestamp последней промывки фильтра
 void saveBackwashTimestamp();
 

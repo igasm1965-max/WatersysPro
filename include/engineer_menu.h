@@ -72,6 +72,9 @@ void editWatchdogTimeout();
 /// Показывает экран смены пароля
 void showChangePasswordScreen();
 
+/// Редактирует часовой пояс
+void editTimeZone();
+
 /// Показывает системную информацию
 void showSystemInfo();
 

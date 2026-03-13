@@ -11,6 +11,8 @@
 #include <esp_system.h>  
 #include <esp_task_wdt.h> 
 #include <rom/rtc.h>
+#include <time.h>
+#include <sys/time.h>
 
 // ============ ИНИЦИАЛИЗАЦИЯ RTC ============
 
@@ -74,6 +76,62 @@ bool isTimeElapsed(unsigned long& lastTime, unsigned long interval) {
     return true;
   }
   return false;
+}
+
+// ============ СИНХРОНИЗАЦИЯ ВРЕМЕНИ (NTP) ============
+
+/// Синхронизирует время с NTP сервером после подключения WiFi
+void syncTimeWithNTP() {
+  extern RTC_DS3231 rtc;
+  extern SafetySettings safetySettings;
+  extern void saveEventLog(LogLevel level, uint8_t eventType, uint16_t param);
+  
+  Serial.println("[NTP] Requesting time synchronization...");
+  
+  // Строим строку часового пояса на основе safetySettings.timeZoneOffset
+  char tzString[32];
+  
+  if (safetySettings.timeZoneOffset >= 0) {
+    snprintf(tzString, sizeof(tzString), "UTC+%d", safetySettings.timeZoneOffset);
+  } else {
+    snprintf(tzString, sizeof(tzString), "UTC%d", safetySettings.timeZoneOffset);
+  }
+  
+  Serial.printf("[NTP] Using timezone: %s\n", tzString);
+  
+  // Настраиваем динамический часовой пояс с NTP серверами
+  configTzTime(tzString, "pool.ntp.org", "time.nist.gov", "time.google.com");
+  
+  // Даем время SNTP клиенту на синхронизацию (макс 30 сек)
+  time_t now = time(nullptr);
+  int attempts = 0;
+  const int maxAttempts = 60; // 30 сек при 500 мс задержке
+  
+  while (now < 24 * 3600 && attempts < maxAttempts) {
+    delay(500);
+    time(&now);
+    attempts++;
+  }
+  
+  if (now > 24 * 3600) {
+    // Время успешно синхронизировано с учетом часового пояса
+    struct tm timeinfo = *localtime(&now);
+    Serial.printf("[NTP] Time synchronized: %04d-%02d-%02d %02d:%02d:%02d (TZ: %+d)\n",
+                  timeinfo.tm_year + 1900,
+                  timeinfo.tm_mon + 1,
+                  timeinfo.tm_mday,
+                  timeinfo.tm_hour,
+                  timeinfo.tm_min,
+                  timeinfo.tm_sec,
+                  safetySettings.timeZoneOffset);
+    
+    // Обновляем RTC модуль синхронизированным временем (уже с учетом часового пояса)
+    rtc.adjust(DateTime(now));
+    saveEventLog(LOG_INFO, EVENT_NTP_SYNC_SUCCESS, safetySettings.timeZoneOffset + 128);  // +128 для сохранения отрицательных значений
+  } else {
+    Serial.println("[NTP] Time synchronization failed");
+    saveEventLog(LOG_WARNING, EVENT_NTP_SYNC_FAILED, attempts);
+  }
 }
 
 // ============ ИНИЦИАЛИЗАЦИЯ WATCHDOG ============
