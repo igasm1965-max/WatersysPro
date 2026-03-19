@@ -29,6 +29,10 @@
    - Все измененные и новые файлы
    - Классификация по подсистемам
    - Риски и рекомендации по разбиению на коммиты
+- **[docs/PRODUCTION_HARDENING_TRACKER.md](docs/PRODUCTION_HARDENING_TRACKER.md)** - Трекер hardening-задач для production
+   - Приоритеты P0/P1/P2
+   - Owner, estimate, статус, DoD
+   - Чекбоксы исполнения по каждой задаче
 
 ---
 
