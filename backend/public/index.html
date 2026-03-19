@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Watersys Remote Control</title>
+  <style>
+    :root {
+      --bg-1: #0c1b2a;
+      --bg-2: #143a5a;
+      --card: #f6fbff;
+      --ink: #102033;
+      --muted: #5b6d7e;
+      --ok: #1f9d55;
+      --warn: #d97706;
+      --bad: #c0392b;
+      --accent: #0f8bd8;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", "Trebuchet MS", sans-serif;
+      color: var(--ink);
+      background: radial-gradient(1200px 700px at -10% -20%, #4bb3fd40, transparent 60%),
+                  radial-gradient(1200px 700px at 110% 120%, #6ee7b730, transparent 60%),
+                  linear-gradient(135deg, var(--bg-1), var(--bg-2));
+      display: grid;
+      place-items: center;
+      padding: 18px;
+    }
+
+    .panel {
+      width: min(940px, 100%);
+      background: var(--card);
+      border-radius: 18px;
+      box-shadow: 0 20px 45px #00162f55;
+      overflow: hidden;
+    }
+
+    .head {
+      padding: 18px;
+      background: linear-gradient(90deg, #032742, #0b588b);
+      color: #fff;
+      display: grid;
+      gap: 6px;
+    }
+
+    .title {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+
+    .sub {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .grid {
+      display: grid;
+      gap: 14px;
+      padding: 16px;
+      grid-template-columns: 1.2fr 1fr;
+    }
+
+    .card {
+      border: 1px solid #d5e4f2;
+      border-radius: 12px;
+      padding: 14px;
+      background: #fff;
+    }
+
+    .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
+    .value { font-size: 16px; font-weight: 700; margin-top: 4px; }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .token-wrap {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    input {
+      width: 100%;
+      border: 1px solid #c5d9ea;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      background: var(--accent);
+      color: #fff;
+    }
+
+    button.secondary { background: #5f7388; }
+    button.on { background: var(--ok); }
+    button.off { background: var(--bad); }
+
+    .controls {
+      display: grid;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .ctrl {
+      border: 1px solid #d8e6f2;
+      border-radius: 10px;
+      padding: 8px;
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .lamp {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 8px;
+      background: #9ba9b7;
+    }
+
+    .lamp.on { background: var(--ok); box-shadow: 0 0 10px #1f9d5588; }
+
+    .log {
+      font-family: Consolas, monospace;
+      font-size: 12px;
+      background: #f2f7fc;
+      border-radius: 10px;
+      padding: 10px;
+      height: 220px;
+      overflow: auto;
+      white-space: pre-wrap;
+    }
+
+    .ok { color: var(--ok); }
+    .warn { color: var(--warn); }
+    .bad { color: var(--bad); }
+
+    @media (max-width: 860px) {
+      .grid { grid-template-columns: 1fr; }
+      .row { grid-template-columns: 1fr; }
+      .ctrl { grid-template-columns: 1fr auto; }
+    }
+  </style>
+</head>
+<body>
+  <main class="panel">
+    <section class="head">
+      <div class="title">Watersys Remote</div>
+      <div class="sub">Управление через MQTT без локального ПК рядом</div>
+    </section>
+
+    <section class="grid">
+      <article class="card">
+        <div class="label">Доступ</div>
+        <div class="token-wrap">
+          <input id="token" type="password" placeholder="REMOTE_ADMIN_TOKEN" />
+          <button class="secondary" id="saveToken">Сохранить</button>
+        </div>
+
+        <div class="row" style="margin-top: 10px;">
+          <div>
+            <div class="label">Topic Base</div>
+            <div class="value" id="topicBase">...</div>
+          </div>
+          <div>
+            <div class="label">Статус</div>
+            <div class="value" id="status">unknown</div>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top: 10px;">
+          <div>
+            <div class="label">Tank 1</div>
+            <div class="value" id="tank1">-</div>
+          </div>
+          <div>
+            <div class="label">Tank 2</div>
+            <div class="value" id="tank2">-</div>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top: 10px;">
+          <div>
+            <div class="label">IP устройства</div>
+            <div class="value" id="deviceIp">-</div>
+          </div>
+          <div>
+            <div class="label">Последнее сообщение</div>
+            <div class="value" id="lastSeen">-</div>
+          </div>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="label">Управление реле</div>
+        <div class="controls" id="controls"></div>
+      </article>
+
+      <article class="card" style="grid-column: 1 / -1;">
+        <div class="label">Лог</div>
+        <div class="log" id="log"></div>
+      </article>
+    </section>
+  </main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const TARGETS = ['pump1', 'pump2', 'aeration', 'ozone', 'filter', 'backwash'];
+
+    const el = {
+      token: document.getElementById('token'),
+      saveToken: document.getElementById('saveToken'),
+      topicBase: document.getElementById('topicBase'),
+      status: document.getElementById('status'),
+      tank1: document.getElementById('tank1'),
+      tank2: document.getElementById('tank2'),
+      deviceIp: document.getElementById('deviceIp'),
+      lastSeen: document.getElementById('lastSeen'),
+      controls: document.getElementById('controls'),
+      log: document.getElementById('log'),
+    };
+
+    const relayLamp = {};
+    const relayState = {};
+
+    function appendLog(msg, cls = '') {
+      const line = document.createElement('div');
+      if (cls) line.className = cls;
+      line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      el.log.prepend(line);
+    }
+
+    function getToken() {
+      return localStorage.getItem('remoteAdminToken') || '';
+    }
+
+    function setToken(t) {
+      localStorage.setItem('remoteAdminToken', t || '');
+      el.token.value = t || '';
+    }
+
+    function renderControls() {
+      el.controls.innerHTML = '';
+      for (const target of TARGETS) {
+        const row = document.createElement('div');
+        row.className = 'ctrl';
+
+        const name = document.createElement('div');
+        const lamp = document.createElement('span');
+        lamp.className = 'lamp';
+        relayLamp[target] = lamp;
+        const text = document.createElement('span');
+        text.textContent = target;
+        name.appendChild(lamp);
+        name.appendChild(text);
+
+        const onBtn = document.createElement('button');
+        onBtn.className = 'on';
+        onBtn.textContent = 'ON';
+        onBtn.onclick = () => sendCommand(target, 'on');
+
+        const offBtn = document.createElement('button');
+        offBtn.className = 'off';
+        offBtn.textContent = 'OFF';
+        offBtn.onclick = () => sendCommand(target, 'off');
+
+        row.appendChild(name);
+        row.appendChild(onBtn);
+        row.appendChild(offBtn);
+        el.controls.appendChild(row);
+      }
+    }
+
+    function applyTelemetry(t) {
+      if (!t) return;
+      el.tank1.textContent = t.tank1 ?? '-';
+      el.tank2.textContent = t.tank2 ?? '-';
+      el.deviceIp.textContent = t.ip || '-';
+      const rel = t.relays || {};
+      for (const target of TARGETS) {
+        relayState[target] = Number(rel[target] || 0);
+        if (relayLamp[target]) {
+          relayLamp[target].className = relayState[target] ? 'lamp on' : 'lamp';
+        }
+      }
+    }
+
+    async function loadConfig() {
+      const r = await fetch('/api/remote/config');
+      const j = await r.json();
+      el.topicBase.textContent = j.topicBase || 'watersystem';
+      appendLog(`Config loaded: topicBase=${j.topicBase}`);
+    }
+
+    async function loadLatest() {
+      const token = getToken();
+      const r = await fetch('/api/remote/latest', {
+        headers: token ? { 'x-admin-token': token } : {}
+      });
+      if (!r.ok) {
+        appendLog(`Latest failed: HTTP ${r.status}`, 'warn');
+        return;
+      }
+      const j = await r.json();
+      el.status.textContent = j.status || 'unknown';
+      el.lastSeen.textContent = j.lastSeenAt || '-';
+      applyTelemetry(j.telemetry);
+    }
+
+    async function sendCommand(target, value) {
+      const token = getToken();
+      const r = await fetch('/api/remote/command', {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, token ? { 'x-admin-token': token } : {}),
+        body: JSON.stringify({ target, value })
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        appendLog(`Command ${target}=${value} failed: ${j.error || r.status}`, 'bad');
+        return;
+      }
+      appendLog(`Command sent: ${j.topic} = ${j.payload}`, 'ok');
+    }
+
+    function initSocket() {
+      const socket = io();
+      socket.on('connect', () => appendLog('Socket connected', 'ok'));
+      socket.on('disconnect', () => appendLog('Socket disconnected', 'warn'));
+
+      socket.on('status_update', (data) => {
+        if (!data || !data.payload) return;
+        applyTelemetry(data.payload);
+        appendLog('Telemetry update');
+      });
+
+      socket.on('device_presence', (data) => {
+        if (!data) return;
+        el.status.textContent = data.status || 'unknown';
+        el.lastSeen.textContent = data.ts || '-';
+        appendLog(`Presence: ${data.status || 'unknown'}`);
+      });
+    }
+
+    el.saveToken.onclick = () => {
+      setToken(el.token.value.trim());
+      appendLog('Token saved in browser storage');
+      loadLatest();
+    };
+
+    async function boot() {
+      renderControls();
+      setToken(getToken());
+      await loadConfig();
+      await loadLatest();
+      initSocket();
+      setInterval(loadLatest, 10000);
+    }
+
+    boot().catch((e) => appendLog(`Boot error: ${e.message}`, 'bad'));
+  </script>
+</body>
+</html>

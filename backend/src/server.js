@@ -10,6 +10,7 @@
 require('dotenv').config();
 const express = require('express');
 const http = require('http');
+const path = require('path');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const socketIo = require('socket.io');
@@ -29,7 +30,12 @@ const jwt = require('jsonwebtoken');
 
 const PORT = process.env.PORT || 3000;
 const MQTT_BROKER = process.env.MQTT_BROKER || 'mqtts://esp32:Miv18072026@8bbebf26c27f4745a2dd39059872f9c3.s1.eu.hivemq.cloud:8883';
+const MQTT_TOPIC_BASE = process.env.MQTT_TOPIC_BASE || 'watersystem';
 const JWT_SECRET = process.env.JWT_SECRET || 'change_this_secret';
+const REMOTE_ADMIN_TOKEN = process.env.REMOTE_ADMIN_TOKEN || '';
+const REMOTE_REQUIRE_TOKEN = (process.env.REMOTE_REQUIRE_TOKEN || 'true') !== 'false';
+
+const REMOTE_TARGETS = new Set(['pump1', 'pump2', 'aeration', 'ozone', 'filter', 'backwash']);
 
 
 const app = express();
@@ -41,6 +47,54 @@ const io = socketIo(server, { cors: { origin: '*' } });
 
 // Simple in-memory cache for push tokens (also persisted to DB)
 let pushTokensCache = new Set();
+let latestRemote = {
+  topicBase: MQTT_TOPIC_BASE,
+  deviceId: MQTT_TOPIC_BASE,
+  status: 'unknown',
+  telemetry: null,
+  state: null,
+  lastSeenTopic: '',
+  lastSeenAt: null,
+};
+
+function updateRemoteSeen(topic) {
+  latestRemote.lastSeenTopic = topic;
+  latestRemote.lastSeenAt = new Date().toISOString();
+}
+
+function parseIncomingTopic(topic) {
+  // New format used by current ESP firmware: watersystem/<kind>
+  if (topic.startsWith(`${MQTT_TOPIC_BASE}/`)) {
+    const kind = topic.substring(MQTT_TOPIC_BASE.length + 1);
+    return { family: 'base', deviceId: MQTT_TOPIC_BASE, kind };
+  }
+
+  // Legacy PoC format: device/<id>/<kind>
+  const parts = topic.split('/');
+  if (parts.length >= 3 && parts[0] === 'device') {
+    return { family: 'legacy', deviceId: parts[1], kind: parts[2] };
+  }
+
+  return null;
+}
+
+function remoteTokenOk(req) {
+  if (!REMOTE_REQUIRE_TOKEN) return true;
+  if (!REMOTE_ADMIN_TOKEN) return false;
+  const token = req.headers['x-admin-token'] || req.query.token || (req.body && req.body.token);
+  return token && token === REMOTE_ADMIN_TOKEN;
+}
+
+function requireRemoteToken(req, res, next) {
+  if (!REMOTE_REQUIRE_TOKEN) return next();
+  if (!REMOTE_ADMIN_TOKEN) {
+    return res.status(503).json({ error: 'REMOTE_ADMIN_TOKEN is not configured on server' });
+  }
+  if (!remoteTokenOk(req)) {
+    return res.status(401).json({ error: 'invalid admin token' });
+  }
+  next();
+}
 
 async function loadPushTokens() {
   const r = await pool.query('SELECT token FROM push_tokens');
@@ -70,21 +124,41 @@ async function sendPushNotification(title, body, data = {}) {
 const client = mqtt.connect(MQTT_BROKER);
 client.on('connect', () => {
   console.log('MQTT connected to', MQTT_BROKER);
+  console.log('Remote topic base:', MQTT_TOPIC_BASE);
   client.subscribe('device/+/telemetry');
   client.subscribe('device/+/alert');
+  client.subscribe(`${MQTT_TOPIC_BASE}/#`);
 });
 
 client.on('message', async (topic, payload) => {
   try {
     const txt = payload.toString();
-    const obj = JSON.parse(txt);
-    const parts = topic.split('/'); // device/<id>/telemetry
-    const deviceId = parts[1];
-    const kind = parts[2];
+    const parsed = parseIncomingTopic(topic);
+    if (!parsed) return;
+
+    const { deviceId, kind } = parsed;
+    updateRemoteSeen(topic);
+
+    let obj = null;
+    if (kind !== 'status') {
+      obj = JSON.parse(txt);
+    }
+
+    if (topic === `${MQTT_TOPIC_BASE}/status` || kind === 'status') {
+      latestRemote.status = txt;
+      io.emit('device_presence', { deviceId, status: txt, topic, ts: latestRemote.lastSeenAt });
+      return;
+    }
 
     if (kind === 'telemetry') {
+      latestRemote.telemetry = obj;
+      latestRemote.deviceId = deviceId;
       await pool.query('INSERT INTO telemetry(device_id, payload) VALUES($1,$2)', [deviceId, obj]);
       io.emit('status_update', { deviceId, payload: obj });
+    } else if (kind === 'state') {
+      latestRemote.state = obj;
+      latestRemote.deviceId = deviceId;
+      io.emit('device_state', { deviceId, payload: obj });
     } else if (kind === 'alert') {
       await pool.query('INSERT INTO alerts(device_id, type, severity, message) VALUES($1,$2,$3,$4)', [deviceId, obj.type || 'alert', obj.severity || 'warning', obj.message || JSON.stringify(obj)]);
       io.emit('alert', { deviceId, ...obj });
@@ -98,6 +172,41 @@ client.on('message', async (topic, payload) => {
 
 // Serve static assets (firmware for OTA)
 app.use('/firmware', express.static('static'));
+app.use('/remote', express.static(path.join(__dirname, '..', 'public')));
+
+app.get('/api/remote/config', (req, res) => {
+  res.json({
+    topicBase: MQTT_TOPIC_BASE,
+    requireToken: REMOTE_REQUIRE_TOKEN,
+  });
+});
+
+app.get('/api/remote/latest', requireRemoteToken, (req, res) => {
+  res.json({
+    ok: true,
+    ...latestRemote,
+  });
+});
+
+app.post('/api/remote/command', requireRemoteToken, (req, res) => {
+  const target = String(req.body.target || '').trim();
+  const value = String(req.body.value || '').trim().toLowerCase();
+
+  if (!REMOTE_TARGETS.has(target)) {
+    return res.status(400).json({ error: 'unsupported target' });
+  }
+  if (value !== 'on' && value !== 'off') {
+    return res.status(400).json({ error: 'value must be on/off' });
+  }
+
+  const topic = `${MQTT_TOPIC_BASE}/cmd/${target}`;
+  const ok = client.publish(topic, value, { qos: 0, retain: false });
+  if (!ok) {
+    return res.status(500).json({ error: 'publish failed' });
+  }
+
+  res.json({ ok: true, topic, payload: value });
+});
 
 // --- REST API ---
 app.get('/api/health', (req, res) => res.json({ ok: true }));
