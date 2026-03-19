@@ -40,3 +40,7 @@ Thumbs.db
 # Environment
 .env
 .env.local
+
+# Local serial monitor dumps
+monitor_error.txt
+monitor_output.txt
