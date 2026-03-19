@@ -302,6 +302,8 @@
       justify-content: center;
       font-weight: 600;
     }
+
+    .chart-card {
       padding: 9px 10px;
       border-radius: var(--radius-md);
       background: radial-gradient(circle at top, rgba(30, 64, 175, 0.28), transparent 55%),
@@ -727,6 +729,7 @@
           <span class="pill-dot"></span>
           LIVE STATUS
         </div>
+        <div class="pill-meta" id="clockPill">--</div>
       </div>
     </header>
 
@@ -834,12 +837,13 @@
               <div class="field-label"><strong>Device token</strong></div>
               <div><input id="token" type="text" placeholder="access token"></div>
 
-              <div class="field-label"><strong>English output</strong></div>
-              <div><input id="lang_en" type="checkbox"></div>
+              <div class="field-label"><strong>Timezone (UTC)</strong></div>
+              <div><input id="timezone" type="number" min="-12" max="12" placeholder="0" style="max-width: 80px"></div>
             </div>
 
             <div class="btn-row">
               <button class="btn-primary" onclick="saveWifi()">Save Wi‑Fi</button>
+              <button class="btn-soft btn-sm" onclick="saveTimezone()">Save Timezone</button>
             </div>
 
             <div class="section-footer-note">После изменения настроек устройство может перезапустить соединение.</div>
@@ -1264,8 +1268,7 @@
   function saveWifi(){
     const payload = { ssid: document.getElementById('ssid').value,
                       pass: document.getElementById('pass').value,
-                      token: document.getElementById('token').value,
-                      lang_en: document.getElementById('lang_en').checked };
+                      token: document.getElementById('token').value };
     fetch('/api/wifi', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)})
       .then(r=>r.json())
       .then(j=>{
@@ -1359,7 +1362,7 @@
 
   // Load MQTT settings on page load
   // If WebSocket is not available/open, start polling fallback so UI stays in sync.
-if (!(wsClient && wsClient.readyState === WebSocket.OPEN)) { fetchStatus(); loadMqtt(); loadLang(); } else { loadMqtt(); loadLang(); }
+if (!(wsClient && wsClient.readyState === WebSocket.OPEN)) { fetchStatus(); loadMqtt(); loadTimezone(); } else { loadMqtt(); loadTimezone(); }
 
   // Download readable logs and trigger file save
   async function downloadLogs(){
@@ -1455,14 +1458,54 @@ if (!(wsClient && wsClient.readyState === WebSocket.OPEN)) { fetchStatus(); load
 
   // Start polling only if WebSocket not available
   if (!wsClient) fetchStatus();
+
+  // Clock: update date & time every second
+  function updateClock(){
+    var now = new Date();
+    var dd = ('0'+now.getDate()).slice(-2);
+    var mm = ('0'+(now.getMonth()+1)).slice(-2);
+    var yyyy = now.getFullYear();
+    var hh = ('0'+now.getHours()).slice(-2);
+    var mi = ('0'+now.getMinutes()).slice(-2);
+    var ss = ('0'+now.getSeconds()).slice(-2);
+    var el = document.getElementById('clockPill');
+    if(el) el.textContent = dd+'.'+mm+'.'+yyyy+' '+hh+':'+mi+':'+ss;
+  }
+  updateClock();
+  setInterval(updateClock, 1000);
   
-  async function loadLang(){
+  async function loadTimezone(){
     try {
-      const r = await fetch('/api/lang');
+      const r = await fetch('/api/timezone');
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const j = await r.json();
-      document.getElementById('lang_en').checked = !!j.english;
-    } catch(e){ console.warn('loadLang error', e); }
+      document.getElementById('timezone').value = j.timezone || 0;
+    } catch(e){ console.warn('loadTimezone error', e); }
+  }
+
+  function saveTimezone(){
+    const token = prompt('Admin token:'); 
+    if (!token) return;
+    const tz = parseInt(document.getElementById('timezone').value) || 0;
+    if (tz < -12 || tz > 12) { 
+      const msg = document.getElementById('msg');
+      msg.innerText = 'Timezone must be between -12 and +12'; 
+      setTimeout(()=>{ msg.innerText=''; }, 3000);
+      return; 
+    }
+    const payload = { timezone: tz, token: token };
+    fetch('/api/timezone', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)})
+      .then(r=>r.json())
+      .then(j=>{
+        const msg = document.getElementById('msg');
+        if (j.ok) {
+          msg.innerText = 'Timezone updated (UTC' + (tz >= 0 ? '+' : '') + tz + ')';
+        } else {
+          msg.innerText = 'Error: ' + (j.error || JSON.stringify(j));
+        }
+        setTimeout(()=>{ msg.innerText=''; }, 3000);
+      })
+      .catch(e=>{ console.warn('saveTimezone error', e); });
   }
 
   // Reset emergency mode
@@ -1472,14 +1515,6 @@ if (!(wsClient && wsClient.readyState === WebSocket.OPEN)) { fetchStatus(); load
     } else {
       fetch('/control?op=reset_emergency').then(()=>{ if (pollingEnabled) setTimeout(fetchStatus,100); }).catch(e=>console.warn(e));
     }
-  }
-
-  function saveLang(){
-    const payload = { lang_en: document.getElementById('lang_en').checked };
-    fetch('/api/lang', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)})
-      .then(r=>r.json())
-      .then(j=>{ const msg=document.getElementById('msg'); msg.innerText = JSON.stringify(j); setTimeout(()=>{msg.innerText='';},3000); })
-      .catch(e=>console.warn('saveLang error', e));
   }
 
   </script>

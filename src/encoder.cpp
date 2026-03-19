@@ -203,6 +203,35 @@ void handleEncoder() {
 
 // ============ ОБРАБОТЧИКИ СОБЫТИЙ ЭНКОДЕРА ============
 
+/// Получает время события с применением смещения часового пояса
+/// Возвращает true если событие найдено и успешно получено время
+inline bool getEventTimeWithTimezone(uint8_t eventType, uint8_t param, uint8_t &hour, uint8_t &minute) {
+  extern SafetySettings safetySettings;
+  
+  if (!getLastEventTime(eventType, param, hour, minute)) {
+    return false;  // Событие не найдено
+  }
+  
+  // Применяем смещение часового пояса
+  int8_t offset = safetySettings.timeZoneOffset;
+  if (offset != 0) {
+    int totalMinutes = hour * 60 + minute;
+    totalMinutes += offset * 60;
+    
+    // Обработка переноса дня (для простоты обёртываем в 24 часа)
+    if (totalMinutes < 0) {
+      totalMinutes += 24 * 60;
+    } else if (totalMinutes >= 24 * 60) {
+      totalMinutes -= 24 * 60;
+    }
+    
+    hour = totalMinutes / 60;
+    minute = totalMinutes % 60;
+  }
+  
+  return true;
+}
+
 /// Инициализирует СТАТИЧНУЮ часть информационного экрана (вызывается один раз)
 void initInfoScreen() {
   extern SafeLCD lcd;
@@ -280,7 +309,7 @@ void updateInfoScreen() {
     // Вставляем время последнего старта озонации в пустую область (между Ozone и Air)
     {
       uint8_t hh = 0, mm = 0;
-      if (getLastEventTime(EVENT_SYSTEM_STATE_CHANGE, (uint8_t)STATE_OZONATION, hh, mm)) {
+      if (getEventTimeWithTimezone(EVENT_SYSTEM_STATE_CHANGE, (uint8_t)STATE_OZONATION, hh, mm)) {
         lcd.setCursor(9, 1);
         if (hh < 10) lcd.print('0');
         lcd.print(hh);
@@ -302,7 +331,7 @@ void updateInfoScreen() {
     // Мини-индикация времени старта аэрации (минуты) если есть место
     {
       uint8_t hh = 0, mm = 0;
-      if (getLastEventTime(EVENT_SYSTEM_STATE_CHANGE, (uint8_t)STATE_AERATION, hh, mm)) {
+      if (getEventTimeWithTimezone(EVENT_SYSTEM_STATE_CHANGE, (uint8_t)STATE_AERATION, hh, mm)) {
         lcd.setCursor(18, 1);
         if (mm < 10) lcd.print('0');
         lcd.print(mm);
@@ -321,7 +350,7 @@ void updateInfoScreen() {
     // Показать время старта Settling
     {
       uint8_t hh = 0, mm = 0;
-      if (getLastEventTime(EVENT_SYSTEM_STATE_CHANGE, (uint8_t)STATE_SETTLING, hh, mm)) {
+      if (getEventTimeWithTimezone(EVENT_SYSTEM_STATE_CHANGE, (uint8_t)STATE_SETTLING, hh, mm)) {
         lcd.setCursor(10, 2);
         if (hh < 10) lcd.print('0');
         lcd.print(hh);
