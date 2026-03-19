@@ -1,0 +1,629 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WaterSysPro Docs App</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --card: #ffffff;
+      --line: #d8e1ec;
+      --ink: #1e2b3a;
+      --muted: #5c6f84;
+      --accent: #0b6fcf;
+      --accent-2: #e9f3ff;
+      --ok: #2d8a46;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      height: 100%;
+      color: var(--ink);
+      background: radial-gradient(circle at 10% -20%, #d9ebff, transparent 40%),
+                  radial-gradient(circle at 90% 120%, #e8f7ef, transparent 35%),
+                  var(--bg);
+      font-family: "Segoe UI", "Trebuchet MS", sans-serif;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 290px minmax(0, 1fr) 260px;
+      gap: 12px;
+      height: 100%;
+      padding: 12px;
+    }
+
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      overflow: hidden;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel-head {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(180deg, #ffffff, #f7fbff);
+      font-weight: 700;
+    }
+
+    .panel-body {
+      padding: 10px;
+      overflow: auto;
+      min-height: 0;
+    }
+
+    .brand {
+      font-size: 17px;
+      margin-bottom: 8px;
+    }
+
+    .tag {
+      display: inline-block;
+      font-size: 12px;
+      border-radius: 999px;
+      padding: 2px 9px;
+      background: #eaf4ff;
+      color: #0c4f92;
+      border: 1px solid #cfe5ff;
+    }
+
+    .search {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 9px 10px;
+      font-size: 14px;
+      margin: 10px 0;
+    }
+
+    .group {
+      margin-bottom: 14px;
+    }
+
+    .group-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      color: var(--muted);
+      letter-spacing: 0.5px;
+      margin: 6px 2px;
+    }
+
+    .doc-item {
+      width: 100%;
+      border: 1px solid transparent;
+      border-radius: 10px;
+      padding: 8px 10px;
+      text-align: left;
+      cursor: pointer;
+      background: transparent;
+      color: var(--ink);
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+
+    .doc-item:hover {
+      background: #f5faff;
+      border-color: #d8ebff;
+    }
+
+    .doc-item.active {
+      background: var(--accent-2);
+      border-color: #bdd9f8;
+      color: #0b4d93;
+      font-weight: 600;
+    }
+
+    .topbar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfdff;
+    }
+
+    .nav-btn {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 9px;
+      padding: 7px 10px;
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--ink);
+    }
+
+    .nav-btn:hover { background: #f3f8ff; }
+
+    .status {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .viewer {
+      padding: 18px 22px;
+      overflow: auto;
+      min-height: 0;
+      line-height: 1.6;
+    }
+
+    .viewer h1, .viewer h2, .viewer h3, .viewer h4 {
+      line-height: 1.3;
+      margin-top: 26px;
+      margin-bottom: 10px;
+      scroll-margin-top: 12px;
+    }
+
+    .viewer h1 { font-size: 30px; }
+    .viewer h2 { font-size: 24px; }
+    .viewer h3 { font-size: 20px; }
+    .viewer h4 { font-size: 17px; }
+
+    .viewer p { margin: 0 0 11px 0; }
+    .viewer ul, .viewer ol { margin: 0 0 12px 20px; }
+    .viewer code {
+      font-family: Consolas, monospace;
+      background: #eef4fb;
+      border: 1px solid #d7e4f2;
+      border-radius: 6px;
+      padding: 1px 5px;
+      font-size: 90%;
+    }
+
+    .viewer pre {
+      margin: 10px 0 14px 0;
+      background: #1d2530;
+      color: #f3f8ff;
+      padding: 12px;
+      border-radius: 10px;
+      overflow: auto;
+      border: 1px solid #2f3d4d;
+    }
+
+    .viewer pre code {
+      background: transparent;
+      border: 0;
+      padding: 0;
+      color: inherit;
+    }
+
+    .viewer blockquote {
+      margin: 0 0 12px 0;
+      border-left: 4px solid #b8d8fb;
+      padding: 6px 10px;
+      background: #f5fbff;
+      color: #355778;
+    }
+
+    .viewer a {
+      color: #0a62ba;
+      text-decoration: none;
+      border-bottom: 1px dashed #83b5e9;
+    }
+
+    .viewer hr {
+      border: 0;
+      border-top: 1px solid var(--line);
+      margin: 18px 0;
+    }
+
+    .toc-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .toc-item {
+      display: block;
+      width: 100%;
+      text-align: left;
+      border: 0;
+      background: transparent;
+      color: var(--ink);
+      padding: 6px 4px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .toc-item:hover {
+      background: #f3f8ff;
+    }
+
+    .toc-l2 { padding-left: 14px; }
+    .toc-l3 { padding-left: 26px; }
+    .toc-l4 { padding-left: 38px; }
+
+    .empty {
+      color: var(--muted);
+      font-size: 13px;
+      padding: 4px;
+    }
+
+    .footer-note {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 10px;
+    }
+
+    @media (max-width: 1120px) {
+      .layout {
+        grid-template-columns: 260px minmax(0, 1fr);
+      }
+      .panel-right {
+        display: none;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .layout {
+        grid-template-columns: 1fr;
+        padding: 8px;
+      }
+      .panel-left {
+        max-height: 36vh;
+      }
+      .viewer {
+        padding: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="panel panel-left">
+      <div class="panel-head">
+        <div class="brand">WaterSysPro Docs</div>
+        <span class="tag">Viewer App</span>
+      </div>
+      <div class="panel-body">
+        <input id="search" class="search" type="search" placeholder="Поиск документа...">
+        <div id="docsList"></div>
+        <div class="footer-note">Подсказка: URL сохраняет текущий документ через hash.</div>
+      </div>
+    </aside>
+
+    <main class="panel">
+      <div class="topbar">
+        <div>
+          <button id="prevBtn" class="nav-btn">← Предыдущий</button>
+          <button id="nextBtn" class="nav-btn">Следующий →</button>
+        </div>
+        <div id="docStatus" class="status">Готово</div>
+      </div>
+      <article id="viewer" class="viewer"></article>
+    </main>
+
+    <aside class="panel panel-right">
+      <div class="panel-head">Оглавление текущей страницы</div>
+      <div class="panel-body">
+        <ul id="toc" class="toc-list"></ul>
+        <div id="tocEmpty" class="empty">Загрузите документ для просмотра оглавления.</div>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    const DOCS = [
+      { id: 'doc-index', title: 'Documentation Index', group: 'Core', path: 'DOCUMENTATION_INDEX.md' },
+      { id: 'readme-ru', title: 'README RU', group: 'Core', path: 'README_RU.md' },
+      { id: 'readme-en', title: 'README EN', group: 'Core', path: 'README.md' },
+      { id: 'changelog-ru', title: 'Changelog RU', group: 'Core', path: 'CHANGELOG_RU.md' },
+      { id: 'changelog-en', title: 'Changelog EN', group: 'Core', path: 'CHANGELOG.md' },
+      { id: 'release-ru', title: 'Release Notes RU', group: 'Core', path: 'RELEASE_NOTES_v1.1.0_RU.md' },
+      { id: 'release-en', title: 'Release Notes EN', group: 'Core', path: 'RELEASE_NOTES_v1.1.0.md' },
+      { id: 'project-status', title: 'Project Status', group: 'Core', path: 'PROJECT_STATUS.md' },
+      { id: 'worktree', title: 'Worktree Changes 2026-03-19', group: 'Docs', path: 'docs/WORKTREE_CHANGES_2026-03-19.md' },
+      { id: 'hardening', title: 'Production Hardening Tracker', group: 'Docs', path: 'docs/PRODUCTION_HARDENING_TRACKER.md' },
+      { id: 'sd', title: 'SD Integration', group: 'Docs', path: 'docs/SD_INTEGRATION.md' },
+      { id: 'refactor', title: 'Refactor and Smoke Summary', group: 'Docs', path: 'docs/REFRACTOR_AND_SMOKE_SUMMARY.md' },
+      { id: 'mobile-start', title: 'Mobile Start Here', group: 'Mobile', path: 'mobile/START_HERE.md' },
+      { id: 'mobile-build', title: 'Mobile Build APK Guide', group: 'Mobile', path: 'mobile/BUILD_APK_GUIDE.md' },
+      { id: 'mobile-check', title: 'Mobile Checklist', group: 'Mobile', path: 'mobile/CHECKLIST.md' },
+      { id: 'mobile-device', title: 'Mobile Device Control Guide', group: 'Mobile', path: 'mobile/DEVICE_CONTROL_GUIDE.md' },
+    ];
+
+    const docsListEl = document.getElementById('docsList');
+    const searchEl = document.getElementById('search');
+    const viewerEl = document.getElementById('viewer');
+    const tocEl = document.getElementById('toc');
+    const tocEmptyEl = document.getElementById('tocEmpty');
+    const statusEl = document.getElementById('docStatus');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+
+    let currentDocId = null;
+    let currentHeadings = [];
+
+    function esc(s) {
+      return s
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function slugify(text) {
+      return text.toLowerCase()
+        .trim()
+        .replace(/[^a-zа-яё0-9\s-]/gi, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-');
+    }
+
+    function inline(md) {
+      let s = esc(md);
+      s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+      s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+      s = s.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+      s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+      return s;
+    }
+
+    function renderMarkdown(md) {
+      const lines = md.replace(/\r/g, '').split('\n');
+      const out = [];
+      const headings = [];
+      const slugCount = {};
+
+      let inCode = false;
+      let codeLines = [];
+      let paragraph = [];
+      let listType = null;
+
+      function closeParagraph() {
+        if (paragraph.length) {
+          out.push('<p>' + inline(paragraph.join(' ')) + '</p>');
+          paragraph = [];
+        }
+      }
+
+      function closeList() {
+        if (listType) {
+          out.push('</' + listType + '>');
+          listType = null;
+        }
+      }
+
+      for (let i = 0; i < lines.length; i++) {
+        const raw = lines[i];
+        const line = raw.trimEnd();
+        const trimmed = line.trim();
+
+        if (trimmed.startsWith('```')) {
+          closeParagraph();
+          closeList();
+          if (!inCode) {
+            inCode = true;
+            codeLines = [];
+          } else {
+            inCode = false;
+            out.push('<pre><code>' + esc(codeLines.join('\n')) + '</code></pre>');
+            codeLines = [];
+          }
+          continue;
+        }
+
+        if (inCode) {
+          codeLines.push(raw);
+          continue;
+        }
+
+        if (!trimmed) {
+          closeParagraph();
+          closeList();
+          continue;
+        }
+
+        const h = trimmed.match(/^(#{1,4})\s+(.+)$/);
+        if (h) {
+          closeParagraph();
+          closeList();
+          const level = h[1].length;
+          const text = h[2].trim();
+          const base = slugify(text) || 'section';
+          const count = (slugCount[base] || 0) + 1;
+          slugCount[base] = count;
+          const id = count > 1 ? base + '-' + count : base;
+          headings.push({ level, text, id });
+          out.push('<h' + level + ' id="' + id + '">' + inline(text) + '</h' + level + '>');
+          continue;
+        }
+
+        if (/^---+$/.test(trimmed) || /^\*\*\*+$/.test(trimmed)) {
+          closeParagraph();
+          closeList();
+          out.push('<hr>');
+          continue;
+        }
+
+        const ul = trimmed.match(/^[-*]\s+(.+)$/);
+        if (ul) {
+          closeParagraph();
+          if (listType !== 'ul') {
+            closeList();
+            listType = 'ul';
+            out.push('<ul>');
+          }
+          out.push('<li>' + inline(ul[1]) + '</li>');
+          continue;
+        }
+
+        const ol = trimmed.match(/^\d+\.\s+(.+)$/);
+        if (ol) {
+          closeParagraph();
+          if (listType !== 'ol') {
+            closeList();
+            listType = 'ol';
+            out.push('<ol>');
+          }
+          out.push('<li>' + inline(ol[1]) + '</li>');
+          continue;
+        }
+
+        const bq = trimmed.match(/^>\s+(.+)$/);
+        if (bq) {
+          closeParagraph();
+          closeList();
+          out.push('<blockquote>' + inline(bq[1]) + '</blockquote>');
+          continue;
+        }
+
+        closeList();
+        paragraph.push(trimmed);
+      }
+
+      closeParagraph();
+      closeList();
+
+      return { html: out.join('\n'), headings };
+    }
+
+    function groupedDocs(filtered) {
+      const map = {};
+      filtered.forEach(doc => {
+        if (!map[doc.group]) map[doc.group] = [];
+        map[doc.group].push(doc);
+      });
+      return map;
+    }
+
+    function renderDocsList(filterText = '') {
+      const q = filterText.toLowerCase().trim();
+      const docs = DOCS.filter(d => !q || d.title.toLowerCase().includes(q));
+      const groups = groupedDocs(docs);
+      docsListEl.innerHTML = '';
+
+      Object.keys(groups).forEach(group => {
+        const wrap = document.createElement('div');
+        wrap.className = 'group';
+
+        const title = document.createElement('div');
+        title.className = 'group-title';
+        title.textContent = group;
+        wrap.appendChild(title);
+
+        groups[group].forEach(doc => {
+          const btn = document.createElement('button');
+          btn.className = 'doc-item' + (doc.id === currentDocId ? ' active' : '');
+          btn.textContent = doc.title;
+          btn.onclick = () => loadDoc(doc.id, true);
+          wrap.appendChild(btn);
+        });
+
+        docsListEl.appendChild(wrap);
+      });
+    }
+
+    function renderToc(headings) {
+      tocEl.innerHTML = '';
+      currentHeadings = headings;
+      if (!headings.length) {
+        tocEmptyEl.style.display = 'block';
+        return;
+      }
+      tocEmptyEl.style.display = 'none';
+
+      headings.forEach(h => {
+        const li = document.createElement('li');
+        const btn = document.createElement('button');
+        btn.className = 'toc-item toc-l' + h.level;
+        btn.textContent = h.text;
+        btn.onclick = () => {
+          const target = document.getElementById(h.id);
+          if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        };
+        li.appendChild(btn);
+        tocEl.appendChild(li);
+      });
+    }
+
+    function getDocById(id) {
+      return DOCS.find(d => d.id === id) || null;
+    }
+
+    function getContentUrl(doc) {
+      return '/docs/content?path=' + encodeURIComponent(doc.path);
+    }
+
+    function syncHash(id) {
+      location.hash = '#doc=' + encodeURIComponent(id);
+    }
+
+    function getDocFromHash() {
+      const m = location.hash.match(/doc=([^&]+)/);
+      if (!m) return null;
+      try {
+        return decodeURIComponent(m[1]);
+      } catch (e) {
+        return null;
+      }
+    }
+
+    async function loadDoc(id, setHash = false) {
+      const doc = getDocById(id);
+      if (!doc) return;
+
+      currentDocId = id;
+      renderDocsList(searchEl.value || '');
+      statusEl.textContent = 'Загрузка: ' + doc.title;
+
+      try {
+        const docUrl = getContentUrl(doc);
+        const res = await fetch(docUrl);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const text = await res.text();
+        const rendered = renderMarkdown(text);
+        viewerEl.innerHTML = rendered.html;
+        renderToc(rendered.headings);
+        statusEl.textContent = 'Открыт: ' + doc.title;
+        if (setHash) syncHash(id);
+      } catch (err) {
+        viewerEl.innerHTML = '<h2>Ошибка загрузки</h2><p>Не удалось открыть документ: ' + esc(doc.path) + '</p><p><code>' + esc(String(err.message || err)) + '</code></p><p>Откройте viewer через backend: <code>http://localhost:3000/docs/</code>.</p>';
+        renderToc([]);
+        statusEl.textContent = 'Ошибка: ' + doc.title;
+      }
+
+      const idx = DOCS.findIndex(d => d.id === currentDocId);
+      prevBtn.disabled = idx <= 0;
+      nextBtn.disabled = idx < 0 || idx >= DOCS.length - 1;
+    }
+
+    prevBtn.onclick = () => {
+      const idx = DOCS.findIndex(d => d.id === currentDocId);
+      if (idx > 0) loadDoc(DOCS[idx - 1].id, true);
+    };
+
+    nextBtn.onclick = () => {
+      const idx = DOCS.findIndex(d => d.id === currentDocId);
+      if (idx >= 0 && idx < DOCS.length - 1) loadDoc(DOCS[idx + 1].id, true);
+    };
+
+    searchEl.addEventListener('input', () => renderDocsList(searchEl.value || ''));
+
+    window.addEventListener('hashchange', () => {
+      const id = getDocFromHash();
+      if (id && id !== currentDocId && getDocById(id)) {
+        loadDoc(id, false);
+      }
+    });
+
+    function init() {
+      const idFromHash = getDocFromHash();
+      const initial = getDocById(idFromHash) ? idFromHash : DOCS[0].id;
+      renderDocsList('');
+      loadDoc(initial, !idFromHash);
+    }
+
+    init();
+  </script>
+</body>
+</html>
