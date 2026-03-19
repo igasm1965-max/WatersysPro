@@ -1,7 +1,7 @@
 /**
  * @file main.cpp
  * @brief Главный файл системы управления водоочисткой на ESP32
- * 
+ *
  * @details
  * Система управления водоочисткой для ESP32 с поддержкой:
  * - Автоматического цикла обработки воды (озонация, аэрация, фильтрация)
@@ -10,31 +10,33 @@
  * - Логирования событий в SPIFFS
  * - Защиты от аварийных ситуаций
  * - Расписания работы и ночного режима
- * 
+ *
  * @version 12.0 (ESP32 Port)
  */
 
 // ============ ПОДКЛЮЧЕНИЕ ВСЕХ МОДУЛЕЙ ============
 #include <Arduino.h>
+
 #include "config.h"
-#include "structures.h"
-#include "relay_control.h"
-#include "sensors.h"
 #include "display.h"
-#include "state_machine.h"
+#include "emergency.h"
+#include "encoder.h"
+#include "engineer_menu.h"
 #include "event_logging.h"
 #include "prefs.h"
-#include "emergency.h"
+#include "relay_control.h"
+#include "sensors.h"
+#include "state_machine.h"
+#include "structures.h"
 #include "timers.h"
-#include "encoder.h"
 #include "utils.h"
-#include "engineer_menu.h"
 #include "web_server.h"
 #ifdef ENABLE_WIFI
 #include "vqtt.h"
 #endif
-#include "wifi_manager.h"
 #include <SD.h>  // required for SD test in setup
+
+#include "wifi_manager.h"
 
 // ============ FORWARD DECLARATIONS ============
 // Обеспечиваем видимость функций из других модулей
@@ -43,7 +45,7 @@ extern void loadAllSettings();
 extern void initRTC();
 extern void initWatchdog();
 extern void initI2C();
-extern bool isTimeElapsed(unsigned long &lastTime, unsigned long interval);
+extern bool isTimeElapsed(unsigned long& lastTime, unsigned long interval);
 extern void updateCountdownTimers();
 extern void checkForHang();
 extern void saveWDTStats();
@@ -72,10 +74,11 @@ SafeLCD lcd(LCD_ADDR, LCD_COLS, LCD_ROWS);
 SystemFlags flags;
 
 /// Системный контекст (поэтапная миграция глобалов)
-SystemContext systemContext = { STATE_IDLE, STATE_IDLE, 0 };
+SystemContext systemContext = {STATE_IDLE, STATE_IDLE, 0};
 
 unsigned long filterOperationStartTime = 0;
-uint32_t lastBackwashTimestamp = 0;  ///< Unix timestamp последней промывки (для восстановления при перезагрузке)
+uint32_t lastBackwashTimestamp =
+    0;  ///< Unix timestamp последней промывки (для восстановления при перезагрузке)
 
 // ============ ПАРАМЕТРЫ БАКОВ ============
 
@@ -99,19 +102,19 @@ WDTStats wdtStats;
 
 /// Настройки безопасности (инженерное меню)
 SafetySettings safetySettings = {
-  DEFAULT_TIMEOUT_FILLING,     // timeoutFilling (минуты)
-  DEFAULT_TIMEOUT_OZONATION,   // timeoutOzonation
-  DEFAULT_TIMEOUT_AERATION,    // timeoutAeration
-  DEFAULT_TIMEOUT_SETTLING,    // timeoutSettling
-  DEFAULT_TIMEOUT_FILTRATION,  // timeoutFiltration
-  DEFAULT_TIMEOUT_BACKWASH,    // timeoutBackwash
-  ENGINEER_PASSWORD,           // engineerPassword
-  WATCHDOG_ENABLED,            // watchdogEnabled
-  WDT_TIMEOUT_SECONDS,         // watchdogTimeout
-  DEFAULT_PUMP_DRY_TIMEOUT_SECONDS, // pumpDryTimeoutSeconds
-  DEFAULT_PUMP_MIN_LEVEL_DELTA_CM,  // pumpMinLevelDeltaCm
-  DEFAULT_PUMP_DRY_CONSECUTIVE_CHECKS, // pumpDryConsecutiveChecks
-  DEFAULT_SENSOR_POLL_PERIOD            // sensorPollPeriod
+    DEFAULT_TIMEOUT_FILLING,              // timeoutFilling (минуты)
+    DEFAULT_TIMEOUT_OZONATION,            // timeoutOzonation
+    DEFAULT_TIMEOUT_AERATION,             // timeoutAeration
+    DEFAULT_TIMEOUT_SETTLING,             // timeoutSettling
+    DEFAULT_TIMEOUT_FILTRATION,           // timeoutFiltration
+    DEFAULT_TIMEOUT_BACKWASH,             // timeoutBackwash
+    ENGINEER_PASSWORD,                    // engineerPassword
+    WATCHDOG_ENABLED,                     // watchdogEnabled
+    WDT_TIMEOUT_SECONDS,                  // watchdogTimeout
+    DEFAULT_PUMP_DRY_TIMEOUT_SECONDS,     // pumpDryTimeoutSeconds
+    DEFAULT_PUMP_MIN_LEVEL_DELTA_CM,      // pumpMinLevelDeltaCm
+    DEFAULT_PUMP_DRY_CONSECUTIVE_CHECKS,  // pumpDryConsecutiveChecks
+    DEFAULT_SENSOR_POLL_PERIOD            // sensorPollPeriod
 };
 
 /// Флаг авторизации в инженерном меню
@@ -119,19 +122,19 @@ bool engineerModeUnlocked = false;
 
 // ============ НАСТРОЙКИ ТАЙМЕРОВ (в секундах) ============
 
-uint32_t setlingDuration = 5 * 3600UL;              ///< Время отстаивания (5ч)
-uint32_t aerationDuration = 1 * 3600UL + 22 * 60UL; ///< Время аэрации (1ч 22м)
-uint32_t ozonationDuration = 5 * 60UL;              ///< Время озонации (5м)
-uint32_t backlightDuration = 5 * 60UL;              ///< Таймаут подсветки (5м)
-uint32_t filterWashDuration = 5 * 60UL;             ///< Время промывки (5м)
-uint32_t filterCleaningInterval = 7 * 24UL * 3600UL; ///< Интервал чистки (7 дней)
+uint32_t setlingDuration = 5 * 3600UL;                ///< Время отстаивания (5ч)
+uint32_t aerationDuration = 1 * 3600UL + 22 * 60UL;   ///< Время аэрации (1ч 22м)
+uint32_t ozonationDuration = 5 * 60UL;                ///< Время озонации (5м)
+uint32_t backlightDuration = 5 * 60UL;                ///< Таймаут подсветки (5м)
+uint32_t filterWashDuration = 5 * 60UL;               ///< Время промывки (5м)
+uint32_t filterCleaningInterval = 7 * 24UL * 3600UL;  ///< Интервал чистки (7 дней)
 
 // ============ РАСПИСАНИЕ И НОЧНОЙ РЕЖИМ ============
 
-byte scheduleStart[3] = {8, 0, 0};   ///< Начало расписания (8:00:00)
-byte scheduleEnd[3] = {22, 0, 0};    ///< Конец расписания (22:00:00)
-byte nightModeStart[2] = {22, 0};    ///< Начало ночи (22:00)
-byte nightModeEnd[2] = {6, 0};       ///< Конец ночи (6:00)
+byte scheduleStart[3] = {8, 0, 0};  ///< Начало расписания (8:00:00)
+byte scheduleEnd[3] = {22, 0, 0};   ///< Конец расписания (22:00:00)
+byte nightModeStart[2] = {22, 0};   ///< Начало ночи (22:00)
+byte nightModeEnd[2] = {6, 0};      ///< Конец ночи (6:00)
 
 // ============ ОСТАВШИЕСЯ ВРЕМЕНА ТАЙМЕРОВ ============
 
@@ -239,88 +242,96 @@ void loopESP32();
 
 #ifdef ENABLE_WIFI
 void initWiFi() {
-  Serial.println("[WiFi] Initializing...");
+    Serial.println("[WiFi] Initializing...");
 
-  // Read credentials only if they exist to avoid the Preferences
-  // library logging an error when the key is absent.
-  String ssid = "";
-  String pass = "";
-  if (preferences.isKey(PREF_KEY_WIFI_SSID)) {
-    ssid = preferences.getString(PREF_KEY_WIFI_SSID, "");
-  }
-  if (preferences.isKey(PREF_KEY_WIFI_PASS)) {
-    pass = preferences.getString(PREF_KEY_WIFI_PASS, "");
-  }
-
-  if (ssid.length() > 0) {
-    Serial.printf("[WiFi] Trying STA: %s\n", ssid.c_str());
-    WiFi.begin(ssid.c_str(), pass.c_str());
-    int attempts = 0;
-    while (WiFi.status() != WL_CONNECTED && attempts < 20) {
-      delay(500);
-      Serial.print(".");
-      attempts++;
+    // Read credentials only if they exist to avoid the Preferences
+    // library logging an error when the key is absent.
+    String ssid = "";
+    String pass = "";
+    if (preferences.isKey(PREF_KEY_WIFI_SSID)) {
+        ssid = preferences.getString(PREF_KEY_WIFI_SSID, "");
     }
-    if (WiFi.status() == WL_CONNECTED) {
-      Serial.println("\n[WiFi] Connected, IP: " + WiFi.localIP().toString());
-      lcd.clear();
-      lcd.setCursor(0,0);
-      lcd.print("WiFi: CONNECTED");
-      lcd.setCursor(0,1);
-      lcd.print("IP:");
-      lcd.print(WiFi.localIP().toString());
-      delay(1500);
-      return;
+    if (preferences.isKey(PREF_KEY_WIFI_PASS)) {
+        pass = preferences.getString(PREF_KEY_WIFI_PASS, "");
+    }
+
+    if (ssid.length() > 0) {
+        Serial.printf("[WiFi] Trying STA: %s\n", ssid.c_str());
+        WiFi.begin(ssid.c_str(), pass.c_str());
+        int attempts = 0;
+        while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+            delay(500);
+            Serial.print(".");
+            attempts++;
+        }
+        if (WiFi.status() == WL_CONNECTED) {
+            Serial.println("\n[WiFi] Connected, IP: " + WiFi.localIP().toString());
+            lcd.clear();
+            lcd.setCursor(0, 0);
+            lcd.print("WiFi: CONNECTED");
+            lcd.setCursor(0, 1);
+            lcd.print("IP:");
+            lcd.print(WiFi.localIP().toString());
+            delay(1500);
+            return;
+        } else {
+            Serial.println("\n[WiFi] STA failed");
+        }
     } else {
-      Serial.println("\n[WiFi] STA failed");
+        Serial.println("[WiFi] No saved SSID");
     }
-  } else {
-    Serial.println("[WiFi] No saved SSID");
-  }
 
-  // Start softAP fallback
-  uint64_t mac = ESP.getEfuseMac();
-  char apName[24];
-  sprintf(apName, "WSystem-%02X%02X", (uint8_t)(mac>>16), (uint8_t)(mac>>8));
-  // Configure AP address to known default and start softAP fallback
-  IPAddress localIp(192,168,4,1);
-  IPAddress gateway(192,168,4,1);
-  IPAddress subnet(255,255,255,0);
-  if (!WiFi.softAPConfig(localIp, gateway, subnet)) {
-    Serial.println("[WiFi] softAPConfig failed");
-  }
+    // Start softAP fallback
+    uint64_t mac = ESP.getEfuseMac();
+    char apName[24];
+    sprintf(apName, "WSystem-%02X%02X", (uint8_t)(mac >> 16), (uint8_t)(mac >> 8));
+    // Configure AP address to known default and start softAP fallback
+    IPAddress localIp(192, 168, 4, 1);
+    IPAddress gateway(192, 168, 4, 1);
+    IPAddress subnet(255, 255, 255, 0);
+    if (!WiFi.softAPConfig(localIp, gateway, subnet)) {
+        Serial.println("[WiFi] softAPConfig failed");
+    }
 
-  if (WiFi.softAP(apName)) {
-    Serial.printf("[WiFi] AP started: %s\n", apName);
-    Serial.printf("[WiFi] AP IP: %s\n", WiFi.softAPIP().toString().c_str());
+    if (WiFi.softAP(apName)) {
+        Serial.printf("[WiFi] AP started: %s\n", apName);
+        Serial.printf("[WiFi] AP IP: %s\n", WiFi.softAPIP().toString().c_str());
 
-    // Log specific AP events
-    WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info){
-      Serial.printf("[WiFi] AP station connected, stations: %d\n", WiFi.softAPgetStationNum());
-    }, ARDUINO_EVENT_WIFI_AP_STACONNECTED);
+        // Log specific AP events
+        WiFi.onEvent(
+            [](WiFiEvent_t event, WiFiEventInfo_t info) {
+                Serial.printf("[WiFi] AP station connected, stations: %d\n",
+                              WiFi.softAPgetStationNum());
+            },
+            ARDUINO_EVENT_WIFI_AP_STACONNECTED);
 
-    WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info){
-      Serial.printf("[WiFi] AP station disconnected, stations: %d\n", WiFi.softAPgetStationNum());
-    }, ARDUINO_EVENT_WIFI_AP_STADISCONNECTED);
+        WiFi.onEvent(
+            [](WiFiEvent_t event, WiFiEventInfo_t info) {
+                Serial.printf("[WiFi] AP station disconnected, stations: %d\n",
+                              WiFi.softAPgetStationNum());
+            },
+            ARDUINO_EVENT_WIFI_AP_STADISCONNECTED);
 
-    // Also log STA events (if ever in STA mode)
-    WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info){
-      Serial.printf("[WiFi] STA got IP: %s\n", WiFi.localIP().toString().c_str());
-    }, ARDUINO_EVENT_WIFI_STA_GOT_IP);
+        // Also log STA events (if ever in STA mode)
+        WiFi.onEvent(
+            [](WiFiEvent_t event, WiFiEventInfo_t info) {
+                Serial.printf("[WiFi] STA got IP: %s\n", WiFi.localIP().toString().c_str());
+            },
+            ARDUINO_EVENT_WIFI_STA_GOT_IP);
 
-    WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info){
-      Serial.printf("[WiFi] STA disconnected\n");
-    }, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+        WiFi.onEvent([](WiFiEvent_t event,
+                        WiFiEventInfo_t info) { Serial.printf("[WiFi] STA disconnected\n"); },
+                     ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
 
-    lcd.clear();
-    lcd.setCursor(0,0);
-    lcd.print("AP: ");
-    lcd.print(apName);
-    lcd.setCursor(0,1);
-    lcd.print("Connect to AP");
-  } else {
-    Serial.println("[WiFi] softAP failed");
-  }
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("AP: ");
+        lcd.print(apName);
+        lcd.setCursor(0, 1);
+        lcd.print("Connect to AP");
+    } else {
+        Serial.println("[WiFi] softAP failed");
+    }
 }
 #endif
 
@@ -329,7 +340,7 @@ void initWiFi() {
 /**
  * @brief Главная функция инициализации
  * @details Вызывается один раз при включении ESP32
- * 
+ *
  * Порядок инициализации:
  * 1. Инициализация последовательного порта
  * 2. Инициализация пинов (реле, энкодер, датчики)
@@ -343,118 +354,128 @@ void initWiFi() {
  * 10. Логирование старта системы
  */
 void setup() {
-  Serial.begin(115200);
-  delay(1000);
-  
-  Serial.println("\n\n=== ESP32 Water System v12.0 ===");
-  Serial.printf("Build: %s %s\n", __DATE__, __TIME__);
-  Serial.println("Initializing...\n");
-  
-  // Очистка флагов
-  memset(&flags, 0, sizeof(flags));
-  
-  // Инициализация LCD дисплея
-  lcd.init();
-  lcd.backlight();
-  lcd.display();
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("W.System v12.0");
-  lcd.setCursor(0, 1);
-  lcd.print("Initializing...");
-  
-  // Инициализация пинов
-  initPins();
+    Serial.begin(115200);
+    delay(1000);
 
-  
-  // I2C шина
-  Wire.begin(I2C_SDA, I2C_SCL);
-  initI2C();
-  
-  // Файловая система (SPIFFS) - optional
-// removed SPIFFS-specific code
+    Serial.println("\n\n=== ESP32 Water System v12.0 ===");
+    Serial.printf("Build: %s %s\n", __DATE__, __TIME__);
+    Serial.println("Initializing...\n");
 
-  // SD card (SPI) - optional; mounts if present and prints status to Serial
-  initSD();
+    // Очистка флагов
+    memset(&flags, 0, sizeof(flags));
 
-  // Инициализация массива событий нулями
-  memset(eventLogs, 0, sizeof(eventLogs));
+    // Инициализация LCD дисплея
+    lcd.init();
+    lcd.backlight();
+    lcd.display();
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("W.System v12.0");
+    lcd.setCursor(0, 1);
+    lcd.print("Initializing...");
 
-  // Диагностика системы при старте
-  runSystemDiagnostics();
-  
-  // Загрузка настроек и инициализация хранилища
-  initializePreferences();
-  loadAllSettings();
-  loadSafetySettings();  // Загрузка настроек безопасности (инженерное меню)
-  loadTimeZoneSetting();  // Загрузка часового пояса
+    // Инициализация пинов
+    initPins();
 
-  #ifdef ENABLE_WIFI
-    // Инициализируем RTC до модулей, которые логируют события (предотвращает crash при rtc.now())
+    // I2C шина
+    Wire.begin(I2C_SDA, I2C_SCL);
+    initI2C();
+
+    // Файловая система (SPIFFS) - optional
+    // removed SPIFFS-specific code
+
+    // SD card (SPI) - optional; mounts if present and prints status to Serial
+    initSD();
+
+    // Инициализация массива событий нулями
+    memset(eventLogs, 0, sizeof(eventLogs));
+
+    // Диагностика системы при старте
+    runSystemDiagnostics();
+
+    // Загрузка настроек и инициализация хранилища
+    initializePreferences();
+    loadAllSettings();
+    loadSafetySettings();   // Загрузка настроек безопасности (инженерное меню)
+    loadTimeZoneSetting();  // Загрузка часового пояса
+
+#ifdef ENABLE_WIFI
+                            // Инициализируем RTC до модулей, которые логируют события
+                            // (предотвращает crash при rtc.now())
     initRTC();
     initWifiManager();
     initWebServer();
     // VQTT (MQTT) client initialization - will connect when Wi-Fi is available
     initVQTT();
-  #endif
+#endif
 
-  // ...existing code...
+    // ...existing code...
 
-  // Флаги инициализации завершены
-  flags.backlightOn = true;
-  flags.displayOn = true;
-  flags.setupComplete = true;
-  
-  // RTC (инициализация уже выполнена ранее)
-  
-  // Восстановление таймера промывки после инициализации RTC
-  restoreBackwashTimer();
+    // Флаги инициализации завершены
+    flags.backlightOn = true;
+    flags.displayOn = true;
+    flags.setupComplete = true;
 
-  // Восстановление состояния после перезагрузки
-  if (loadRuntimeState()) {
-    saveEventLog(LOG_INFO, EVENT_RUNTIME_STATE_RESTORED, (uint16_t)systemContext.currentState);
-  }
-  
-  // Watchdog
-  initWatchdog();
-  
-  // Инициализация энкодера
-  initEncoder();
-  
-  // Инициализация датчиков
-  initSensors();
-  
-  // Инициализация дисплея
-  initDisplay();
-  
-  // Загрузка журнала событий
-  loadEventLogs();
-  
-  // Инициализация аварийного мониторинга
-  initEmergencyMonitoring();
-  
-  // Флаги инициализации завершены
-  flags.backlightOn = true;
-  flags.displayOn = true;
-  flags.setupComplete = true;
+    // RTC (инициализация уже выполнена ранее)
 
-  // Ensure periodic services are scheduled
-  // wifi manager and web server will be polled from loop()
+    // Восстановление таймера промывки после инициализации RTC
+    restoreBackwashTimer();
 
-  systemContext.currentState = STATE_IDLE;
-  systemContext.previousState = STATE_IDLE;
-  systemContext.stateStartTime = millis();
-  lastActivityTime = millis();
-  loopStartTime = millis();
-  
-  // Логируем старт системы
-  saveEventLog(LOG_INFO, EVENT_SYSTEM_START, 0);
-  
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("System ready!");
-  delay(2000);
-  forceRedisplay();
+    // Восстановление состояния после перезагрузки
+    if (loadRuntimeState()) {
+        saveEventLog(LOG_INFO, EVENT_RUNTIME_STATE_RESTORED, (uint16_t)systemContext.currentState);
+    } else {
+        // Если состояние не восстановлено (был IDLE) — принудительно очищаем флаги цикла,
+        // чтобы избежать рассинхрона flags vs state
+        flags.waterTreatmentInProgress = 0;
+        flags.backwashInProgress = 0;
+    }
+
+    // Watchdog
+    initWatchdog();
+
+    // Инициализация энкодера
+    initEncoder();
+
+    // Инициализация датчиков
+    initSensors();
+
+    // Инициализация дисплея
+    initDisplay();
+
+    // Загрузка журнала событий
+    loadEventLogs();
+
+    // Инициализация аварийного мониторинга
+    initEmergencyMonitoring();
+
+    // Флаги инициализации завершены
+    flags.backlightOn = true;
+    flags.displayOn = true;
+    flags.setupComplete = true;
+
+    // Ensure periodic services are scheduled
+    // wifi manager and web server will be polled from loop()
+
+    // Принудительный старт из IDLE — очищаем флаги, которые могли остаться
+    // от восстановленного состояния (loadRuntimeState восстанавливает флаги,
+    // но далее мы всё равно стартуем из IDLE)
+    systemContext.currentState = STATE_IDLE;
+    systemContext.previousState = STATE_IDLE;
+    systemContext.stateStartTime = millis();
+    flags.waterTreatmentInProgress = 0;
+    flags.backwashInProgress = 0;
+    lastActivityTime = millis();
+    loopStartTime = millis();
+
+    // Логируем старт системы
+    saveEventLog(LOG_INFO, EVENT_SYSTEM_START, 0);
+
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("System ready!");
+    delay(2000);
+    forceRedisplay();
 }
 
 // ============ LOOP - ОСНОВНОЙ ЦИКЛ ============
@@ -462,7 +483,7 @@ void setup() {
 /**
  * @brief Главный цикл выполнения
  * @details Вызывается непрерывно после setup()
- * 
+ *
  * Порядок выполнения в цикле:
  * 1. Сброс watchdog таймера
  * 2. Чтение датчиков уровня воды
@@ -474,158 +495,156 @@ void setup() {
  * 8. Валидация состояния реле
  * 9. Проверка на зависание системы
  */
-void loop() {
-  loopESP32();
-}
+void loop() { loopESP32(); }
 
 void loopESP32() {
-  // Сброс watchdog
-  if (flags.watchdogEnabled) {
-    WDT_RESET();
-  }
+    // Сброс watchdog
+    if (flags.watchdogEnabled) {
+        WDT_RESET();
+    }
 
-  // Мигание для индикации (используется в отображении)
-  static unsigned long blinkTimerLast = 0;
-  if (isTimeElapsed(blinkTimerLast, 500)) {
-    flags.blinkState = !flags.blinkState;
-  }
-  
-  loopStartTime = millis();
-  
-  // Чтение датчиков по настраиваемому периоду
-  unsigned long pollMs = (unsigned long)safetySettings.sensorPollPeriod * 1000UL;
-  if (pollMs < 250) pollMs = 250; // нижняя граница
-  if (isTimeElapsed(sensorPollTimerLast, pollMs)) {
-    readUltrasonicSensors();
-    checkTankEmptyStatus();
+    // Мигание для индикации (используется в отображении)
+    static unsigned long blinkTimerLast = 0;
+    if (isTimeElapsed(blinkTimerLast, 500)) {
+        flags.blinkState = !flags.blinkState;
+    }
+
+    loopStartTime = millis();
+
+    // Чтение датчиков по настраиваемому периоду
+    unsigned long pollMs = (unsigned long)safetySettings.sensorPollPeriod * 1000UL;
+    if (pollMs < 250) pollMs = 250;  // нижняя граница
+    if (isTimeElapsed(sensorPollTimerLast, pollMs)) {
+        readUltrasonicSensors();
+        checkTankEmptyStatus();
+        checkSchedule();
+    }
+
+    // Обработка энкодера
+    handleEncoder();
+
+    // Управление подсветкой
+    updateBacklight();
+
+    // Обновление аварийного мониторинга
+    updateEmergencyMonitoring();
+
+    // Обновление таймеров (каждую секунду)
+    if (isTimeElapsed(countdownTimerLast, 1000)) {
+        updateCountdownTimers();
+    }
+
+    // Проверка расписания и ночного режима
     checkSchedule();
-  }
-  
-  // Обработка энкодера
-  handleEncoder();
-  
-  // Управление подсветкой
-  updateBacklight();
-  
-  // Обновление аварийного мониторинга
-  updateEmergencyMonitoring();
-  
-  // Обновление таймеров (каждую секунду)
-  if (isTimeElapsed(countdownTimerLast, 1000)) {
-    updateCountdownTimers();
-  }
-  
-  // Проверка расписания и ночного режима
-  checkSchedule();
 
-  // Background Wi-Fi and web server periodic tasks
-  #ifdef ENABLE_WIFI
+// Background Wi-Fi and web server periodic tasks
+#ifdef ENABLE_WIFI
     loopWifiManager();
-    
+
     // Синхронизация NTP если WiFi только что подключился
     extern bool wifi_needsNTPSync();
     extern void wifi_clearNTPSyncFlag();
     extern void syncTimeWithNTP();
-    
+
     if (wifi_needsNTPSync()) {
-      syncTimeWithNTP();
-      wifi_clearNTPSyncFlag();
+        syncTimeWithNTP();
+        wifi_clearNTPSyncFlag();
     }
-    
+
     webServerPeriodic();
     // Handle MQTT client periodic tasks
     loopVQTT();
-  #endif
-  
-  // Обработка меню
-  if (flags.inMenu) {
-    checkMenuIdleTimeout();
-  } else {
-    // Проверка энкодера для входа в меню
-    checkEncoderForMenu();
-    
-    // Обновление дисплея
-    if (!flags.emergencyMode && !flags.inFilterWashInfo) {
-      updateDisplay();
-    }
-    
-    // Обработка режима инфо по фильтру
-    if (flags.inFilterWashInfo) {
-      displayFilterWashInfo();
-    }
-  }
-  
-  // Обработка аварийного режима
-  if (flags.emergencyMode) {
-    handleEmergency();
-    displayEmergencyScreen();
-    checkEmergencyReset();
-  } else {
-    // Основная логика автомата состояний
-    if (isTimeElapsed(stateUpdateTimerLast, 100)) {
-      processAutomaticControl();
-    }
-  }
-  
-  // Учет времени работы фильтра
-  updateFilterOperationTime();
-  
-  // Периодическая очистка старых логов
-  checkAndCleanOldLogs();
-  
-  // Валидация состояния реле
-  validateRelayStates();
-  
-  // Проверка зависания
-  checkForHang();
-  
-  // Сохранение статистики WDT
-  if (isTimeElapsed(wdtStatsSaveTimerLast, 30000)) {
-    saveWDTStats();
-  }
+#endif
 
-  // Сохранение состояния работы (каждые 30 секунд)
-  if (isTimeElapsed(runtimeStateSaveTimerLast, 30000)) {
-    saveRuntimeState();
-  }
-  
-  // Мягкая задержка
-  delay(20);
+    // Обработка меню
+    if (flags.inMenu) {
+        checkMenuIdleTimeout();
+    } else {
+        // Проверка энкодера для входа в меню
+        checkEncoderForMenu();
+
+        // Обновление дисплея
+        if (!flags.emergencyMode && !flags.inFilterWashInfo) {
+            updateDisplay();
+        }
+
+        // Обработка режима инфо по фильтру
+        if (flags.inFilterWashInfo) {
+            displayFilterWashInfo();
+        }
+    }
+
+    // Обработка аварийного режима
+    if (flags.emergencyMode) {
+        handleEmergency();
+        displayEmergencyScreen();
+        checkEmergencyReset();
+    } else {
+        // Основная логика автомата состояний
+        if (isTimeElapsed(stateUpdateTimerLast, 100)) {
+            processAutomaticControl();
+        }
+    }
+
+    // Учет времени работы фильтра
+    updateFilterOperationTime();
+
+    // Периодическая очистка старых логов
+    checkAndCleanOldLogs();
+
+    // Валидация состояния реле
+    validateRelayStates();
+
+    // Проверка зависания
+    checkForHang();
+
+    // Сохранение статистики WDT
+    if (isTimeElapsed(wdtStatsSaveTimerLast, 30000)) {
+        saveWDTStats();
+    }
+
+    // Сохранение состояния работы (каждые 30 секунд)
+    if (isTimeElapsed(runtimeStateSaveTimerLast, 30000)) {
+        saveRuntimeState();
+    }
+
+    // Мягкая задержка
+    delay(20);
 }
 
 // ============ ИНИЦИАЛИЗАЦИЯ ПИНОВ ============
 
 void initPins() {
-  // Реле (выходы)
-  pinMode(PUMP_PIN, OUTPUT);
-  digitalWrite(PUMP_PIN, LOW);
-  
-  pinMode(PUMP2_PIN, OUTPUT);
-  digitalWrite(PUMP2_PIN, LOW);
-  
-  pinMode(AERATION_PIN, OUTPUT);
-  digitalWrite(AERATION_PIN, LOW);
-  
-  pinMode(OZONE_PIN, OUTPUT);
-  digitalWrite(OZONE_PIN, LOW);
-  
-  pinMode(BACKWASH_PIN, OUTPUT);
-  digitalWrite(BACKWASH_PIN, LOW);
-  
-  pinMode(FILTER_PIN, OUTPUT);
-  digitalWrite(FILTER_PIN, LOW);
-  
-  // Энкодер (входы) - GPIO34/35 только INPUT, без внутренней подтяжки
-  pinMode(pinCLK, INPUT);      // GPIO34 - input only
-  pinMode(pinDT, INPUT);       // GPIO35 - input only
-  pinMode(pinSW, INPUT_PULLUP); // GPIO32 - с подтяжкой
-  
-  // Датчики УЗ
-  pinMode(HC_TRIG1, OUTPUT);
-  pinMode(HC_ECHO1, INPUT);
-  pinMode(HC_TRIG2, OUTPUT);
-  pinMode(HC_ECHO2, INPUT);
-  
-  // Встроенный LED
-  pinMode(LED_BUILTIN, OUTPUT);
+    // Реле (выходы)
+    pinMode(PUMP_PIN, OUTPUT);
+    digitalWrite(PUMP_PIN, LOW);
+
+    pinMode(PUMP2_PIN, OUTPUT);
+    digitalWrite(PUMP2_PIN, LOW);
+
+    pinMode(AERATION_PIN, OUTPUT);
+    digitalWrite(AERATION_PIN, LOW);
+
+    pinMode(OZONE_PIN, OUTPUT);
+    digitalWrite(OZONE_PIN, LOW);
+
+    pinMode(BACKWASH_PIN, OUTPUT);
+    digitalWrite(BACKWASH_PIN, LOW);
+
+    pinMode(FILTER_PIN, OUTPUT);
+    digitalWrite(FILTER_PIN, LOW);
+
+    // Энкодер (входы) - GPIO34/35 только INPUT, без внутренней подтяжки
+    pinMode(pinCLK, INPUT);        // GPIO34 - input only
+    pinMode(pinDT, INPUT);         // GPIO35 - input only
+    pinMode(pinSW, INPUT_PULLUP);  // GPIO32 - с подтяжкой
+
+    // Датчики УЗ
+    pinMode(HC_TRIG1, OUTPUT);
+    pinMode(HC_ECHO1, INPUT);
+    pinMode(HC_TRIG2, OUTPUT);
+    pinMode(HC_ECHO2, INPUT);
+
+    // Встроенный LED
+    pinMode(LED_BUILTIN, OUTPUT);
 }
