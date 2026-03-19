@@ -108,7 +108,6 @@ void loadAllSettings() {
   tank2.minLevel = preferences.getUChar("tank2_min", 10);
   tank2.maxLevel = preferences.getUChar("tank2_max", 80);
   
-
 }
 
 // ============ СОХРАНЕНИЕ НАСТРОЕК ============
@@ -562,7 +561,7 @@ void loadTimeZoneSetting() {
     safetySettings.timeZoneOffset = 0; // UTC по умолчанию
   }
   
-  Serial.printf("[Preferences] Timezone loaded: %d hours\\n", safetySettings.timeZoneOffset);
+  Serial.printf("[Preferences] Timezone loaded: %d hours\n", safetySettings.timeZoneOffset);
 }
 
 /// Сохраняет часовой пояс в память
@@ -571,5 +570,5 @@ void saveTimeZoneSetting() {
   extern Preferences preferences;
   
   preferences.putChar(PREF_KEY_TIMEZONE, safetySettings.timeZoneOffset);
-  Serial.printf("[Preferences] Timezone saved: %d hours\\n", safetySettings.timeZoneOffset);
+  Serial.printf("[Preferences] Timezone saved: %d hours\n", safetySettings.timeZoneOffset);
 }

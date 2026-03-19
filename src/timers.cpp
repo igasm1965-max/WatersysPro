@@ -78,6 +78,41 @@ bool isTimeElapsed(unsigned long& lastTime, unsigned long interval) {
   return false;
 }
 
+// ============ ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ПРЕОБРАЗОВАНИЯ ВРЕМЕНИ ============
+
+/// Преобразует время из UTC в локальное время с использованием часового пояса
+/// @param utcSeconds UTC время в секундах (unix timestamp)
+/// @param tzOffsetHours Смещение часового пояса в часах
+/// @return DateTime объект с локальным временем
+DateTime utcToLocal(time_t utcSeconds, int8_t tzOffsetHours) {
+  // Применяем смещение часового пояса
+  time_t localSeconds = utcSeconds + (tzOffsetHours * 3600);
+  return DateTime(localSeconds);
+}
+
+/// Преобразует локальное время обратно в UTC, используя часовой пояс
+/// @param localTime Локальное время (DateTime объект)
+/// @param tzOffsetHours Смещение часового пояса в часах
+/// @return Unix timestamp (UTC)
+time_t localToUTC(const DateTime& localTime, int8_t tzOffsetHours) {
+  // Преобразуем DateTime в unix timestamp (как будто это UTC)
+  struct tm tm;
+  tm.tm_year = localTime.year() - 1900;
+  tm.tm_mon = localTime.month() - 1;
+  tm.tm_mday = localTime.day();
+  tm.tm_hour = localTime.hour();
+  tm.tm_min = localTime.minute();
+  tm.tm_sec = localTime.second();
+  tm.tm_isdst = -1;
+  
+  time_t localAsUnix = mktime(&tm);
+  
+  // Вычитаем смещение часового пояса чтобы получить истинное UTC
+  time_t utcSeconds = localAsUnix - (tzOffsetHours * 3600);
+  
+  return utcSeconds;
+}
+
 // ============ СИНХРОНИЗАЦИЯ ВРЕМЕНИ (NTP) ============
 
 /// Синхронизирует время с NTP сервером после подключения WiFi
@@ -89,15 +124,16 @@ void syncTimeWithNTP() {
   Serial.println("[NTP] Requesting time synchronization...");
   
   // Строим строку часового пояса на основе safetySettings.timeZoneOffset
-  // ВАЖНО: RTC хранит UTC время, часовой пояс нужен только для отображения
   char tzString[32];
   
+  // POSIX TZ strings use inverted sign for fixed offsets:
+  // UTC+5 (east) is encoded as "UTC-5".
   if (safetySettings.timeZoneOffset == 0) {
-    strcpy(tzString, "UTC0");  // Special case для UTC (UTC+0 может не работать)
+    strcpy(tzString, "UTC0");
   } else if (safetySettings.timeZoneOffset > 0) {
-    snprintf(tzString, sizeof(tzString), "UTC+%d", safetySettings.timeZoneOffset);
+    snprintf(tzString, sizeof(tzString), "UTC-%d", safetySettings.timeZoneOffset);
   } else {
-    snprintf(tzString, sizeof(tzString), "UTC%d", safetySettings.timeZoneOffset);
+    snprintf(tzString, sizeof(tzString), "UTC+%d", -safetySettings.timeZoneOffset);
   }
   
   Serial.printf("[NTP] Using timezone: %s\n", tzString);
@@ -119,9 +155,8 @@ void syncTimeWithNTP() {
   if (nowUtc > 24 * 3600) {
     // Время успешно синхронизировано
     // nowUtc содержит UTC время
-    // Получим локальное время для отображения в логах
-    struct tm timeinfo_utc = *gmtime(&nowUtc);  // UTC для RTC
-    struct tm timeinfo_local = *localtime(&nowUtc);  // Локальное для логов
+    struct tm timeinfo_utc = *gmtime(&nowUtc);  // UTC
+    struct tm timeinfo_local = *localtime(&nowUtc);  // Локальное время
     
     Serial.printf("[NTP] UTC time: %04d-%02d-%02d %02d:%02d:%02d\n",
                   timeinfo_utc.tm_year + 1900,
@@ -140,13 +175,61 @@ void syncTimeWithNTP() {
                   timeinfo_local.tm_sec,
                   safetySettings.timeZoneOffset);
     
-    // Обновляем RTC только UTC временем! (не локальным)
-    rtc.adjust(DateTime(nowUtc));
-    saveEventLog(LOG_INFO, EVENT_NTP_SYNC_SUCCESS, safetySettings.timeZoneOffset + 128);  // +128 для сохранения отрицательных значений
+    // ВАЖНО: Теперь сохраняем ЛОКАЛЬНОЕ время в RTC (не UTC!)
+    // Это позволяет коду отображения работать без коррекций
+    DateTime localDateTime(
+      timeinfo_local.tm_year + 1900,
+      timeinfo_local.tm_mon + 1,
+      timeinfo_local.tm_mday,
+      timeinfo_local.tm_hour,
+      timeinfo_local.tm_min,
+      timeinfo_local.tm_sec
+    );
+    rtc.adjust(localDateTime);
+    
+    Serial.println("[NTP] RTC updated with LOCAL time");
+    saveEventLog(LOG_INFO, EVENT_NTP_SYNC_SUCCESS, safetySettings.timeZoneOffset + 128);
   } else {
     Serial.println("[NTP] Time synchronization failed");
     saveEventLog(LOG_WARNING, EVENT_NTP_SYNC_FAILED, attempts);
   }
+}
+
+/// Пересчитывает время в RTC при смене часового пояса
+/// Конвертирует текущее локальное время из старого пояса в новый
+void recalculateRTCForTimezone(int8_t oldOffset, int8_t newOffset) {
+  extern RTC_DS3231 rtc;
+  extern void saveEventLog(LogLevel level, uint8_t eventType, uint16_t param);
+  
+  if (oldOffset == newOffset) {
+    Serial.println("[Timezone] No change in offset, skipping recalculation");
+    return;
+  }
+  
+  // Получаем текущее время из RTC (это локальное время для oldOffset)
+  DateTime currentLocal = rtc.now();
+  
+  // Преобразуем локальное время в UTC, используя старый offset
+  // localTime + offset*3600s = UTC
+  time_t utcSeconds = currentLocal.unixtime() - (oldOffset * 3600);
+  
+  // Теперь применяем новый offset для получения нового локального времени
+  // UTC + newOffset*3600s = newLocalTime
+  time_t newLocalSeconds = utcSeconds + (newOffset * 3600);
+  DateTime newLocal = DateTime(newLocalSeconds);
+  
+  // Сохраняем новое локальное время в RTC
+  rtc.adjust(newLocal);
+  
+  Serial.printf("[Timezone] RTC recalculated: old UTC%+d -> new UTC%+d\n", oldOffset, newOffset);
+  Serial.printf("[Timezone] Old local: %04d-%02d-%02d %02d:%02d:%02d\n",
+                currentLocal.year(), currentLocal.month(), currentLocal.day(),
+                currentLocal.hour(), currentLocal.minute(), currentLocal.second());
+  Serial.printf("[Timezone] New local: %04d-%02d-%02d %02d:%02d:%02d\n",
+                newLocal.year(), newLocal.month(), newLocal.day(),
+                newLocal.hour(), newLocal.minute(), newLocal.second());
+  
+  saveEventLog(LOG_INFO, EVENT_TIMEZONE_CHANGED, newOffset + 128);
 }
 
 // ============ ИНИЦИАЛИЗАЦИЯ WATCHDOG ============

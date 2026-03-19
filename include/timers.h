@@ -69,6 +69,18 @@ unsigned long timeToMs(byte hours, byte minutes, byte seconds);
 /// Проверка истечения интервала времени
 bool isTimeElapsed(unsigned long &lastTime, unsigned long interval);
 
+/// Преобразует время из UTC в локальное время с использованием часового пояса
+/// @param utcSeconds UTC время в секундах (unix timestamp)
+/// @param tzOffsetHours Смещение часового пояса в часах
+/// @return DateTime объект с локальным временем
+DateTime utcToLocal(time_t utcSeconds, int8_t tzOffsetHours);
+
+/// Преобразует локальное время обратно в UTC, используя часовой пояс
+/// @param localTime Локальное время (DateTime объект)
+/// @param tzOffsetHours Смещение часового пояса в часах
+/// @return Unix timestamp (UTC)
+time_t localToUTC(const DateTime& localTime, int8_t tzOffsetHours);
+
 /// Обновление состояния мигания
 void updateBlinkState();
 
@@ -83,5 +95,10 @@ const char* getResetReason();
 
 /// Обновление статистики WDT
 void updateWDTStats();
+
+/// Пересчитывает время в RTC при смене часового пояса
+/// @param oldOffset Старое смещение часового пояса в часах
+/// @param newOffset Новое смещение часового пояса в часах
+void recalculateRTCForTimezone(int8_t oldOffset, int8_t newOffset);
 
 #endif // TIMERS_H

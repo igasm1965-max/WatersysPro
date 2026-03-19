@@ -17,8 +17,8 @@
 #ifdef ENABLE_WIFI
 #include <WiFi.h>
 #include "web_server.h"
+#include "wifi_manager.h"
 #include "vqtt.h"
-extern void initWiFi();
 extern void restartWebServer();
 #endif
 
@@ -95,7 +95,7 @@ bool showPasswordScreen() {
       lcd.print("Attempts left: ");
       lcd.print(MAX_ATTEMPTS - attempts);
     } else {
-      lcd.print("Turn=digit Click=nxt");
+      lcd.print("Turn=chg Click=next ");
     }
     
     // Compute centered position for password field
@@ -242,7 +242,7 @@ static void editValue(const char* title, uint16_t* value, uint16_t minVal, uint1
   lcd.print(" ");
   lcd.print(unit);
   lcd.setCursor(0, 3);
-  lcd.print("Turn=edit Click=save");
+  lcd.print("Turn=chg Click=save ");
   
   while (editing) {
     // Обновляем только значение если изменилось
@@ -386,7 +386,7 @@ void showChangePasswordScreen() {
   snprintf(prompt, sizeof(prompt), "Enter %d digits:", PASSWORD_DIGITS);
   lcd.print(prompt);
   lcd.setCursor(0, 3);
-  lcd.print("Long press = cancel");
+  lcd.print("Turn=chg Click=next ");
   
   // Center field
   int pwdFieldWidth = PASSWORD_DIGITS + 2; // [digits]
@@ -731,13 +731,14 @@ static void editString(const char* title, const char* prefKey, int maxLen, bool 
       lcd.setCursor(0,2);
       lcd.print("Pos:");
       lcd.print(pos);
+      lcd.print(" Ch:");
+      lcd.print(wifiCharSet[charIdx]);
+      lcd.print("       ");
       lcd.setCursor(0,3);
       if (cursorMode) {
-        lcd.print("Turn=move Click=exit");
+        lcd.print("Turn=move Click=ok ");
       } else {
-        lcd.print("Char: ");
-        lcd.print(wifiCharSet[charIdx]);
-        lcd.print("Turn=chg Click=next");
+        lcd.print("Turn=chg Click=next ");
       }
 
       // Visual cursor: blink at selected character when in cursor mode
@@ -995,11 +996,11 @@ void clearWifiSettings() {
   preferences.remove(PREF_KEY_WIFI_PASS);
   lcd.clear(); lcd.setCursor(0,1); lcd.print("Wi-Fi cleared");
 #ifdef ENABLE_WIFI
-  Serial.println("[WiFi] Cleared stored credentials, restarting WiFi as AP...");
-  WiFi.disconnect(true);
-  WiFi.mode(WIFI_OFF);
-  delay(200);
-  initWiFi(); // initWiFi will start AP when no SSID saved
+  Serial.println("[WiFi] Cleared stored credentials, switching to AP mode...");
+  // Keep Wi-Fi radio enabled and clear current STA session,
+  // then use the active wifi_manager path to start AP.
+  WiFi.disconnect(false, true);
+  wifi_clearCredentials();
   restartWebServer();
   lcd.clear(); lcd.setCursor(0,1); lcd.print("AP mode");
 #endif
@@ -1423,10 +1424,43 @@ void editTimeZone() {
       }
     } else if (action == eButton) {
       // Сохраняем значение
-      safetySettings.timeZoneOffset = (int8_t)(value - 12);
+      int8_t newTimeZoneOffset = (int8_t)(value - 12);
+      int8_t oldTimeZoneOffset = safetySettings.timeZoneOffset;
+      
+      // Если часовой пояс изменился, нужно пересчитать время в RTC
+      if (newTimeZoneOffset != oldTimeZoneOffset) {
+        extern RTC_DS3231 rtc;
+        extern void saveEventLog(LogLevel level, uint8_t eventType, uint16_t param);
+        
+        // Получаем текущее время из RTC (которое сейчас хранит локальное время в старом поясе)
+        DateTime oldLocalTime = rtc.now();
+        
+        // Преобразуем старое локальное время обратно в UTC
+        // localToUTC доступна из timers.cpp (нужно её объявить как external)
+        extern time_t localToUTC(const DateTime& localTime, int8_t tzOffsetHours);
+        time_t utcTime = localToUTC(oldLocalTime, oldTimeZoneOffset);
+        
+        // Преобразуем UTC в новое локальное время
+        extern DateTime utcToLocal(time_t utcSeconds, int8_t tzOffsetHours);
+        DateTime newLocalTime = utcToLocal(utcTime, newTimeZoneOffset);
+        
+        // Обновляем RTC с новым локальным временем
+        rtc.adjust(newLocalTime);
+        
+        Serial.printf("[Engineer] Timezone changed from %+d to %+d, RTC recalculated\n", 
+                      oldTimeZoneOffset, newTimeZoneOffset);
+      }
+      
+      safetySettings.timeZoneOffset = newTimeZoneOffset;
+      
+      // Сохраняем в SafetySettings
       saveSafetySettings();
       
-      Serial.printf("[Engineer] TimeZone set to %+d hours\n", safetySettings.timeZoneOffset);
+      // Явно сохраняем в Preferences с правильным ключом
+      extern Preferences preferences;
+      preferences.putChar("timezone", safetySettings.timeZoneOffset);
+      
+      Serial.printf("[Engineer] TimeZone set to %+d hours (saved to Preferences)\n", safetySettings.timeZoneOffset);
       saveEventLog(LOG_INFO, EVENT_TIMEZONE_CHANGED, safetySettings.timeZoneOffset + 128);  // +128 для сохранения отрицательных значений
       
       flags.displayLocked = 0;

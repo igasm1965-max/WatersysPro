@@ -851,21 +851,6 @@ void initWebServer() {
     // Ничего не отправляем здесь, обработка и send() происходят в handlePostAdminTokenBody().
   }, NULL, handlePostAdminTokenBody);
 
-  // DEBUG: отладочный эндпоинт для просмотра текущего admin token из NVS.
-  // ВНИМАНИЕ: использовать только для диагностики, затем удалить или закрыть.
-  server.on("/api/admin_token_debug", HTTP_GET, [](AsyncWebServerRequest* request) {
-    if (!prefsIsAvailable()) {
-      request->send(503, "application/json", "{\"error\":\"preferences unavailable\"}");
-      return;
-    }
-    String storedToken = preferences.getString(PREF_KEY_ADMIN_TOKEN, "");
-    DynamicJsonDocument doc(128);
-    doc["token"] = storedToken;
-    String out;
-    serializeJson(doc, out);
-    request->send(200, "application/json", out);
-  });
-
   // Register MQTT handlers
   server.on("/api/mqtt", HTTP_GET, [](AsyncWebServerRequest* request) { handleGetMqtt(request); });
   server.on("/api/mqtt", HTTP_POST, [](AsyncWebServerRequest* request) {
@@ -1089,6 +1074,54 @@ void initWebServer() {
       request->send(400, "application/json", "{\"error\":\"unknown action\"}");
       return;
     } });
+
+  // API: Get/Set timezone (GET returns {"timezone": <hours>}, POST requires admin token)
+  server.on("/api/timezone", HTTP_GET, [](AsyncWebServerRequest* request) {
+    extern SafetySettings safetySettings;
+    DynamicJsonDocument doc(128);
+    doc["timezone"] = safetySettings.timeZoneOffset;
+    String out;
+    serializeJson(doc, out);
+    request->send(200, "application/json", out);
+  });
+  server.on("/api/timezone", HTTP_POST, [](AsyncWebServerRequest* request) {
+    // Response is sent by body handler
+  }, NULL, [](AsyncWebServerRequest* request, uint8_t* data, size_t len, size_t index, size_t total) {
+    if (len == 0) { request->send(400, "application/json", "{\"error\":\"empty body\"}"); return; }
+    DynamicJsonDocument doc(256);
+    DeserializationError err = deserializeJson(doc, data, len);
+    if (err) { request->send(400, "application/json", "{\"error\":\"invalid json\"}"); return; }
+    const char* token = doc["token"];
+    if (!token) { request->send(403, "application/json", "{\"error\":\"token required\"}"); return; }
+    String storedToken = preferences.getString(PREF_KEY_ADMIN_TOKEN, "");
+    if (storedToken.length() == 0) { request->send(403, "application/json", "{\"error\":\"no admin token set\"}"); return; }
+    if (String(token) != storedToken) { request->send(403, "application/json", "{\"error\":\"invalid token\"}"); return; }
+    
+    extern SafetySettings safetySettings;
+    extern void recalculateRTCForTimezone(int8_t, int8_t);
+    extern void saveEventLog(LogLevel, uint8_t, uint16_t);
+    
+    int8_t newTz = doc["timezone"] | 0;
+    if (newTz < -12 || newTz > 12) { 
+      request->send(400, "application/json", "{\"error\":\"timezone must be -12 to +12\"}"); 
+      return; 
+    }
+    
+    int8_t oldTz = safetySettings.timeZoneOffset;
+    if (oldTz != newTz) {
+      recalculateRTCForTimezone(oldTz, newTz);
+      safetySettings.timeZoneOffset = newTz;
+      saveTimeZoneSetting();
+      saveEventLog(LOG_INFO, EVENT_TIMEZONE_CHANGED, newTz + 128);
+      Serial.printf("[Web] Timezone changed from UTC%+d to UTC%+d\n", oldTz, newTz);
+    }
+    
+    DynamicJsonDocument resp(128);
+    resp["ok"] = true;
+    resp["timezone"] = newTz;
+    String out; serializeJson(resp, out);
+    request->send(200, "application/json", out);
+  });
 
   server.begin();
   Serial.println("[Web] Async server started on port 80");
