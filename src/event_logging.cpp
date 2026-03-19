@@ -1087,28 +1087,27 @@ int filterEventsByCode(uint16_t eventCode, int* outIndices, int maxCount) {
 
 /// Получает текст события по его коду
 const char* getEventText(uint16_t eventCode) {
-  // Return English or Russian description depending on language preference
-  bool en = isEnglish();
+  // Final behavior: keep event log text in English only.
   switch(eventCode) {
-    case EVENT_FILTER_WASH_START: return en ? "Filter wash started"          : "Начало промывки фильтра";
-    case EVENT_EMERGENCY:          return en ? "Emergency triggered"          : "Аварийный режим";
-    case EVENT_SYSTEM_START:       return en ? "System started"               : "Система запущена";
-    case EVENT_SYSTEM_STOP:        return en ? "System stopped"               : "Система остановлена";
-    case EVENT_STATS_CLEAR:        return en ? "Statistics cleared"           : "Статистика очищена";
-    case EVENT_SETTINGS_CHANGE:    return en ? "Settings changed"             : "Изменены настройки";
-    case EVENT_SYSTEM_STATE_CHANGE:return en ? "State change"                 : "Смена состояния";
-    case EVENT_MANUAL_OPERATION:   return en ? "Manual operation"             : "Ручная операция";
-    case EVENT_MENU_ACTION:        return en ? "Menu action"                 : "Действие меню";
-    case EVENT_WATCHDOG_RESET:     return en ? "Watchdog reset"              : "Сброс сторожевого таймера";
-    case EVENT_RTC_LOST_POWER:     return en ? "RTC lost power"              : "RTC потерял питание";
-    case EVENT_SENSOR_ERROR:       return en ? "Sensor error"                : "Ошибка датчика";
+    case EVENT_FILTER_WASH_START: return "Filter wash started";
+    case EVENT_EMERGENCY:          return "Emergency triggered";
+    case EVENT_SYSTEM_START:       return "System started";
+    case EVENT_SYSTEM_STOP:        return "System stopped";
+    case EVENT_STATS_CLEAR:        return "Statistics cleared";
+    case EVENT_SETTINGS_CHANGE:    return "Settings changed";
+    case EVENT_SYSTEM_STATE_CHANGE:return "State change";
+    case EVENT_MANUAL_OPERATION:   return "Manual operation";
+    case EVENT_MENU_ACTION:        return "Menu action";
+    case EVENT_WATCHDOG_RESET:     return "Watchdog reset";
+    case EVENT_RTC_LOST_POWER:     return "RTC lost power";
+    case EVENT_SENSOR_ERROR:       return "Sensor error";
     case EVENT_UNEXPECTED_STATE_CHANGE:
-                                  return en ? "Unexpected state change"    : "Неожиданная смена";
+                                  return "Unexpected state change";
     case EVENT_RUNTIME_STATE_RESTORED:
-                                  return en ? "Runtime state restored"     : "Восстановлено состояние";
-    case EVENT_WIFI_CONNECTED:     return en ? "Wi-Fi connected"             : "Wi-Fi подключен";
-    case EVENT_WIFI_AP_STARTED:    return en ? "Wi-Fi AP started"            : "Wi-Fi AP запущена";
-    default:                      return en ? "Unknown event"               : "Неизвестное событие";
+                                  return "Runtime state restored";
+    case EVENT_WIFI_CONNECTED:     return "Wi-Fi connected";
+    case EVENT_WIFI_AP_STARTED:    return "Wi-Fi AP started";
+    default:                      return "Unknown event";
   }
 }
 
