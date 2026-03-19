@@ -406,7 +406,7 @@ int inputVal(const char* title, int minVal, int maxVal, int initialVal) {
       lcd.print("    ");
       
       lcd.setCursor(0, 3);
-      lcd.print("Press to confirm");
+      lcd.print("Turn=chg Click=ok  ");
       
       lastUpdate = millis();
     }

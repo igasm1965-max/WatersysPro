@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.1.1] - 2026-03-19
+
+### Fixed (Firmware)
+- **Engineer input UI on 20x4 LCD**: fixed hint text overlap/wrapping in input submenus.
+  - Unified short one-line hints for all input editors (password, numeric, string):
+    - `Turn=chg Click=next`
+    - `Turn=chg Click=save`
+    - `Turn=chg Click=ok`
+  - Moved dynamic character preview out of the bottom hint line in string editor.
+  - Added explicit tail clearing with spaces for dynamic fields to prevent stale characters.
+
+### UX
+- Input screens now use consistent controls wording and fit within LCD width limits without visual artifacts.
+
 ## [1.1.0] - 2026-03-13
 
 ### Major Features
