@@ -11,6 +11,7 @@ require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const path = require('path');
+const fs = require('fs');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const socketIo = require('socket.io');
@@ -34,6 +35,26 @@ const MQTT_TOPIC_BASE = process.env.MQTT_TOPIC_BASE || 'watersystem';
 const JWT_SECRET = process.env.JWT_SECRET || 'change_this_secret';
 const REMOTE_ADMIN_TOKEN = process.env.REMOTE_ADMIN_TOKEN || '';
 const REMOTE_REQUIRE_TOKEN = (process.env.REMOTE_REQUIRE_TOKEN || 'true') !== 'false';
+const REPO_ROOT = path.join(__dirname, '..', '..');
+const DOCS_APP_ROOT = path.join(REPO_ROOT, 'docs', 'app');
+const DOCS_ALLOWED_FILES = new Set([
+  'DOCUMENTATION_INDEX.md',
+  'README.md',
+  'README_RU.md',
+  'CHANGELOG.md',
+  'CHANGELOG_RU.md',
+  'RELEASE_NOTES_v1.1.0.md',
+  'RELEASE_NOTES_v1.1.0_RU.md',
+  'PROJECT_STATUS.md',
+  'docs/WORKTREE_CHANGES_2026-03-19.md',
+  'docs/PRODUCTION_HARDENING_TRACKER.md',
+  'docs/SD_INTEGRATION.md',
+  'docs/REFRACTOR_AND_SMOKE_SUMMARY.md',
+  'mobile/START_HERE.md',
+  'mobile/BUILD_APK_GUIDE.md',
+  'mobile/CHECKLIST.md',
+  'mobile/DEVICE_CONTROL_GUIDE.md',
+]);
 
 const REMOTE_TARGETS = new Set(['pump1', 'pump2', 'aeration', 'ozone', 'filter', 'backwash']);
 
@@ -173,6 +194,24 @@ client.on('message', async (topic, payload) => {
 // Serve static assets (firmware for OTA)
 app.use('/firmware', express.static('static'));
 app.use('/remote', express.static(path.join(__dirname, '..', 'public')));
+app.use('/docs', express.static(DOCS_APP_ROOT));
+
+app.get('/docs/content', async (req, res) => {
+  try {
+    const relPath = String(req.query.path || '').replace(/\\/g, '/');
+    if (!DOCS_ALLOWED_FILES.has(relPath)) {
+      return res.status(404).send('Document is not available');
+    }
+
+    const absPath = path.join(REPO_ROOT, relPath);
+    const data = await fs.promises.readFile(absPath, 'utf8');
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    return res.status(200).send(data);
+  } catch (err) {
+    console.error('Docs content error', err);
+    return res.status(500).send('Failed to load document');
+  }
+});
 
 app.get('/api/remote/config', (req, res) => {
   res.json({
