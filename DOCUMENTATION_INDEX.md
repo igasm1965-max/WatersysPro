@@ -61,6 +61,7 @@
 
 ### Документация и руководства
 - **[mobile/START_HERE.md](mobile/START_HERE.md)** ⭐ - Начните отсюда! (5 минут)
+- **[mobile/MOBILE_APP_CREATION_GUIDE_RU.md](mobile/MOBILE_APP_CREATION_GUIDE_RU.md)** - Полный гайд по созданию мобильного приложения
 - **[mobile/QUICK_START_BUILD.md](mobile/QUICK_START_BUILD.md)** - Пошаговая инструкция
 - **[mobile/BUILD_APK_GUIDE.md](mobile/BUILD_APK_GUIDE.md)** - Полное руководство сборки
 - **[mobile/CHECKLIST.md](mobile/CHECKLIST.md)** - Чек-лист перед сборкой
@@ -104,6 +105,7 @@
 ### Для новичков
 1. Читайте **[README_RU.md](README_RU.md)** - основная информация
 2. Смотрите **[mobile/START_HERE.md](mobile/START_HERE.md)** - как собрать APK
+3. Для полного пути от идеи до APK: **[mobile/MOBILE_APP_CREATION_GUIDE_RU.md](mobile/MOBILE_APP_CREATION_GUIDE_RU.md)**
 
 ### Для разработчиков
 1. **[CHANGELOG_RU.md](CHANGELOG_RU.md)** - что изменилось
@@ -131,6 +133,7 @@
 │
 └── mobile/                         📱 Мобильное приложение
     ├── START_HERE.md               ⭐ Начните отсюда
+   ├── MOBILE_APP_CREATION_GUIDE_RU.md
     ├── QUICK_START_BUILD.md
     ├── BUILD_APK_GUIDE.md
     ├── CHECKLIST.md
