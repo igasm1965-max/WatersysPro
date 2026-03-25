@@ -1197,16 +1197,16 @@ void getEventTypeDescription(uint8_t eventType, char* buffer, uint8_t size) {
 /// Описание состояния системы
 void getStateDescription(uint8_t state, char* buffer, uint8_t size) {
   if (!buffer || size == 0) return;
-  const char* text = "Неизв.";
+  const char* text = "Unknown";
   switch (state) {
-    case STATE_IDLE: text = "Ожидание"; break;
-    case STATE_FILLING_TANK1: text = "Заполнение"; break;
-    case STATE_OZONATION: text = "Озонирование"; break;
-    case STATE_AERATION: text = "Аэрация"; break;
-    case STATE_SETTLING: text = "Отстаивание"; break;
-    case STATE_FILTRATION: text = "Фильтрация"; break;
-    case STATE_BACKWASH: text = "Обратная промывка"; break;
-    default: text = "Неизв."; break;
+    case STATE_IDLE: text = "Idle"; break;
+    case STATE_FILLING_TANK1: text = "Filling"; break;
+    case STATE_OZONATION: text = "Ozonation"; break;
+    case STATE_AERATION: text = "Aeration"; break;
+    case STATE_SETTLING: text = "Settling"; break;
+    case STATE_FILTRATION: text = "Filtration"; break;
+    case STATE_BACKWASH: text = "Backwash"; break;
+    default: text = "Unknown"; break;
   }
   strncpy(buffer, text, size - 1);
   buffer[size - 1] = '\0';
@@ -1236,21 +1236,21 @@ void getSettingDescription(uint8_t settingType, char* buffer, uint8_t size) {
 /// Описание ручной операции
 void getManualOperationDescription(uint8_t operation, char* buffer, uint8_t size) {
   if (!buffer || size == 0) return;
-  const char* text = "Неизв.";
+  const char* text = "Unknown";
   switch (operation) {
-    case MANUAL_PUMP1_ON:  text = "Насос1 ВКЛ"; break;
-    case MANUAL_PUMP1_OFF: text = "Насос1 ВЫКЛ"; break;
-    case MANUAL_PUMP2_ON:  text = "Насос2 ВКЛ"; break;
-    case MANUAL_PUMP2_OFF: text = "Насос2 ВЫКЛ"; break;
-    case MANUAL_AERATION_ON:  text = "Аэрация ВКЛ"; break;
-    case MANUAL_AERATION_OFF: text = "Аэрация ВЫКЛ"; break;
-    case MANUAL_OZONE_ON:  text = "Озон ВКЛ"; break;
-    case MANUAL_OZONE_OFF: text = "Озон ВЫКЛ"; break;
-    case MANUAL_FILTER_ON:  text = "Фильтр ВКЛ"; break;
-    case MANUAL_FILTER_OFF: text = "Фильтр ВЫКЛ"; break;
-    case MANUAL_BACKWASH_ON:  text = "Обратка ВКЛ"; break;
-    case MANUAL_BACKWASH_OFF: text = "Обратка ВЫКЛ"; break;
-    default: text = "Неизв."; break;
+    case MANUAL_PUMP1_ON:  text = "Pump1 ON"; break;
+    case MANUAL_PUMP1_OFF: text = "Pump1 OFF"; break;
+    case MANUAL_PUMP2_ON:  text = "Pump2 ON"; break;
+    case MANUAL_PUMP2_OFF: text = "Pump2 OFF"; break;
+    case MANUAL_AERATION_ON:  text = "Aeration ON"; break;
+    case MANUAL_AERATION_OFF: text = "Aeration OFF"; break;
+    case MANUAL_OZONE_ON:  text = "Ozone ON"; break;
+    case MANUAL_OZONE_OFF: text = "Ozone OFF"; break;
+    case MANUAL_FILTER_ON:  text = "Filter ON"; break;
+    case MANUAL_FILTER_OFF: text = "Filter OFF"; break;
+    case MANUAL_BACKWASH_ON:  text = "Backwash ON"; break;
+    case MANUAL_BACKWASH_OFF: text = "Backwash OFF"; break;
+    default: text = "Unknown"; break;
   }
   strncpy(buffer, text, size - 1);
   buffer[size - 1] = '\0';

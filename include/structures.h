@@ -152,7 +152,7 @@ struct SystemFlags {
   
   // Байт 3: дополнительные флаги
   uint8_t displayLocked : 1;          ///< Дисплей заблокирован (не обновляется в фоне)
-  uint8_t reserved_flags2 : 1;
+  uint8_t manualMode : 1;             ///< 1 = ручной режим, 0 = автоматический режим
   uint8_t reserved_flags3 : 1;
   uint8_t reserved_flags4 : 1;
   uint8_t reserved_flags5 : 1;

@@ -52,7 +52,7 @@ void EventFilterHandler() {
 void saveTimerSetting(uint8_t timerType, uint8_t hours, uint8_t minutes, uint8_t seconds);
 void saveTankSettings(uint8_t tankNumber, int minLevel, int maxLevel);
 void saveScheduleSettings();
-void saveFilterCleaningPeriod(uint32_t days);
+void saveFilterCleaningPeriod(uint32_t intervalSeconds);
 void resetAllSettings();
 
 // ============ ВНЕШНИЕ ПЕРЕМЕННЫЕ ============
@@ -808,7 +808,7 @@ void FilterCleaningPeriodHandler() {
   
   if (newInterval != filterCleaningInterval) {
     filterCleaningInterval = newInterval;
-    saveFilterCleaningPeriod(newDays);
+    saveFilterCleaningPeriod(newInterval);
     saveEventLog(LOG_INFO, EVENT_SETTINGS_CHANGE, (uint16_t)SETTING_FILTER_PERIOD, newInterval);
   }
   lcd.clear();

@@ -64,8 +64,8 @@ void saveTankSettings(uint8_t tankNumber, int minLevel, int maxLevel);
 /// Сохранение настроек расписания
 void saveScheduleSettings();
 
-/// Сохранение периода очистки фильтра
-void saveFilterCleaningPeriod(uint32_t days);
+/// Сохранение периода очистки фильтра (в секундах)
+void saveFilterCleaningPeriod(uint32_t intervalSeconds);
 
 /// Загрузка часового пояса из памяти
 void loadTimeZoneSetting();

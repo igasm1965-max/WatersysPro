@@ -90,10 +90,10 @@ void readUltrasonicSensors() {
     tank1RawDistance = raw1;
     tank2RawDistance = raw2;
 
-    // Если ping_cm() вернул 0 (нет эхо) — сохраняем предыдущее значение,
-    // чтобы пустой бак (расстояние > диапазона) не интерпретировался как полный
-    if (raw1 != 0) tank1Level = raw1;
-    if (raw2 != 0) tank2Level = raw2;
+    // Политика чтения: значение raw применяется напрямую, включая 0 (no echo).
+    // Логику "при raw==0 оставить предыдущее значение" больше не используем.
+    tank1Level = raw1;
+    tank2Level = raw2;
 
     // Debug: логируем сырые значения и то, что записано в переменные уровней
     Serial.printf("[SENSOR] raw1=%d raw2=%d -> tank1=%d tank2=%d\n", tank1RawDistance,
