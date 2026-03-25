@@ -303,6 +303,30 @@
       font-weight: 600;
     }
 
+    .relay-btn.relay-disabled,
+    .relay-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      filter: grayscale(0.35);
+    }
+
+    .mode-switch {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 6px;
+      margin-bottom: 6px;
+    }
+
+    .mode-switch .mode-btn-active {
+      box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.8), 0 0 12px rgba(34, 211, 238, 0.35);
+    }
+
+    #modeLockHint {
+      color: #fecaca;
+      min-height: 1.2em;
+    }
+
     .chart-card {
       padding: 9px 10px;
       border-radius: var(--radius-md);
@@ -765,6 +789,12 @@
             <div class="status-grid">
               <div>
                 <div id="info">Loading...</div>
+                <div class="mode-switch">
+                  <button id="modeManualBtn" class="btn-soft btn-sm" onclick="setMode('manual')">Ручной</button>
+                  <button id="modeAutoBtn" class="btn-soft btn-sm" onclick="setMode('auto')">Автомат</button>
+                </div>
+                <div id="modeStatus" class="hint-text">Режим: неизвестен</div>
+                <div id="modeLockHint" class="hint-text"></div>
                 <div id="controls"></div>
               </div>
               <div class="chart-card">
@@ -948,11 +978,69 @@
   <script>
   // Enhanced status update: prefer WebSocket (push) and pause polling when page hidden to reduce load
   var pollingEnabled = true;
+  var currentControlMode = 'auto';
+
+  function setUiMessage(text, timeoutMs) {
+    const msg = document.getElementById('msg');
+    if (!msg) return;
+    msg.innerText = text;
+    setTimeout(function(){ msg.innerText = ''; }, timeoutMs || 3000);
+  }
+
+  function applyControlMode(mode) {
+    currentControlMode = (mode === 'manual') ? 'manual' : 'auto';
+    const manualBtn = document.getElementById('modeManualBtn');
+    const autoBtn = document.getElementById('modeAutoBtn');
+    const modeStatus = document.getElementById('modeStatus');
+    const modeHint = document.getElementById('modeLockHint');
+
+    if (manualBtn) {
+      manualBtn.classList.toggle('mode-btn-active', currentControlMode === 'manual');
+    }
+    if (autoBtn) {
+      autoBtn.classList.toggle('mode-btn-active', currentControlMode === 'auto');
+    }
+    if (modeStatus) {
+      modeStatus.textContent = 'Режим: ' + (currentControlMode === 'manual' ? 'Ручной' : 'Автоматический');
+    }
+    if (modeHint) {
+      modeHint.textContent = currentControlMode === 'manual' ? '' : 'Ручное управление реле заблокировано в автоматическом режиме';
+    }
+  }
+
+  function setMode(mode) {
+    const targetMode = (mode === 'manual') ? 'manual' : 'auto';
+
+    if (wsClient && wsClient.readyState === WebSocket.OPEN) {
+      wsClient.send(JSON.stringify({type:'control', op:'set_mode', mode:targetMode}));
+      return;
+    }
+
+    fetch('/control?op=set_mode&mode=' + encodeURIComponent(targetMode))
+      .then(function(r){
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        if (pollingEnabled) setTimeout(fetchStatus, 80);
+      })
+      .catch(function(e){
+        console.warn('setMode error', e);
+        setUiMessage('Ошибка переключения режима');
+      });
+  }
+
+  function getControlToken() {
+    var tokenEl = document.getElementById('token');
+    if (!tokenEl) return '';
+    return (tokenEl.value || '').trim();
+  }
   function escapeHtml(s) {
     return s == null ? '' : String(s);
   }
   function renderStatus(j) {
     try {
+      const modeRaw = (j && j.control_mode) ? String(j.control_mode) : ((j && j.flags && j.flags.manualMode) ? 'manual' : 'auto');
+      const mode = modeRaw.toLowerCase() === 'manual' ? 'manual' : 'auto';
+      applyControlMode(mode);
+
       let s = 'IP:' + escapeHtml(j.ip || '') + '<br>MAC:' + escapeHtml(j.mac || '') + '<br>Uptime:' + (j.uptime || 0) + 's';
       // MQTT status
       if (j.mqtt) {
@@ -972,13 +1060,26 @@
           }
         }
       }
+
+      if (j.wifi) {
+        let ws = 'disconnected';
+        if (j.wifi.connected) ws = 'STA connected';
+        else if (j.wifi.ap_active) ws = 'AP mode';
+        s += '<br><b>Wi-Fi: ' + ws + '</b>';
+      }
       
       // Update Wi-Fi indicator
       const wifiIndicatorEl = document.getElementById('wifiIndicator');
-      if (wifiIndicatorEl && j.ip) {
-        wifiIndicatorEl.innerHTML = '<span class="status-dot sd-ok"></span>connected';
-      } else if (wifiIndicatorEl) {
-        wifiIndicatorEl.innerHTML = '<span class="status-dot sd-missing"></span>disconnected';
+      if (wifiIndicatorEl) {
+        const wifiConnected = !!(j.wifi && j.wifi.connected);
+        const apActive = !!(j.wifi && j.wifi.ap_active);
+        if (wifiConnected) {
+          wifiIndicatorEl.innerHTML = '<span class="status-dot sd-ok"></span>connected';
+        } else if (apActive) {
+          wifiIndicatorEl.innerHTML = '<span class="status-dot sd-unknown"></span>AP mode';
+        } else {
+          wifiIndicatorEl.innerHTML = '<span class="status-dot sd-missing"></span>disconnected';
+        }
       }
       
       document.getElementById('info').innerHTML = s;
@@ -986,12 +1087,13 @@
       // Relay controls: colored buttons instead of text status
       let controls = '';
       if (j.relays) {
+        const interactive = mode === 'manual';
         for (let name in j.relays) {
           if (!Object.prototype.hasOwnProperty.call(j.relays, name)) continue;
           const isOn = !!j.relays[name];
-          const stateClass = isOn ? 'relay-on' : 'relay-off';
+          const stateClass = (isOn ? 'relay-on' : 'relay-off') + (interactive ? '' : ' relay-disabled');
           const stateLabel = isOn ? 'ВКЛ' : 'ВЫКЛ';
-          controls += '<button class="relay-btn ' + stateClass + '" onclick="control(\'' + name + '\',\'toggle\')">'
+          controls += '<button class="relay-btn ' + stateClass + '" ' + (interactive ? '' : 'disabled ') + 'onclick="control(\'' + name + '\',\'toggle\')">'
                     + escapeHtml(name) + ' '
                     + '<span class="relay-state-label">' + stateLabel + '</span>'
                     + '</button>';
@@ -1257,11 +1359,29 @@
   });
 
   function control(name,op){
+    if (currentControlMode !== 'manual') {
+      setUiMessage('В автоматическом режиме ручные команды запрещены');
+      return;
+    }
+
     // If WebSocket is available, send via WS (optimistic update will be handled on WS message). Otherwise use HTTP and fetch status quickly.
     if (wsClient && wsClient.readyState === WebSocket.OPEN) {
       wsClient.send(JSON.stringify({type:'control', name:name, op:op}));
     } else {
-      fetch('/control?name='+name+'&op='+op).then(()=>{ if (pollingEnabled) setTimeout(fetchStatus,50); }).catch(e=>console.warn(e));
+      var token = getControlToken();
+      var query = '/control?name=' + encodeURIComponent(name) + '&op=' + encodeURIComponent(op);
+      if (token) {
+        query += '&token=' + encodeURIComponent(token);
+      }
+      fetch(query)
+        .then(function(r){
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          if (pollingEnabled) setTimeout(fetchStatus,50);
+        })
+        .catch(function(e){
+          console.warn(e);
+          setUiMessage('Команда отклонена: проверьте режим и токен');
+        });
     }
   }
 

@@ -68,6 +68,7 @@ const io = socketIo(server, { cors: { origin: '*' } });
 
 // Simple in-memory cache for push tokens (also persisted to DB)
 let pushTokensCache = new Set();
+let dbReady = false;
 let latestRemote = {
   topicBase: MQTT_TOPIC_BASE,
   deviceId: MQTT_TOPIC_BASE,
@@ -248,7 +249,13 @@ app.post('/api/remote/command', requireRemoteToken, (req, res) => {
 });
 
 // --- REST API ---
-app.get('/api/health', (req, res) => res.json({ ok: true }));
+app.get('/api/health', (req, res) => {
+  res.json({
+    ok: true,
+    dbReady,
+    docsReady: true,
+  });
+});
 
 // Firmware metadata (used by devices to check updates)
 app.get('/api/firmware/latest', (req, res) => {
@@ -366,9 +373,16 @@ io.on('connection', (socket) => {
   try {
     await initDb();
     await loadPushTokens();
-    server.listen(PORT, () => console.log(`Backend listening on http://localhost:${PORT}`));
+    dbReady = true;
   } catch (err) {
-    console.error('Startup error', err);
-    process.exit(1);
+    dbReady = false;
+    console.error('Startup warning: DB unavailable, running in degraded mode', err && err.code ? err.code : err);
   }
+
+  server.listen(PORT, () => {
+    console.log(`Backend listening on http://localhost:${PORT}`);
+    if (!dbReady) {
+      console.log('Docs are available at /docs/, DB-dependent API may fail until PostgreSQL is up.');
+    }
+  });
 })();

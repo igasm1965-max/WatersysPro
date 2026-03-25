@@ -68,6 +68,18 @@ void webServerPeriodic() {
 
 
 static unsigned long lastBroadcast = 0;
+
+static bool isStaReallyConnected() {
+  wifi_mode_t mode = WiFi.getMode();
+  bool staEnabled = (mode == WIFI_MODE_STA || mode == WIFI_MODE_APSTA);
+  if (!staEnabled) return false;
+  if (wifi_getSSID().length() == 0) return false;
+  if (WiFi.status() != WL_CONNECTED) return false;
+  IPAddress staIp = WiFi.localIP();
+  if ((uint32_t)staIp == 0) return false;
+  return true;
+}
+
 static void broadcastStatus() {
   if (millis() - lastBroadcast < 2000)
     return;
@@ -76,6 +88,15 @@ static void broadcastStatus() {
   doc["uptime"] = millis() / 1000;
   doc["ip"] = wifi_getIP();
   doc["mac"] = getMacString();
+
+  WifiState wifiSt = wifi_getState();
+  bool wifiConnected = isStaReallyConnected();
+  wifi_mode_t mode = WiFi.getMode();
+  bool apActive = (mode == WIFI_MODE_AP || mode == WIFI_MODE_APSTA);
+  JsonObject wifi = doc.createNestedObject("wifi");
+  wifi["connected"] = wifiConnected ? 1 : 0;
+  wifi["state"] = (int)wifiSt;
+  wifi["ap_active"] = apActive ? 1 : 0;
 
   // Relay states
   JsonObject rel = doc.createNestedObject("relays");
@@ -118,6 +139,8 @@ static void broadcastStatus() {
   f["filterCleaningNeeded"] = flags.filterCleaningNeeded;
   f["backwashInProgress"] = flags.backwashInProgress;
   f["blinkState"] = flags.blinkState;
+  f["manualMode"] = flags.manualMode;
+  doc["control_mode"] = flags.manualMode ? "manual" : "auto";
 
   // MQTT status
   JsonObject mqtt = doc.createNestedObject("mqtt");
@@ -149,6 +172,15 @@ static void sendStatusNow() {
   doc["uptime"] = millis() / 1000;
   doc["ip"] = wifi_getIP();
   doc["mac"] = getMacString();
+
+  WifiState wifiSt = wifi_getState();
+  bool wifiConnected = isStaReallyConnected();
+  wifi_mode_t mode = WiFi.getMode();
+  bool apActive = (mode == WIFI_MODE_AP || mode == WIFI_MODE_APSTA);
+  JsonObject wifi = doc.createNestedObject("wifi");
+  wifi["connected"] = wifiConnected ? 1 : 0;
+  wifi["state"] = (int)wifiSt;
+  wifi["ap_active"] = apActive ? 1 : 0;
 
   // Relay states
   JsonObject rel = doc.createNestedObject("relays");
@@ -191,6 +223,8 @@ static void sendStatusNow() {
   f["filterCleaningNeeded"] = flags.filterCleaningNeeded;
   f["backwashInProgress"] = flags.backwashInProgress;
   f["blinkState"] = flags.blinkState;
+  f["manualMode"] = flags.manualMode;
+  doc["control_mode"] = flags.manualMode ? "manual" : "auto";
  
   // Emergency status
   JsonObject emergency = doc.createNestedObject("emergency");
@@ -203,6 +237,102 @@ static void sendStatusNow() {
   if (ws.count() > 0) {
     ws.textAll(out);
   }
+}
+
+static bool isKnownRelay(const String& name) {
+  return name == "pump1" || name == "pump2" || name == "aeration" ||
+         name == "ozone" || name == "filter" || name == "backwash";
+}
+
+static bool applyRelayToggleByName(const String& name, uint16_t& opCode) {
+  opCode = 0;
+  if (name == "pump1") {
+    if (getRelayState(0)) {
+      turnOffPump1();
+      opCode = MANUAL_PUMP1_OFF;
+    } else {
+      turnOnPump1();
+      opCode = MANUAL_PUMP1_ON;
+    }
+    return true;
+  }
+  if (name == "pump2") {
+    if (getRelayState(1)) {
+      turnOffPump2();
+      opCode = MANUAL_PUMP2_OFF;
+    } else {
+      turnOnPump2();
+      opCode = MANUAL_PUMP2_ON;
+    }
+    return true;
+  }
+  if (name == "aeration") {
+    if (getRelayState(2)) {
+      turnOffAeration();
+      opCode = MANUAL_AERATION_OFF;
+    } else {
+      turnOnAeration();
+      opCode = MANUAL_AERATION_ON;
+    }
+    return true;
+  }
+  if (name == "ozone") {
+    if (getRelayState(3)) {
+      turnOffOzone();
+      opCode = MANUAL_OZONE_OFF;
+    } else {
+      turnOnOzone();
+      opCode = MANUAL_OZONE_ON;
+    }
+    return true;
+  }
+  if (name == "filter") {
+    if (getRelayState(4)) {
+      turnOffFilter();
+      opCode = MANUAL_FILTER_OFF;
+    } else {
+      turnOnFilter();
+      opCode = MANUAL_FILTER_ON;
+    }
+    return true;
+  }
+  if (name == "backwash") {
+    if (getRelayState(5)) {
+      turnOffBackwash();
+      opCode = MANUAL_BACKWASH_OFF;
+    } else {
+      turnOnBackwash();
+      opCode = MANUAL_BACKWASH_ON;
+    }
+    return true;
+  }
+  return false;
+}
+
+static bool setControlMode(const String& mode, uint16_t& opCode) {
+  extern SystemFlags flags;
+  extern SystemContext systemContext;
+
+  if (mode == "manual") {
+    flags.manualMode = 1;
+    // При входе в ручной режим останавливаем автоцикл и очищаем зависимые флаги.
+    if (systemContext.currentState != STATE_IDLE) {
+      changeState(STATE_IDLE);
+    }
+    turnOffAllRelays();
+    flags.waterTreatmentInProgress = 0;
+    flags.backwashInProgress = 0;
+    opCode = MANUAL_SET_MANUAL;
+    return true;
+  }
+
+  if (mode == "auto") {
+    flags.manualMode = 0;
+    opCode = MANUAL_SET_AUTOMATIC;
+    return true;
+  }
+
+  return false;
 }
 
 // Periodic monitor: log and optionally broadcast meta info every 10s (extended)
@@ -253,6 +383,15 @@ static void handleStatus(AsyncWebServerRequest* request) {
   doc["ip"] = ip;
   doc["mac"] = getMacString();
   doc["uptime"] = millis() / 1000;
+
+  WifiState wifiSt = wifi_getState();
+  bool wifiConnected = isStaReallyConnected();
+  wifi_mode_t mode = WiFi.getMode();
+  bool apActive = (mode == WIFI_MODE_AP || mode == WIFI_MODE_APSTA);
+  JsonObject wifi = doc.createNestedObject("wifi");
+  wifi["connected"] = wifiConnected ? 1 : 0;
+  wifi["state"] = (int)wifiSt;
+  wifi["ap_active"] = apActive ? 1 : 0;
   JsonObject arr = doc.createNestedObject("relays");
   struct {
       const char* name;
@@ -294,6 +433,8 @@ static void handleStatus(AsyncWebServerRequest* request) {
   f["filterCleaningNeeded"] = flags.filterCleaningNeeded;
   f["backwashInProgress"] = flags.backwashInProgress;
   f["blinkState"] = flags.blinkState;
+  f["manualMode"] = flags.manualMode;
+  doc["control_mode"] = flags.manualMode ? "manual" : "auto";
 
   // MQTT status
   JsonObject mqtt = doc.createNestedObject("mqtt");
@@ -322,22 +463,58 @@ static void handleStatus(AsyncWebServerRequest* request) {
 }
 
 static void handleControl(AsyncWebServerRequest* request) {
-  // Check for reset_emergency (no token required - can be used from UI without admin)
-  if (request->hasParam("op")) {
-    String op = request->getParam("op")->value();
-    if (op == "reset_emergency") {
-      resetEmergency();
-      IPAddress clientIP = request->client()->remoteIP();
-#ifdef DEBUG_SERIAL
-      Serial.printf("[Web] GET /control reset_emergency from %s\n", clientIP.toString().c_str());
-#endif
-      request->send(200, "text/plain", "ok");
-      sendStatusNow();
-      return;
-    }
+  extern SystemFlags flags;
+
+  if (!request->hasParam("op")) {
+    request->send(400, "text/plain", "bad request");
+    return;
   }
 
-   // Проверка токена
+  String op = request->getParam("op")->value();
+
+  if (op == "reset_emergency") {
+    resetEmergency();
+    request->send(200, "text/plain", "ok");
+    sendStatusNow();
+    return;
+  }
+
+  if (op == "set_mode") {
+    String mode = request->hasParam("mode") ? request->getParam("mode")->value() : "";
+    uint16_t modeCode = 0;
+    if (!setControlMode(mode, modeCode)) {
+      request->send(400, "text/plain", "unknown mode");
+      return;
+    }
+    saveEventLog(LOG_INFO, EVENT_MANUAL_OPERATION, modeCode, SRC_WEB);
+    request->send(200, "text/plain", "ok");
+    sendStatusNow();
+    return;
+  }
+
+  if (!request->hasParam("name")) {
+    request->send(400, "text/plain", "bad request");
+    return;
+  }
+
+  String name = request->getParam("name")->value();
+  if (!isKnownRelay(name)) {
+    request->send(400, "text/plain", "unknown relay");
+    return;
+  }
+  if (op != "toggle") {
+    request->send(400, "text/plain", "unsupported op");
+    return;
+  }
+
+  if (!flags.manualMode) {
+    saveEventLog(LOG_WARNING, EVENT_MANUAL_OPERATION, MANUAL_COMMAND_REJECTED_AUTO, SRC_WEB);
+    request->send(403, "text/plain", "manual control disabled in auto mode");
+    sendStatusNow();
+    return;
+  }
+
+  // Проверка токена для HTTP ручных команд.
   if (!request->hasParam("token")) {
     request->send(401, "text/plain", "Unauthorized: token missing");
     return;
@@ -349,89 +526,14 @@ static void handleControl(AsyncWebServerRequest* request) {
     return;
   }
 
-  if (!request->hasParam("name") || !request->hasParam("op")) {
-    request->send(400, "text/plain", "bad request");
-    return;
-  }
-  String name = request->getParam("name")->value();
-  String op = request->getParam("op")->value();
-  IPAddress clientIP = request->client()->remoteIP();
-#ifdef DEBUG_SERIAL
-  Serial.printf("[Web] GET /control from %s (name=%s op=%s)\n", clientIP.toString().c_str(), name.c_str(), op.c_str());
-#endif
-
-  // Map name to actions
   uint16_t opCode = 0;
-  if (name == "pump1") {
-    Serial.printf("[Web] HTTP control received: name=%s op=%s\n", name.c_str(), op.c_str());
-    if (op == "toggle") {
-      if (getRelayState(0)) {
-        turnOffPump1();
-        opCode = MANUAL_PUMP1_OFF;
-      } else {
-        turnOnPump1();
-        opCode = MANUAL_PUMP1_ON;
-      }
-    }
-  } else if (name == "pump2") {
-    Serial.printf("[Web] HTTP control received: name=%s op=%s\n", name.c_str(), op.c_str());
-    if (op == "toggle") {
-      if (getRelayState(1)) {
-        turnOffPump2();
-        opCode = MANUAL_PUMP2_OFF;
-      } else {
-        turnOnPump2();
-        opCode = MANUAL_PUMP2_ON;
-      }
-    }
-  } else if (name == "aeration") {
-    if (op == "toggle") {
-      if (getRelayState(2)) {
-        turnOffAeration();
-        opCode = MANUAL_AERATION_OFF;
-      } else {
-        turnOnAeration();
-        opCode = MANUAL_AERATION_ON;
-      }
-    }
-  } else if (name == "ozone") {
-    if (op == "toggle") {
-      if (getRelayState(3)) {
-        turnOffOzone();
-        opCode = MANUAL_OZONE_OFF;
-      } else {
-        turnOnOzone();
-        opCode = MANUAL_OZONE_ON;
-      }
-    }
-  } else if (name == "filter") {
-    if (op == "toggle") {
-      if (getRelayState(4)) {
-        turnOffFilter();
-        opCode = MANUAL_FILTER_OFF;
-      } else {
-        turnOnFilter();
-        opCode = MANUAL_FILTER_ON;
-      }
-    }
-  } else if (name == "backwash") {
-    if (op == "toggle") {
-      if (getRelayState(5)) {
-        turnOffBackwash();
-        opCode = MANUAL_BACKWASH_OFF;
-      } else {
-        turnOnBackwash();
-        opCode = MANUAL_BACKWASH_ON;
-      }
-    }
-  } else {
-    request->send(400, "text/plain", "unknown relay");
+  if (!applyRelayToggleByName(name, opCode) || opCode == 0) {
+    request->send(400, "text/plain", "unsupported command");
     return;
   }
 
   saveEventLog(LOG_INFO, EVENT_MANUAL_OPERATION, opCode, SRC_WEB);
   request->send(200, "text/plain", "ok");
-  // Send immediate status update so clients see the change without waiting for regular broadcast
   sendStatusNow();
 }
 
@@ -509,66 +611,62 @@ void onWsEvent(AsyncWebSocket* serverWS, AsyncWebSocketClient* client, AwsEventT
       }
 
       if (strcmp(typeStr, "control") == 0) {
-        const char* name = doc["name"];
+        extern SystemFlags flags;
         const char* op = doc["op"];
-        if (!name || !op) {
-          client->text("{\"responseTo\":\"control\",\"ok\":false,\"message\":\"missing params\"}");
+        if (!op) {
+          client->text("{\"responseTo\":\"control\",\"ok\":false,\"message\":\"missing op\"}");
           return;
         }
-        String sname = String(name);
+
         String sop = String(op);
-        Serial.printf("[Web] WS control received: name=%s op=%s\n", sname.c_str(), sop.c_str());
-        // Perform same action as HTTP control
-        if (sname == "pump1") {
-          if (sop == "toggle") {
-            if (getRelayState(0))
-              turnOffPump1();
-            else
-              turnOnPump1();
-          }
-        } else if (sname == "pump2") {
-          if (sop == "toggle") {
-            if (getRelayState(1))
-              turnOffPump2();
-            else
-              turnOnPump2();
-          }
-        } else if (sname == "aeration") {
-          if (sop == "toggle") {
-            if (getRelayState(2))
-              turnOffAeration();
-            else
-              turnOnAeration();
-          }
-        } else if (sname == "ozone") {
-          if (sop == "toggle") {
-            if (getRelayState(3))
-              turnOffOzone();
-            else
-              turnOnOzone();
-          }
-        } else if (sname == "filter") {
-          if (sop == "toggle") {
-            if (getRelayState(4))
-              turnOffFilter();
-            else
-              turnOnFilter();
-          }
-        } else if (sname == "backwash") {
-          if (sop == "toggle") {
-            if (getRelayState(5))
-              turnOffBackwash();
-            else
-              turnOnBackwash();
-          }
-        } else {
-          client->text("{\"responseTo\":\"control\",\"ok\":false,\"message\":\"unknown relay\"}");
+
+        if (sop == "reset_emergency") {
+          resetEmergency();
+          client->text("{\"responseTo\":\"control\",\"ok\":true,\"message\":\"ok\"}");
+          sendStatusNow();
           return;
         }
-        saveEventLog(LOG_INFO, EVENT_MANUAL_OPERATION, 0);
-        Serial.println("[Web] WS control executed and event logged");
+
+        if (sop == "set_mode") {
+          const char* mode = doc["mode"];
+          uint16_t modeCode = 0;
+          if (!mode || !setControlMode(String(mode), modeCode)) {
+            client->text("{\"responseTo\":\"control\",\"ok\":false,\"message\":\"unknown mode\"}");
+            return;
+          }
+          saveEventLog(LOG_INFO, EVENT_MANUAL_OPERATION, modeCode, SRC_WEB);
+          client->text("{\"responseTo\":\"control\",\"ok\":true,\"message\":\"ok\"}");
+          sendStatusNow();
+          return;
+        }
+
+        const char* name = doc["name"];
+        if (!name) {
+          client->text("{\"responseTo\":\"control\",\"ok\":false,\"message\":\"missing name\"}");
+          return;
+        }
+
+        String sname = String(name);
+        if (!isKnownRelay(sname) || sop != "toggle") {
+          client->text("{\"responseTo\":\"control\",\"ok\":false,\"message\":\"unsupported command\"}");
+          return;
+        }
+
+        if (!flags.manualMode) {
+          saveEventLog(LOG_WARNING, EVENT_MANUAL_OPERATION, MANUAL_COMMAND_REJECTED_AUTO, SRC_WEB);
+          client->text("{\"responseTo\":\"control\",\"ok\":false,\"message\":\"manual control disabled in auto mode\"}");
+          sendStatusNow();
+          return;
+        }
+
+        uint16_t opCode = 0;
+        if (!applyRelayToggleByName(sname, opCode) || opCode == 0) {
+          client->text("{\"responseTo\":\"control\",\"ok\":false,\"message\":\"unsupported command\"}");
+          return;
+        }
+
+        saveEventLog(LOG_INFO, EVENT_MANUAL_OPERATION, opCode, SRC_WEB);
         client->text("{\"responseTo\":\"control\",\"ok\":true,\"message\":\"ok\"}");
-        // After action, send immediate updated status to all clients (no rate limit)
         sendStatusNow();
         return;
       } else if (strcmp(typeStr, "wifi") == 0) {

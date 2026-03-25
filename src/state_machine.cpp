@@ -254,6 +254,19 @@ void processAutomaticControl() {
     extern void exitBackwashScreen();
     extern void saveBackwashTimestamp();
 
+    // В ручном режиме автоматика полностью отключена, вмешательство FSM запрещено.
+    if (flags.manualMode) {
+        if (systemContext.currentState != STATE_IDLE) {
+            turnOffAllRelays();
+            changeState(STATE_IDLE);
+        }
+        if (flags.waterTreatmentInProgress || flags.backwashInProgress) {
+            flags.waterTreatmentInProgress = 0;
+            flags.backwashInProgress = 0;
+        }
+        return;
+    }
+
     // Аварийный режим: просто выключаем всё
     if (flags.emergencyMode) {
         Serial.println("[FSM] BLOCKED by emergencyMode!");

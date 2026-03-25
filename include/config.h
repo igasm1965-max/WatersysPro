@@ -125,6 +125,9 @@ using SafeLCD = LiquidCrystal_I2C;
 #define MANUAL_FILTER_OFF 10
 #define MANUAL_BACKWASH_ON 11
 #define MANUAL_BACKWASH_OFF 12
+#define MANUAL_SET_AUTOMATIC 13
+#define MANUAL_SET_MANUAL 14
+#define MANUAL_COMMAND_REJECTED_AUTO 15
 
 // ============ КОДЫ ДЕЙСТВИЙ МЕНЮ ============
 #define MENU_ENTER 1

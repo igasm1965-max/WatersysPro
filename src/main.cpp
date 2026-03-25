@@ -463,6 +463,7 @@ void setup() {
     systemContext.currentState = STATE_IDLE;
     systemContext.previousState = STATE_IDLE;
     systemContext.stateStartTime = millis();
+    flags.manualMode = 0;
     flags.waterTreatmentInProgress = 0;
     flags.backwashInProgress = 0;
     lastActivityTime = millis();

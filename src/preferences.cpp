@@ -77,7 +77,15 @@ void loadAllSettings() {
   extern unsigned long backlightTimeout;
   backlightTimeout = backlightDuration * 1000UL; // sync runtime timeout (s -> ms)
   filterWashDuration = preferences.getULong("filter_wash", 10UL);
-  filterCleaningInterval = preferences.getULong("filter_clean", 7 * 24UL * 3600UL);
+  // Prefer canonical key; migrate legacy key if present.
+  if (preferences.isKey("filter_clean")) {
+    filterCleaningInterval = preferences.getULong("filter_clean", 7 * 24UL * 3600UL);
+  } else if (preferences.isKey("filter_period")) {
+    filterCleaningInterval = preferences.getULong("filter_period", 7 * 24UL * 3600UL);
+    preferences.putULong("filter_clean", filterCleaningInterval);
+  } else {
+    filterCleaningInterval = 7 * 24UL * 3600UL;
+  }
   
   // Загружаем timestamp последней промывки (восстановление в restoreBackwashTimer после initRTC)
   lastBackwashTimestamp = preferences.getULong("last_backwash", 0);
@@ -539,15 +547,15 @@ void saveTankSettings(uint8_t tankNumber, int minLevel, int maxLevel) {
   Serial.println(maxLevel);
 }
 
-/// Сохранение периода очистки фильтра
-void saveFilterCleaningPeriod(uint32_t days) {
+/// Сохранение периода очистки фильтра (в секундах)
+void saveFilterCleaningPeriod(uint32_t intervalSeconds) {
   extern Preferences preferences;
   
-  preferences.putULong("filter_period", days * 86400UL);
+  preferences.putULong("filter_clean", intervalSeconds);
   
   Serial.print("[PREF] Filter cleaning period saved: ");
-  Serial.print(days);
-  Serial.println(" days");
+  Serial.print(intervalSeconds);
+  Serial.println(" sec");
 }
 
 /// Загружает часовой пояс из памяти
