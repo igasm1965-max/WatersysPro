@@ -20,9 +20,15 @@ export default function LoginScreen({ navigation, onLogin }: any) {
   const register = async () => {
     try {
       const r = await ApiService.register(email, password);
-      (global as any).authToken = r.token;
+      let token = r?.token;
+      if (!token) {
+        const loginResponse = await ApiService.login(email, password);
+        token = loginResponse?.token;
+      }
+      if (!token) throw new Error('No token received after registration');
+      (global as any).authToken = token;
       alert('Registered successfully');
-      if (onLogin) onLogin(r.token);
+      if (onLogin) onLogin(token);
     } catch (err) { alert('Registration failed'); }
   };
 

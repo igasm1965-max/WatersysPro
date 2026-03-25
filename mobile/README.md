@@ -1,5 +1,8 @@
 Mobile (Expo) PoC
 
+Подробное руководство по созданию и сборке приложения:
+- [MOBILE_APP_CREATION_GUIDE_RU.md](MOBILE_APP_CREATION_GUIDE_RU.md)
+
 Quick start:
 1. cd mobile
 2. npm install

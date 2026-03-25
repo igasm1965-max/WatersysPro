@@ -325,8 +325,13 @@ app.post('/api/auth/register', async (req, res) => {
   if (!email || !password) return res.status(400).json({ error: 'email+password required' });
   const hash = await bcrypt.hash(password, 10);
   try {
-    await pool.query('INSERT INTO users(email, password_hash) VALUES($1,$2)', [email, hash]);
-    res.json({ ok: true });
+    const insert = await pool.query(
+      'INSERT INTO users(email, password_hash) VALUES($1,$2) RETURNING id, role',
+      [email, hash]
+    );
+    const user = insert.rows[0];
+    const token = jwt.sign({ userId: user.id, email, role: user.role }, JWT_SECRET, { expiresIn: '8h' });
+    res.json({ ok: true, token });
   } catch (err) {
     console.error('register error', err);
     res.status(500).json({ error: 'db error' });
