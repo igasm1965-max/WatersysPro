@@ -1,0 +1,29 @@
+version: '3.8'
+
+# Cloud deploy: backend + postgres only.
+# Mosquitto is NOT needed — ESP32 connects to external wqtt.ru broker.
+# Usage: docker-compose -f docker-compose.cloud.yml up -d
+
+services:
+  postgres:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: watersys
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    env_file:
+      - .env.cloud
+    ports:
+      - '3000:3000'
+
+volumes:
+  pgdata:
