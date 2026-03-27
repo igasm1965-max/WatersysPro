@@ -1,17 +1,22 @@
 import { io, Socket } from 'socket.io-client';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const DEFAULT_SERVER_URL = 'http://192.168.0.103:3000';
 
 class WebSocketService {
   private socket: Socket | null = null;
 
-  connect() {
-    if (this.socket) return;
-    this.socket = io('http://192.168.3.13:80'); // <-- ESP32 device
+  async connect(): Promise<void> {
+    if (this.socket?.connected) return;
+    if (this.socket) { this.socket.disconnect(); this.socket = null; }
+    const stored = await AsyncStorage.getItem('serverUrl');
+    const url = (stored || DEFAULT_SERVER_URL).replace(/\/$/, '');
+    this.socket = io(url);
   }
 
   onStatusUpdate(cb: (data: any) => void) {
-    if (!this.socket) this.connect();
     this.socket!.on('status_update', cb);
-    return () => { this.socket!.off('status_update', cb); };
+    return () => { this.socket?.off('status_update', cb); };
   }
 
   disconnect() { if (this.socket) { this.socket.disconnect(); this.socket = null; } }
