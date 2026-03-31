@@ -56,7 +56,7 @@ const DOCS_ALLOWED_FILES = new Set([
   'mobile/DEVICE_CONTROL_GUIDE.md',
 ]);
 
-const REMOTE_TARGETS = new Set(['pump1', 'pump2', 'aeration', 'ozone', 'filter', 'backwash']);
+const REMOTE_TARGETS = new Set(['pump1', 'pump2', 'aeration', 'ozone', 'filter', 'backwash', 'set_mode', 'reset_emergency']);
 
 
 const app = express();
@@ -235,8 +235,19 @@ app.post('/api/remote/command', requireRemoteToken, (req, res) => {
   if (!REMOTE_TARGETS.has(target)) {
     return res.status(400).json({ error: 'unsupported target' });
   }
-  if (value !== 'on' && value !== 'off') {
-    return res.status(400).json({ error: 'value must be on/off' });
+
+  // Validate value based on target type
+  const RELAY_TARGETS = new Set(['pump1', 'pump2', 'aeration', 'ozone', 'filter', 'backwash']);
+  if (RELAY_TARGETS.has(target)) {
+    if (value !== 'on' && value !== 'off') {
+      return res.status(400).json({ error: 'value must be on/off' });
+    }
+  } else if (target === 'set_mode') {
+    if (value !== 'manual' && value !== 'auto') {
+      return res.status(400).json({ error: 'value must be manual/auto' });
+    }
+  } else if (target === 'reset_emergency') {
+    // Any value accepted, device expects '1'
   }
 
   const topic = `${MQTT_TOPIC_BASE}/cmd/${target}`;

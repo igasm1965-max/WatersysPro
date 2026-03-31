@@ -126,13 +126,25 @@ static void broadcastStatus() {
   extern uint32_t currentAerationRemaining;
   extern uint32_t currentOzonationRemaining;
   extern uint32_t currentSetlingRemaining;
+  extern uint32_t currentBackwashRemaining;
+  extern unsigned long filterOperationStartTime;
+  extern uint32_t filterCleaningInterval;
+  extern SystemFlags flags;
   JsonObject timers = doc.createNestedObject("timers");
   timers["aeration"] = currentAerationRemaining;
   timers["ozonation"] = currentOzonationRemaining;
   timers["settling"] = currentSetlingRemaining;
+  timers["backwash"] = currentBackwashRemaining;
+  {
+    uint32_t filterRemaining = 0;
+    if (!flags.filterCleaningNeeded && filterOperationStartTime != 0) {
+      unsigned long elapsedSec = (millis() - filterOperationStartTime) / 1000UL;
+      filterRemaining = (elapsedSec < filterCleaningInterval) ? (filterCleaningInterval - elapsedSec) : 0;
+    }
+    timers["filterRemaining"] = filterRemaining;
+  }
 
   // Флаги, связанные с основным экраном
-  extern SystemFlags flags;
   JsonObject f = doc.createNestedObject("flags");
   f["tank1Empty"] = flags.tank1Empty;
   f["tank2Empty"] = flags.tank2Empty;
@@ -210,13 +222,25 @@ static void sendStatusNow() {
   extern uint32_t currentAerationRemaining;
   extern uint32_t currentOzonationRemaining;
   extern uint32_t currentSetlingRemaining;
+  extern uint32_t currentBackwashRemaining;
+  extern unsigned long filterOperationStartTime;
+  extern uint32_t filterCleaningInterval;
+  extern SystemFlags flags;
   JsonObject timers = doc.createNestedObject("timers");
   timers["aeration"] = currentAerationRemaining;
   timers["ozonation"] = currentOzonationRemaining;
   timers["settling"] = currentSetlingRemaining;
+  timers["backwash"] = currentBackwashRemaining;
+  {
+    uint32_t filterRemaining = 0;
+    if (!flags.filterCleaningNeeded && filterOperationStartTime != 0) {
+      unsigned long elapsedSec = (millis() - filterOperationStartTime) / 1000UL;
+      filterRemaining = (elapsedSec < filterCleaningInterval) ? (filterCleaningInterval - elapsedSec) : 0;
+    }
+    timers["filterRemaining"] = filterRemaining;
+  }
 
   // Флаги для главного экрана
-  extern SystemFlags flags;
   JsonObject f = doc.createNestedObject("flags");
   f["tank1Empty"] = flags.tank1Empty;
   f["tank2Empty"] = flags.tank2Empty;
@@ -245,6 +269,7 @@ static bool isKnownRelay(const String& name) {
 }
 
 static bool applyRelayToggleByName(const String& name, uint16_t& opCode) {
+  extern SystemFlags flags;
   opCode = 0;
   if (name == "pump1") {
     if (getRelayState(0)) {
@@ -277,21 +302,37 @@ static bool applyRelayToggleByName(const String& name, uint16_t& opCode) {
     return true;
   }
   if (name == "ozone") {
+    // Озон управляет и аэрацией (как на устройстве)
     if (getRelayState(3)) {
       turnOffOzone();
+      turnOffAeration();
       opCode = MANUAL_OZONE_OFF;
     } else {
       turnOnOzone();
+      turnOnAeration();
       opCode = MANUAL_OZONE_ON;
     }
     return true;
   }
   if (name == "filter") {
     if (getRelayState(4)) {
+      // Запрет выключения фильтра во время автоцикла (как на устройстве)
+      if (flags.waterTreatmentInProgress) {
+        opCode = MANUAL_FILTER_OFF;
+        return true;
+      }
       turnOffFilter();
+      if (getRelayState(1) && !getRelayState(5)) {
+        turnOffPump2();
+        saveEventLog(LOG_INFO, EVENT_MANUAL_OPERATION, MANUAL_PUMP2_OFF, SRC_WEB);
+      }
       opCode = MANUAL_FILTER_OFF;
     } else {
       turnOnFilter();
+      if (!getRelayState(1)) {
+        turnOnPump2();
+        saveEventLog(LOG_INFO, EVENT_MANUAL_OPERATION, MANUAL_PUMP2_ON, SRC_WEB);
+      }
       opCode = MANUAL_FILTER_ON;
     }
     return true;
@@ -299,9 +340,17 @@ static bool applyRelayToggleByName(const String& name, uint16_t& opCode) {
   if (name == "backwash") {
     if (getRelayState(5)) {
       turnOffBackwash();
+      if (getRelayState(1) && !getRelayState(4)) {
+        turnOffPump2();
+        saveEventLog(LOG_INFO, EVENT_MANUAL_OPERATION, MANUAL_PUMP2_OFF, SRC_WEB);
+      }
       opCode = MANUAL_BACKWASH_OFF;
     } else {
       turnOnBackwash();
+      if (!getRelayState(1)) {
+        turnOnPump2();
+        saveEventLog(LOG_INFO, EVENT_MANUAL_OPERATION, MANUAL_PUMP2_ON, SRC_WEB);
+      }
       opCode = MANUAL_BACKWASH_ON;
     }
     return true;
@@ -362,6 +411,29 @@ void webMonitorPeriodic() {
   }
 }
 
+// Minimal rescue page shown when index.html is absent from SD card.
+// Provides a file upload form so the user can install the UI without
+// physically removing the SD card.
+static const char RESCUE_PAGE[] PROGMEM =
+  "<!doctype html><html><head><meta charset=utf-8>"
+  "<meta name=viewport content='width=device-width,initial-scale=1'>"
+  "<title>WSystem Setup</title>"
+  "<style>body{background:#020617;color:#e5e7eb;font-family:sans-serif;padding:20px}"
+  "h2{color:#22d3ee}code{color:#fdba74}input,button{display:block;margin:8px 0;"
+  "padding:8px;width:100%;box-sizing:border-box;background:#0f172a;color:#e5e7eb;"
+  "border:1px solid rgba(148,163,184,.4);border-radius:4px}button{background:#0891b2;"
+  "cursor:pointer}button:hover{background:#0e7490}.note{color:#9ca3af;font-size:13px}"
+  "</style></head><body>"
+  "<h2>WSystem &#8212; Setup</h2>"
+  "<p>&#x26A0; Файл <code>index.html</code> не найден на SD-карте.</p>"
+  "<p>Загрузите файл ниже (URL: <code>POST /api/sd_upload?token=ТВОЙ_ТОКЕН</code>):</p>"
+  "<form method=POST action='/api/sd_upload' enctype='multipart/form-data'>"
+  "<input type=password name=token id=t placeholder='Admin token'>"
+  "<input type=file name=file accept='.html'>"
+  "<button type=submit>Загрузить на SD</button></form>"
+  "<p class=note>После загрузки index.html перезагрузите страницу.<br>"
+  "SD: %s | IP: %s</p></body></html>";
+
 // root page handler (serves index.html from SD/SPIFFS)
 static void handleRoot(AsyncWebServerRequest* request) {
   IPAddress clientIP = request->client()->remoteIP();
@@ -369,7 +441,13 @@ static void handleRoot(AsyncWebServerRequest* request) {
   Serial.printf("[Web] GET / from %s\n", clientIP.toString().c_str());
 #endif
   if (!sendStaticResource(request, "/index.html", "text/html")) {
-    request->send(404, "text/plain", "index.html not found");
+    // SD card missing index.html – show embedded rescue/upload page
+    extern bool sdPresent;
+    char page[sizeof(RESCUE_PAGE) + 32];
+    snprintf(page, sizeof(page), RESCUE_PAGE,
+             sdPresent ? "OK" : "NOT FOUND",
+             wifi_getIP().c_str());
+    request->send(200, "text/html", page);
   }
 }
 
@@ -420,13 +498,25 @@ static void handleStatus(AsyncWebServerRequest* request) {
   extern uint32_t currentAerationRemaining;
   extern uint32_t currentOzonationRemaining;
   extern uint32_t currentSetlingRemaining;
+  extern uint32_t currentBackwashRemaining;
+  extern unsigned long filterOperationStartTime;
+  extern uint32_t filterCleaningInterval;
+  extern SystemFlags flags;
   JsonObject timers = doc.createNestedObject("timers");
   timers["aeration"] = currentAerationRemaining;
   timers["ozonation"] = currentOzonationRemaining;
   timers["settling"] = currentSetlingRemaining;
+  timers["backwash"] = currentBackwashRemaining;
+  {
+    uint32_t filterRemaining = 0;
+    if (!flags.filterCleaningNeeded && filterOperationStartTime != 0) {
+      unsigned long elapsedSec = (millis() - filterOperationStartTime) / 1000UL;
+      filterRemaining = (elapsedSec < filterCleaningInterval) ? (filterCleaningInterval - elapsedSec) : 0;
+    }
+    timers["filterRemaining"] = filterRemaining;
+  }
 
   // flags for main screen
-  extern SystemFlags flags;
   JsonObject f = doc.createNestedObject("flags");
   f["tank1Empty"] = flags.tank1Empty;
   f["tank2Empty"] = flags.tank2Empty;
@@ -1220,6 +1310,50 @@ void initWebServer() {
     String out; serializeJson(resp, out);
     request->send(200, "application/json", out);
   });
+
+  // SD file upload endpoint — POST /api/sd_upload?token=xxx  (multipart/form-data, field "file")
+  static File sdUploadFile;
+  static bool sdUploadOk = false;
+  server.on("/api/sd_upload", HTTP_POST,
+    [](AsyncWebServerRequest* request) {
+      if (!sdUploadOk) {
+        request->send(403, "application/json", "{\"error\":\"unauthorized or SD missing\"}");
+      } else {
+        request->send(200, "application/json", "{\"ok\":true}");
+      }
+      sdUploadOk = false;
+    },
+    [&sdUploadFile, &sdUploadOk](AsyncWebServerRequest* request, const String& filename,
+                                  size_t index, uint8_t* data, size_t len, bool final) {
+      extern bool sdPresent;
+      if (index == 0) {
+        sdUploadOk = false;
+        // Validate token from URL query param or form field
+        String tok = "";
+        if (request->hasParam("token")) tok = request->getParam("token")->value();
+        else if (request->hasParam("token", true)) tok = request->getParam("token", true)->value();
+        String stored = safeGetPref(PREF_KEY_ADMIN_TOKEN, "");
+        if (stored.length() == 0 || tok != stored) {
+          Serial.println("[Web] sd_upload: invalid token");
+          return;
+        }
+        if (!sdPresent) { Serial.println("[Web] sd_upload: SD not present"); return; }
+        if (filename.indexOf("..") >= 0) { Serial.println("[Web] sd_upload: invalid filename"); return; }
+        String path = "/" + filename;
+        Serial.printf("[Web] sd_upload: writing %s\n", path.c_str());
+        sdUploadFile = SD.open(path, FILE_WRITE);
+        if (!sdUploadFile) { Serial.println("[Web] sd_upload: open failed"); return; }
+        sdUploadOk = true;
+      }
+      if (sdUploadOk && sdUploadFile) {
+        if (len) sdUploadFile.write(data, len);
+        if (final) {
+          sdUploadFile.close();
+          Serial.printf("[Web] sd_upload: %s written OK\n", filename.c_str());
+        }
+      }
+    }
+  );
 
   server.begin();
   Serial.println("[Web] Async server started on port 80");

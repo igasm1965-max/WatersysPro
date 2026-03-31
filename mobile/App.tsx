@@ -1,67 +1,56 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import * as Notifications from 'expo-notifications';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import DashboardScreen from './src/screens/DashboardScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
-import LoginScreen from './src/screens/LoginScreen';
-import ApiService from './src/services/api';
-
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({ shouldShowAlert: true, shouldPlaySound: true, shouldSetBadge: true })
-});
+import PinScreen, { PIN_KEY } from './src/screens/PinScreen';
+import { AppContext } from './src/context/AppContext';
 
 const Tab = createBottomTabNavigator();
 
 export default function App() {
-  const notificationListener = useRef<any>();
-  const responseListener = useRef<any>();
+  // null = loading, 'create' = no pin yet, 'unlock' = pin exists, 'open' = authenticated
+  const [pinState, setPinState] = useState<'loading' | 'create' | 'unlock' | 'open'>('loading');
 
   useEffect(() => {
-    (async () => {
-      const { status } = await Notifications.requestPermissionsAsync();
-      if (status === 'granted') {
-        const tokenData = await Notifications.getExpoPushTokenAsync();
-        const token = tokenData.data;
-        await ApiService.registerPushToken(token).catch(() => {});
-      }
-    })();
-
-    notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
-      console.log('Notification received', notification);
+    AsyncStorage.getItem(PIN_KEY).then(stored => {
+      setPinState(stored ? 'unlock' : 'create');
     });
-
-    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
-      console.log('Notification response', response);
-    });
-
-    return () => {
-      if (notificationListener.current) Notifications.removeNotificationSubscription(notificationListener.current);
-      if (responseListener.current) Notifications.removeNotificationSubscription(responseListener.current);
-    };
   }, []);
 
+  const handlePinSuccess = useCallback(() => setPinState('open'), []);
+
+  const lockApp = useCallback(async () => {
+    await AsyncStorage.removeItem(PIN_KEY);
+    setPinState('create');
+  }, []);
+
+  if (pinState === 'loading') return null;
+
+  if (pinState === 'create' || pinState === 'unlock') {
+    return <PinScreen mode={pinState} onSuccess={handlePinSuccess} />;
+  }
+
   return (
-    <NavigationContainer>
-      {(global as any).authToken ? (
-      <Tab.Navigator screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused, color, size }) => {
-          let iconName: any = 'home-outline';
-          if (route.name === 'Главная') iconName = focused ? 'home' : 'home-outline';
-          if (route.name === 'Настройки') iconName = focused ? 'settings' : 'settings-outline';
-          return <Ionicons name={iconName} size={size} color={color} />;
-        },
-        tabBarActiveTintColor: '#2196F3',
-        tabBarInactiveTintColor: 'gray'
-      })}>
-        <Tab.Screen name="Главная" component={DashboardScreen} />
-        <Tab.Screen name="Настройки" component={SettingsScreen} />
-      </Tab.Navigator>
-      ) : (
-        <LoginScreen onLogin={(t: string) => { (global as any).authToken = t; }} />
-      )}
-    </NavigationContainer>
+    <AppContext.Provider value={{ lockApp }}>
+      <NavigationContainer>
+        <Tab.Navigator screenOptions={({ route }) => ({
+          tabBarIcon: ({ focused, color, size }) => {
+            let iconName: any = 'home-outline';
+            if (route.name === 'Главная') iconName = focused ? 'home' : 'home-outline';
+            if (route.name === 'Настройки') iconName = focused ? 'settings' : 'settings-outline';
+            return <Ionicons name={iconName} size={size} color={color} />;
+          },
+          tabBarActiveTintColor: '#2196F3',
+          tabBarInactiveTintColor: 'gray'
+        })}>
+          <Tab.Screen name="Главная" component={DashboardScreen} />
+          <Tab.Screen name="Настройки" component={SettingsScreen} />
+        </Tab.Navigator>
+      </NavigationContainer>
+    </AppContext.Provider>
   );
 }

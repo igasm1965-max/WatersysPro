@@ -211,8 +211,20 @@
       </article>
 
       <article class="card">
+        <div class="label">Режим управления</div>
+        <div class="mode-controls" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+          <button id="modeManualBtn" onclick="sendMode('manual')">Ручной</button>
+          <button id="modeAutoBtn" class="secondary" onclick="sendMode('auto')">Автомат</button>
+        </div>
+        <div id="modeHint" style="font-size:12px;color:var(--warn);margin-top:6px;"></div>
+      </article>
+
+      <article class="card">
         <div class="label">Управление реле</div>
         <div class="controls" id="controls"></div>
+        <div style="margin-top:10px;">
+          <button class="secondary" id="resetEmBtn" onclick="sendReset()" style="width:100%;background:var(--bad);">Сброс аварии</button>
+        </div>
       </article>
 
       <article class="card" style="grid-column: 1 / -1;">
@@ -225,6 +237,7 @@
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const TARGETS = ['pump1', 'pump2', 'aeration', 'ozone', 'filter', 'backwash'];
+    let currentMode = 'auto';
 
     const el = {
       token: document.getElementById('token'),
@@ -237,6 +250,9 @@
       lastSeen: document.getElementById('lastSeen'),
       controls: document.getElementById('controls'),
       log: document.getElementById('log'),
+      modeManualBtn: document.getElementById('modeManualBtn'),
+      modeAutoBtn: document.getElementById('modeAutoBtn'),
+      modeHint: document.getElementById('modeHint'),
     };
 
     const relayLamp = {};
@@ -258,8 +274,56 @@
       el.token.value = t || '';
     }
 
+    function applyMode(mode) {
+      currentMode = (mode === 'manual') ? 'manual' : 'auto';
+      if (el.modeManualBtn) {
+        el.modeManualBtn.style.background = currentMode === 'manual' ? 'var(--ok)' : '';
+      }
+      if (el.modeAutoBtn) {
+        el.modeAutoBtn.style.background = currentMode === 'auto' ? 'var(--accent)' : '';
+        el.modeAutoBtn.className = currentMode === 'auto' ? '' : 'secondary';
+      }
+      if (el.modeHint) {
+        el.modeHint.textContent = currentMode === 'manual' ? '' : 'Ручное управление реле заблокировано в автоматическом режиме';
+      }
+      // Update relay button states
+      renderControls();
+    }
+
+    async function sendMode(mode) {
+      const token = getToken();
+      const r = await fetch('/api/remote/command', {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, token ? { 'x-admin-token': token } : {}),
+        body: JSON.stringify({ target: 'set_mode', value: mode })
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        appendLog(`Mode ${mode} failed: ${j.error || r.status}`, 'bad');
+        return;
+      }
+      applyMode(mode);
+      appendLog(`Mode set to: ${mode}`, 'ok');
+    }
+
+    async function sendReset() {
+      const token = getToken();
+      const r = await fetch('/api/remote/command', {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, token ? { 'x-admin-token': token } : {}),
+        body: JSON.stringify({ target: 'reset_emergency', value: '1' })
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        appendLog(`Reset failed: ${j.error || r.status}`, 'bad');
+        return;
+      }
+      appendLog('Emergency reset sent', 'ok');
+    }
+
     function renderControls() {
       el.controls.innerHTML = '';
+      const interactive = currentMode === 'manual';
       for (const target of TARGETS) {
         const row = document.createElement('div');
         row.className = 'ctrl';
@@ -272,16 +336,22 @@
         text.textContent = target;
         name.appendChild(lamp);
         name.appendChild(text);
+        // Re-apply lamp state
+        if (relayState[target]) lamp.className = 'lamp on';
 
         const onBtn = document.createElement('button');
         onBtn.className = 'on';
         onBtn.textContent = 'ON';
         onBtn.onclick = () => sendCommand(target, 'on');
+        onBtn.disabled = !interactive;
+        if (!interactive) onBtn.style.opacity = '0.4';
 
         const offBtn = document.createElement('button');
         offBtn.className = 'off';
         offBtn.textContent = 'OFF';
         offBtn.onclick = () => sendCommand(target, 'off');
+        offBtn.disabled = !interactive;
+        if (!interactive) offBtn.style.opacity = '0.4';
 
         row.appendChild(name);
         row.appendChild(onBtn);
@@ -301,6 +371,11 @@
         if (relayLamp[target]) {
           relayLamp[target].className = relayState[target] ? 'lamp on' : 'lamp';
         }
+      }
+      // Sync control mode from telemetry
+      const mode = t.mode || t.control_mode || (t.flags && t.flags.manualMode ? 'manual' : 'auto');
+      if (mode !== currentMode) {
+        applyMode(mode);
       }
     }
 
@@ -327,6 +402,10 @@
     }
 
     async function sendCommand(target, value) {
+      if (currentMode !== 'manual') {
+        appendLog('В автоматическом режиме ручные команды запрещены', 'warn');
+        return;
+      }
       const token = getToken();
       const r = await fetch('/api/remote/command', {
         method: 'POST',

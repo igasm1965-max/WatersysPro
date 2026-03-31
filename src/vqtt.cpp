@@ -8,6 +8,7 @@
 #include "sensors.h"
 #include "relay_control.h"
 #include "state_machine.h"
+#include "emergency.h"
 
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
@@ -42,36 +43,130 @@ static unsigned long reconnectIntervalMs = 5000;
 // Helper function
 static String safeGetPref(const char *key, const String &def = "") {
     if (preferences.isKey(key)) {
-        return preferences.getString(key, def);
+    const String value = preferences.getString(key, def);
+    if (value.length() > 0) {
+      return value;
+    }
     }
     return def;
 }
 
 // MQTT Callback handler
 static void onMqttMessage(char* topic, byte* payload, unsigned int length) {
+  extern SystemFlags flags;
+  extern SystemContext systemContext;
+
   String t(topic);
   String p((char*)payload, length);
   Serial.printf("[VQTT] Message received: topic=%s payload=%s\n", t.c_str(), p.c_str());
-  saveEventLog(LOG_INFO, EVENT_MANUAL_OPERATION, 0);
 
   // Strip base
   String prefix = mqttTopicBase + "/cmd/";
   if (!t.startsWith(prefix)) return;
   String cmd = t.substring(prefix.length());
 
-  // Handle commands
+  // set_mode and reset_emergency always allowed
+  if (cmd == "set_mode") {
+    if (p == "manual") {
+      flags.manualMode = 1;
+      if (systemContext.currentState != STATE_IDLE) changeState(STATE_IDLE);
+      turnOffAllRelays();
+      flags.waterTreatmentInProgress = 0;
+      flags.backwashInProgress = 0;
+      saveEventLog(LOG_INFO, EVENT_MANUAL_OPERATION, MANUAL_SET_MANUAL, SRC_MQTT);
+      Serial.println("[VQTT] Mode set to MANUAL");
+    } else if (p == "auto") {
+      flags.manualMode = 0;
+      saveEventLog(LOG_INFO, EVENT_MANUAL_OPERATION, MANUAL_SET_AUTOMATIC, SRC_MQTT);
+      Serial.println("[VQTT] Mode set to AUTO");
+    }
+    return;
+  }
+
+  if (cmd == "reset_emergency") {
+    resetEmergency();
+    saveEventLog(LOG_INFO, EVENT_MANUAL_OPERATION, 0, SRC_MQTT);
+    Serial.println("[VQTT] Emergency reset via MQTT");
+    return;
+  }
+
+  // Relay commands require manual mode
+  if (!flags.manualMode) {
+    Serial.println("[VQTT] Command rejected: not in manual mode");
+    saveEventLog(LOG_WARNING, EVENT_MANUAL_OPERATION, MANUAL_COMMAND_REJECTED_AUTO, SRC_MQTT);
+    return;
+  }
+
+  uint16_t opCode = 0;
+
   if (cmd == "pump1") {
-    if (p == "on") turnOnPump1(); else if (p == "off") turnOffPump1();
+    bool newState = (p == "on");
+    if (newState) { turnOnPump1(); opCode = MANUAL_PUMP1_ON; }
+    else          { turnOffPump1(); opCode = MANUAL_PUMP1_OFF; }
   } else if (cmd == "pump2") {
-    if (p == "on") turnOnPump2(); else if (p == "off") turnOffPump2();
+    bool newState = (p == "on");
+    if (newState) { turnOnPump2(); opCode = MANUAL_PUMP2_ON; }
+    else          { turnOffPump2(); opCode = MANUAL_PUMP2_OFF; }
   } else if (cmd == "aeration") {
-    if (p == "on") turnOnAeration(); else if (p == "off") turnOffAeration();
+    bool newState = (p == "on");
+    if (newState) { turnOnAeration(); opCode = MANUAL_AERATION_ON; }
+    else          { turnOffAeration(); opCode = MANUAL_AERATION_OFF; }
   } else if (cmd == "ozone") {
-    if (p == "on") turnOnOzone(); else if (p == "off") turnOffOzone();
+    // Озон управляет и аэрацией (как на устройстве)
+    bool newState = (p == "on");
+    if (newState) {
+      turnOnOzone();
+      turnOnAeration();
+      opCode = MANUAL_OZONE_ON;
+    } else {
+      turnOffOzone();
+      turnOffAeration();
+      opCode = MANUAL_OZONE_OFF;
+    }
   } else if (cmd == "filter") {
-    if (p == "on") turnOnFilter(); else if (p == "off") turnOffFilter();
+    bool newState = (p == "on");
+    if (!newState && flags.waterTreatmentInProgress) {
+      // Запрет выключения фильтра во время автоцикла (как на устройстве)
+      Serial.println("[VQTT] Filter OFF rejected: auto cycle active");
+      opCode = MANUAL_FILTER_OFF;
+    } else {
+      if (newState) {
+        turnOnFilter();
+        if (!getRelayState(RELAY_PUMP2)) {
+          turnOnPump2();
+          saveEventLog(LOG_INFO, EVENT_MANUAL_OPERATION, MANUAL_PUMP2_ON, SRC_MQTT);
+        }
+        opCode = MANUAL_FILTER_ON;
+      } else {
+        turnOffFilter();
+        if (getRelayState(RELAY_PUMP2) && !getRelayState(RELAY_BACKWASH)) {
+          turnOffPump2();
+          saveEventLog(LOG_INFO, EVENT_MANUAL_OPERATION, MANUAL_PUMP2_OFF, SRC_MQTT);
+        }
+        opCode = MANUAL_FILTER_OFF;
+      }
+    }
   } else if (cmd == "backwash") {
-    if (p == "on") turnOnBackwash(); else if (p == "off") turnOffBackwash();
+    bool newState = (p == "on");
+    if (newState) {
+      turnOnBackwash();
+      if (!getRelayState(RELAY_PUMP2)) {
+        turnOnPump2();
+        saveEventLog(LOG_INFO, EVENT_MANUAL_OPERATION, MANUAL_PUMP2_ON, SRC_MQTT);
+      }
+      opCode = MANUAL_BACKWASH_ON;
+    } else {
+      turnOffBackwash();
+      if (getRelayState(RELAY_PUMP2) && !getRelayState(RELAY_FILTER)) {
+        turnOffPump2();
+        saveEventLog(LOG_INFO, EVENT_MANUAL_OPERATION, MANUAL_PUMP2_OFF, SRC_MQTT);
+      }
+      opCode = MANUAL_BACKWASH_OFF;
+    }
+  }
+
+  if (opCode > 0) {
+    saveEventLog(LOG_INFO, EVENT_MANUAL_OPERATION, opCode, SRC_MQTT);
   }
 }
 
@@ -95,7 +190,7 @@ static void connectToBroker() {
     return;
   }
 
-  String broker = safeGetPref(PREF_KEY_MQTT_BROKER, "");
+  String broker = safeGetPref(PREF_KEY_MQTT_BROKER, DEFAULT_MQTT_BROKER);
   if (broker.length() == 0) {
     Serial.println("[VQTT] No broker configured");
     return;
@@ -132,8 +227,8 @@ static void connectToBroker() {
   // Attempt connect
   Serial.printf("[VQTT] Connecting to %s:%u (TLS=%s)...\n", broker.c_str(), (unsigned int)port, useTLS ? "ON" : "OFF");
   
-  const String user = safeGetPref(PREF_KEY_MQTT_USER, "");
-  const String pass = safeGetPref(PREF_KEY_MQTT_PASS, "");
+  const String user = safeGetPref(PREF_KEY_MQTT_USER, DEFAULT_MQTT_USER);
+  const String pass = safeGetPref(PREF_KEY_MQTT_PASS, DEFAULT_MQTT_PASS);
   
   bool connectOk = false;
   if (user.length() > 0) {
@@ -168,6 +263,31 @@ static void connectToBroker() {
 }
 
 void initVQTT() {
+  // One-time migration: update broker to current defaults if outdated value is stored.
+  const String oldBroker = preferences.getString(PREF_KEY_MQTT_BROKER, "");
+  bool needsMigration = (oldBroker == "8bbebf26c27f4745a2dd39059872f9c3.s1.eu.hivemq.cloud")
+                     || (oldBroker == "192.168.0.103");
+  if (needsMigration) {
+    preferences.putBool(PREF_KEY_MQTT_ENABLED, true);
+    preferences.putString(PREF_KEY_MQTT_BROKER, DEFAULT_MQTT_BROKER);
+    preferences.putUInt(PREF_KEY_MQTT_PORT, DEFAULT_MQTT_PORT);
+    preferences.putBool(PREF_KEY_MQTT_SECURE, false);
+    preferences.putUInt(PREF_KEY_MQTT_TLS_PORT, DEFAULT_MQTT_TLS_PORT);
+    preferences.putString(PREF_KEY_MQTT_USER, DEFAULT_MQTT_USER);
+    preferences.putString(PREF_KEY_MQTT_PASS, DEFAULT_MQTT_PASS);
+    preferences.putString(PREF_KEY_MQTT_TOPIC_BASE, DEFAULT_MQTT_TOPIC_BASE);
+    Serial.printf("[VQTT] Migrated MQTT config from '%s' to '%s'\n", oldBroker.c_str(), DEFAULT_MQTT_BROKER);
+  }
+
+  // Seed defaults once for first-time devices and for users without manual MQTT setup.
+  if (!preferences.isKey(PREF_KEY_MQTT_ENABLED)) preferences.putBool(PREF_KEY_MQTT_ENABLED, DEFAULT_MQTT_ENABLED);
+  if (!preferences.isKey(PREF_KEY_MQTT_BROKER)) preferences.putString(PREF_KEY_MQTT_BROKER, DEFAULT_MQTT_BROKER);
+  if (!preferences.isKey(PREF_KEY_MQTT_USER)) preferences.putString(PREF_KEY_MQTT_USER, DEFAULT_MQTT_USER);
+  if (!preferences.isKey(PREF_KEY_MQTT_PASS)) preferences.putString(PREF_KEY_MQTT_PASS, DEFAULT_MQTT_PASS);
+  if (!preferences.isKey(PREF_KEY_MQTT_TOPIC_BASE)) preferences.putString(PREF_KEY_MQTT_TOPIC_BASE, DEFAULT_MQTT_TOPIC_BASE);
+  if (!preferences.isKey(PREF_KEY_MQTT_SECURE)) preferences.putBool(PREF_KEY_MQTT_SECURE, DEFAULT_MQTT_SECURE);
+  if (!preferences.isKey(PREF_KEY_MQTT_TLS_PORT)) preferences.putUInt(PREF_KEY_MQTT_TLS_PORT, DEFAULT_MQTT_TLS_PORT);
+
   // Load Client ID
   String customClientId = safeGetPref(PREF_KEY_MQTT_CLIENT_ID, "");
   mqttClientId = (customClientId.length() > 0) ? customClientId : makeDeviceId();
@@ -185,6 +305,8 @@ void initVQTT() {
   // Initialize default MQTT client (will switch to TLS if needed)
   mqttClient.setServer("", 0);
   mqttClient.setCallback(onMqttMessage);
+  mqttClient.setBufferSize(512);
+  mqttClientSecure.setBufferSize(512);
   activeMqtt = &mqttClient;
   
   // Initial connection attempt only if WiFi is ready
@@ -275,12 +397,27 @@ void vqtt_publishTelemetry() {
     return;
   }
   
-  DynamicJsonDocument doc(256);
+  extern SystemFlags flags;
+  extern uint32_t currentOzonationRemaining;
+  extern uint32_t currentAerationRemaining;
+  extern uint32_t currentSetlingRemaining;
+  extern uint32_t currentBackwashRemaining;
+  extern unsigned long filterOperationStartTime;
+  extern uint32_t filterCleaningInterval;
+
+  DynamicJsonDocument doc(640);
   doc["uptime"] = millis() / 1000;
   doc["ip"] = wifi_getIP();
   doc["tank1"] = tank1Level;
   doc["tank2"] = tank2Level;
-  
+  doc["mode"] = flags.manualMode ? "manual" : "auto";
+  doc["state"] = (int)systemContext.currentState;
+
+  JsonObject emergency = doc.createNestedObject("emergency");
+  emergency["active"] = isInEmergencyMode();
+  const char* emMsg = getEmergencyMessage();
+  emergency["message"] = (emMsg && emMsg[0]) ? emMsg : "";
+
   JsonObject rel = doc.createNestedObject("relays");
   rel["pump1"] = getRelayState(RELAY_PUMP1) ? 1 : 0;
   rel["pump2"] = getRelayState(RELAY_PUMP2) ? 1 : 0;
@@ -288,6 +425,21 @@ void vqtt_publishTelemetry() {
   rel["ozone"] = getRelayState(RELAY_OZONE) ? 1 : 0;
   rel["filter"] = getRelayState(RELAY_FILTER) ? 1 : 0;
   rel["backwash"] = getRelayState(RELAY_BACKWASH) ? 1 : 0;
+
+  JsonObject tmr = doc.createNestedObject("timers");
+  tmr["ozonation"] = currentOzonationRemaining;
+  tmr["aeration"] = currentAerationRemaining;
+  tmr["settling"] = currentSetlingRemaining;
+  tmr["backwash"] = currentBackwashRemaining;
+  // Время до следующей промывки фильтра (секунды, 0 если не запущен)
+  if (filterOperationStartTime != 0 && filterCleaningInterval > 0) {
+    unsigned long elapsedSec = (millis() - filterOperationStartTime) / 1000UL;
+    uint32_t remaining = (elapsedSec < filterCleaningInterval)
+                         ? (filterCleaningInterval - (uint32_t)elapsedSec) : 0;
+    tmr["filter_next"] = remaining;
+  } else {
+    tmr["filter_next"] = 0;
+  }
   
   String out;
   serializeJson(doc, out);
