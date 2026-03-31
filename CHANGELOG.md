@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.2.0] - 2026-03-31
+
+### Fixed (Firmware)
+- **Manual mode sync**: MQTT handler now checks manual mode before executing relay commands, matching device behavior
+- **Special relay logic via MQTT/WebSocket**: ozone↔aeration interlock, pump2 auto-toggle for filter/backwash, filter OFF protection during water treatment
+- **Emergency status in MQTT telemetry**: added `emergency` object (active, type, message) to telemetry publishing
+- **State flags in MQTT telemetry**: added `flags` object (tank1Empty, tank2Empty, filterCleaningNeeded, backwashInProgress, manualMode) — fixes wash period timer in mobile app
+
+### Fixed (Mobile App)
+- **Relay button colors**: removed `disabled` attribute that was overriding button color; active relays now highlight green in all modes
+- **Emergency card**: red "⚠ АВАРИЯ" banner with reset button, shown only when emergency is active
+- **Wash period timer**: mobile app now correctly displays remaining time and backwash status
+
+### Added (Backend)
+- **set_mode and reset_emergency commands**: cloud backend now supports manual/auto mode switching and emergency reset via MQTT
+- **Cloud web interface**: mode toggle buttons, relay disable in auto mode, emergency reset button
+
 ## [1.1.1] - 2026-03-19
 
 ### Fixed (Firmware)
