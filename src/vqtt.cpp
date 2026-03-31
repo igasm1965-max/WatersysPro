@@ -405,7 +405,7 @@ void vqtt_publishTelemetry() {
   extern unsigned long filterOperationStartTime;
   extern uint32_t filterCleaningInterval;
 
-  DynamicJsonDocument doc(640);
+  DynamicJsonDocument doc(768);
   doc["uptime"] = millis() / 1000;
   doc["ip"] = wifi_getIP();
   doc["tank1"] = tank1Level;
@@ -417,6 +417,13 @@ void vqtt_publishTelemetry() {
   emergency["active"] = isInEmergencyMode();
   const char* emMsg = getEmergencyMessage();
   emergency["message"] = (emMsg && emMsg[0]) ? emMsg : "";
+
+  JsonObject fl = doc.createNestedObject("flags");
+  fl["tank1Empty"] = flags.tank1Empty;
+  fl["tank2Empty"] = flags.tank2Empty;
+  fl["filterCleaningNeeded"] = flags.filterCleaningNeeded;
+  fl["backwashInProgress"] = flags.backwashInProgress;
+  fl["manualMode"] = flags.manualMode;
 
   JsonObject rel = doc.createNestedObject("relays");
   rel["pump1"] = getRelayState(RELAY_PUMP1) ? 1 : 0;
