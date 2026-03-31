@@ -1,19 +1,15 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, ScrollView, RefreshControl, Text, Alert } from 'react-native';
-import { Card, Title, Paragraph, Button, ActivityIndicator } from 'react-native-paper';
+import { Card, Title, Paragraph, Button, ActivityIndicator, Chip } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import ApiService from '../services/api';
-import WebSocketService from '../services/websocket';
+import MqttService from '../services/mqttService';
 import { useFocusEffect } from '@react-navigation/native';
 
 export default function DashboardScreen() {
   const [status, setStatus] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [deviceId, setDeviceId] = useState<string | null>(null);
-  const [noDataMessage, setNoDataMessage] = useState('Нет данных телеметрии.');
-  const [adminToken, setAdminToken] = useState('');
-  const ipRef = useRef<string | null>(null);
+  const [mqttConnected, setMqttConnected] = useState(false);
   const prevEmergencyRef = useRef<boolean>(false);
 
   const relayTargets = ['pump1', 'pump2', 'aeration', 'ozone', 'filter', 'backwash'];
@@ -48,212 +44,112 @@ export default function DashboardScreen() {
     return `${fmt2(h)}:${fmt2(m)}:${fmt2(ss)}`;
   };
 
-  const loadControlConfig = useCallback(async () => {
-    try {
-      const token = await AsyncStorage.getItem('adminToken');
-      setAdminToken((token || '').trim());
-    } catch (e) {
-      console.warn('loadControlConfig', e);
-    }
-  }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadControlConfig();
-    }, [loadControlConfig])
-  );
 
-  // Sync ipRef whenever IP becomes known (avoids stale closure inside interval)
-  useEffect(() => {
-    if (status?.ip) ipRef.current = status.ip;
-  }, [status?.ip]);
-
-  // Pop up alert when emergency becomes active
+  // Alert when emergency becomes active
   useEffect(() => {
     const isActive = !!status?.emergency?.active;
     if (isActive && !prevEmergencyRef.current) {
-      Alert.alert(
-        'АВАРИЯ',
-        status?.emergency?.message || 'Аварийный режим активирован',
-        [{ text: 'OK' }]
-      );
+      Alert.alert('АВАРИЯ', status?.emergency?.message || 'Аварийный режим активирован', [{ text: 'OK' }]);
     }
     prevEmergencyRef.current = isActive;
   }, [status?.emergency?.active]);
 
-  // Poll ESP32 /status every 2 s to keep timers/flags current
+  // Connect to MQTT on mount, disconnect on unmount
   useEffect(() => {
-    const poll = async () => {
-      const ip = ipRef.current;
-      if (!ip) return;
-      try {
-        const r = await fetch(`http://${ip}/status`);
-        if (r.ok) {
-          const j = await r.json();
-          setStatus((prev: any) => ({
-            ...(prev || {}),
-            ...(j || {}),
-            relays: j?.relays ?? prev?.relays,
-            emergency: j?.emergency !== undefined ? j.emergency : prev?.emergency,
-            control_mode: j?.control_mode ?? prev?.control_mode,
-          }));
-        }
-      } catch (_) {}
-    };
-    const id = setInterval(poll, 2000);
-    return () => clearInterval(id);
-  }, []); // mount only
+    let unsubTelemetry: (() => void) | null = null;
+    let unsubConn: (() => void) | null = null;
 
-  useEffect(() => {
-    let unsub: (() => void) | null = null;
-    loadData();
-    loadControlConfig();
-    WebSocketService.connect().then(() => {
-      unsub = WebSocketService.onStatusUpdate((s) => {
-        if (!deviceId || s.deviceId === deviceId) {
-          setStatus((prev: any) => ({
-            ...(prev || {}),
-            ...(s?.payload || {}),
-            relays: s?.payload?.relays ?? prev?.relays,
-            control_mode: s?.payload?.control_mode ?? prev?.control_mode,
-            emergency: s?.payload?.emergency !== undefined ? s.payload.emergency : prev?.emergency,
-          }));
-        }
+    unsubConn = MqttService.onConnectionChange(setMqttConnected);
+
+    const timeout = setTimeout(() => {
+      setLoading(false);
+    }, 10000);
+
+    MqttService.connect()
+      .then(() => {
+        setMqttConnected(true);
+        setLoading(false);
+        unsubTelemetry = MqttService.onTelemetry((data) => {
+          setStatus(data);
+        });
+      })
+      .catch((err) => {
+        console.warn('[MQTT] connect error', err);
+        setLoading(false);
       });
-    });
+
     return () => {
-      if (unsub) unsub();
-      WebSocketService.disconnect();
+      clearTimeout(timeout);
+      if (unsubTelemetry) unsubTelemetry();
+      if (unsubConn) unsubConn();
+      MqttService.disconnect();
     };
-  }, [deviceId, loadControlConfig]);
+  }, []);
 
-  const loadData = async () => {
-    try {
-      let currentDeviceId = deviceId;
-      if (!currentDeviceId) {
-        const devices = await ApiService.getDevices();
-        if (!Array.isArray(devices) || devices.length === 0) {
-          setStatus(null);
-          setNoDataMessage('Нет устройств в базе. Проверьте, что ESP32 публикует телеметрию в MQTT.');
-          return;
-        }
-        currentDeviceId = String(devices[0]);
-        setDeviceId(currentDeviceId);
-      }
-
-      const st = await ApiService.getStatus(currentDeviceId);
-      const baseStatus = st.payload || st;
-      setStatus((prev: any) => ({
-        ...(prev || {}),
-        ...(baseStatus || {}),
-        relays: baseStatus?.relays ?? prev?.relays,
-        control_mode: baseStatus?.control_mode ?? prev?.control_mode,
-        emergency: baseStatus?.emergency !== undefined ? baseStatus.emergency : prev?.emergency,
-      }));
-
-      // Backend telemetry payload does not always include control_mode/emergency.
-      // Fetch direct device status (same endpoint as web UI) to keep control buttons in sync.
-      if (baseStatus?.ip) {
-        try {
-          const direct = await fetch(`http://${baseStatus.ip}/status`);
-          if (direct.ok) {
-            const directJson = await direct.json();
-            setStatus((prev: any) => ({
-              ...(prev || {}),
-              ...(directJson || {}),
-              relays: directJson?.relays ?? prev?.relays,
-              emergency: directJson?.emergency !== undefined ? directJson.emergency : prev?.emergency,
-              control_mode: directJson?.control_mode ?? prev?.control_mode,
-            }));
-          }
-        } catch (e) {
-          console.warn('direct /status fetch failed', e);
-        }
-      }
-
-      setNoDataMessage('Нет данных телеметрии.');
-    } catch (e) {
-      console.warn(e);
-      setStatus(null);
-      setNoDataMessage('Нет связи с backend или данных по устройству. Проверьте URL и запуск сервера.');
-    } finally { setLoading(false); setRefreshing(false); }
+  const onRefresh = () => {
+    setRefreshing(true);
+    // Telemetry arrives automatically; just clear the spinner after a moment
+    setTimeout(() => setRefreshing(false), 1500);
   };
 
-  const onRefresh = () => { setRefreshing(true); loadData(); };
-
-  const toggleRelay = async (target: string) => {
-    const current = !!status?.relays?.[target];
-    const next = !current;
+  const toggleRelay = (target: string) => {
     if (status?.control_mode !== 'manual') {
       alert('Реле можно переключать только в ручном режиме.');
       return;
     }
-    if (!adminToken) {
-      alert('Нужен admin token: откройте Настройки и заполните поле Admin token.');
+    if (!mqttConnected) {
+      alert('Нет подключения к MQTT брокеру.');
       return;
     }
-    try {
-      // Optimistic UI
-      setStatus((prev: any) => ({
-        ...prev,
-        relays: { ...(prev?.relays || {}), [target]: next ? 1 : 0 },
-      }));
-      await ApiService.sendRemoteRelay(target, next ? 'on' : 'off', adminToken);
-      setTimeout(loadData, 500);
-    } catch (e) {
-      console.warn(e);
-      setStatus((prev: any) => ({
-        ...prev,
-        relays: { ...(prev?.relays || {}), [target]: current ? 1 : 0 },
-      }));
-      alert(`Команда отклонена. Проверьте admin token и ручной режим.`);
-    }
+    const next = !status?.relays?.[target];
+    // Optimistic UI
+    setStatus((prev: any) => ({
+      ...prev,
+      relays: { ...(prev?.relays || {}), [target]: next ? 1 : 0 },
+    }));
+    MqttService.publish(target, next ? 'on' : 'off');
   };
 
-  const setControlMode = async (mode: 'manual' | 'auto') => {
-    if (!adminToken) {
-      alert('Нужен admin token: откройте Настройки и заполните поле Admin token.');
-      return;
-    }
-    try {
-      await ApiService.sendRemoteMode(mode, adminToken);
-      setStatus((prev: any) => ({ ...(prev || {}), control_mode: mode }));
-      setTimeout(loadData, 500);
-    } catch (e) {
-      console.warn(e);
-      alert('Не удалось переключить режим управления.');
-    }
+  const setControlMode = (mode: 'manual' | 'auto') => {
+    if (!mqttConnected) { alert('Нет подключения к MQTT брокеру.'); return; }
+    MqttService.publish('set_mode', mode);
+    setStatus((prev: any) => ({ ...(prev || {}), control_mode: mode }));
   };
 
-  const resetEmergency = async () => {
-    if (!adminToken) {
-      alert('Нужен admin token: откройте Настройки и заполните поле Admin token.');
-      return;
-    }
-    try {
-      await ApiService.sendRemoteReset(adminToken);
-      setTimeout(loadData, 500);
-    } catch (e) {
-      console.warn(e);
-      alert('Не удалось сбросить аварийный режим.');
-    }
+  const resetEmergency = () => {
+    if (!mqttConnected) { alert('Нет подключения к MQTT брокеру.'); return; }
+    MqttService.publish('reset_emergency', '1');
   };
 
-  if (loading) return (<View style={{flex:1,justifyContent:'center',alignItems:'center'}}><ActivityIndicator size="large" /></View>);
+  if (loading) return (
+    <View style={{flex:1,justifyContent:'center',alignItems:'center'}}>
+      <ActivityIndicator size="large" />
+      <Paragraph style={{marginTop:12}}>Подключение к MQTT...</Paragraph>
+    </View>
+  );
   if (!status) return (
     <View style={{flex:1,justifyContent:'center',alignItems:'center',paddingHorizontal:24}}>
       <Title style={{textAlign:'center'}}>Нет данных</Title>
-      <Paragraph style={{textAlign:'center',marginTop:8}}>{noDataMessage}</Paragraph>
-      <Button onPress={loadData} style={{marginTop:12}}>Обновить</Button>
+      <Paragraph style={{textAlign:'center',marginTop:8}}>
+        {mqttConnected ? 'Ожидание телеметрии от устройства...' : 'Нет подключения к MQTT брокеру m1.wqtt.ru'}
+      </Paragraph>
     </View>
   );
 
   return (
     <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />} style={{flex:1}}>
+      {/* MQTT status bar */}
+      <View style={{flexDirection:'row', alignItems:'center', paddingHorizontal:16, paddingTop:10, paddingBottom:4}}>
+        <View style={{width:10, height:10, borderRadius:5, backgroundColor: mqttConnected ? '#22c55e' : '#ef4444', marginRight:6}} />
+        <Text style={{fontSize:12, color: mqttConnected ? '#15803d' : '#b91c1c'}}>
+          {mqttConnected ? 'MQTT: подключено (wqtt.ru)' : 'MQTT: нет связи...'}
+        </Text>
+      </View>
       <Card style={{margin:16}}>
         <Card.Content>
           <Title>Текущее состояние</Title>
-          <Paragraph>ID устройства: {deviceId || '-'}</Paragraph>
+          <Paragraph>ID устройства: {status.device_id || status.ip || '-'}</Paragraph>
           <Paragraph>IP устройства: {status.ip || '-'}</Paragraph>
           <View style={{flexDirection:'row',justifyContent:'space-between',marginTop:16}}>
             <View><Paragraph>Бак 1</Paragraph><Title>{status.tank1 ?? '-'}%</Title></View>
@@ -368,13 +264,14 @@ export default function DashboardScreen() {
             {relayTargets.map((target) => {
               const isOn = !!status?.relays?.[target];
               const manualMode = status?.control_mode === 'manual';
+              const btnColor = isOn ? '#2e7d32' : (manualMode ? '#c62828' : '#9e9e9e');
               return (
                 <Button
                   key={target}
                   mode="contained"
                   onPress={() => toggleRelay(target)}
                   disabled={!manualMode}
-                  buttonColor={manualMode ? (isOn ? '#2e7d32' : '#c62828') : '#9e9e9e'}
+                  buttonColor={btnColor}
                   textColor="#ffffff"
                   style={{marginBottom:10, width:'48%'}}
                 >
@@ -388,13 +285,17 @@ export default function DashboardScreen() {
 
       <Card style={{margin:16, backgroundColor: status?.emergency?.active ? '#ffebee' : '#ffffff'}}>
         <Card.Content>
-          <Title>Авария</Title>
-          <Paragraph style={{marginBottom:12}}>
+          <Title style={status?.emergency?.active ? {color: '#c62828'} : undefined}>
+            {status?.emergency?.active ? '⚠ АВАРИЯ' : 'Авария'}
+          </Title>
+          <Paragraph style={{marginBottom:12, color: status?.emergency?.active ? '#c62828' : undefined, fontWeight: status?.emergency?.active ? 'bold' : 'normal'}}>
             {status?.emergency?.active
               ? `Активна: ${status?.emergency?.message || 'без сообщения'}`
               : 'Авария не активна'}
           </Paragraph>
-          <Button mode="contained" onPress={resetEmergency}>Сброс аварии</Button>
+          {status?.emergency?.active && (
+            <Button mode="contained" buttonColor="#c62828" textColor="#ffffff" onPress={resetEmergency}>Сброс аварии</Button>
+          )}
         </Card.Content>
       </Card>
     </ScrollView>
