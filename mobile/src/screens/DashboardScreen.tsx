@@ -264,16 +264,15 @@ export default function DashboardScreen() {
             {relayTargets.map((target) => {
               const isOn = !!status?.relays?.[target];
               const manualMode = status?.control_mode === 'manual';
-              const btnColor = isOn ? '#2e7d32' : (manualMode ? '#c62828' : '#9e9e9e');
+              const btnColor = isOn ? '#2e7d32' : (manualMode ? '#c62828' : '#757575');
               return (
                 <Button
                   key={target}
                   mode="contained"
                   onPress={() => toggleRelay(target)}
-                  disabled={!manualMode}
                   buttonColor={btnColor}
                   textColor="#ffffff"
-                  style={{marginBottom:10, width:'48%'}}
+                  style={{marginBottom:10, width:'48%', opacity: manualMode ? 1 : 0.85}}
                 >
                   {target}: {isOn ? 'ON' : 'OFF'}
                 </Button>
