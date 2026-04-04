@@ -143,6 +143,17 @@ uint32_t currentOzonationRemaining = 0;
 uint32_t currentSetlingRemaining = 0;
 uint32_t currentBackwashRemaining = 0;
 
+// ============ СОХРАНЁННОЕ СОСТОЯНИЕ ПЕРЕД РУЧНЫМ РЕЖИМОМ ============
+SystemState savedStateBeforeManual = STATE_IDLE;
+unsigned long savedStateStartTime = 0;
+uint8_t savedWaterTreatmentInProgress = 0;
+uint8_t savedBackwashInProgress = 0;
+uint32_t savedOzonationRemaining = 0;
+uint32_t savedAerationRemaining = 0;
+uint32_t savedSetlingRemaining = 0;
+uint32_t savedBackwashRemaining = 0;
+unsigned long manualModeEntryTime = 0;
+
 // ============ ЖУРНАЛ СОБЫТИЙ ============
 
 /// Массив событий (последние 200 записей в ОЗУ)
