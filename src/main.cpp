@@ -610,6 +610,12 @@ void loopESP32() {
     // Проверка зависания
     checkForHang();
 
+    // Проверка I2C шины и восстановление LCD (каждые 5 секунд)
+    static unsigned long i2cCheckTimerLast = 0;
+    if (isTimeElapsed(i2cCheckTimerLast, 5000)) {
+        checkAndRecoverI2C();
+    }
+
     // Сохранение статистики WDT
     if (isTimeElapsed(wdtStatsSaveTimerLast, 30000)) {
         saveWDTStats();

@@ -106,5 +106,9 @@ extern bool sdPresent;
 /// Spinlock guarding all SD/SPIFFS operations
 extern portMUX_TYPE sdMux;
 
+/// Проверяет доступность I2C шины и LCD. При зависании переинициализирует Wire и LCD.
+/// Вызывать периодически из loop() (раз в 5-10 секунд).
+void checkAndRecoverI2C();
+
 
 #endif // UTILS_H
