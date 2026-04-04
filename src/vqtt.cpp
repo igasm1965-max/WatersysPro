@@ -67,7 +67,32 @@ static void onMqttMessage(char* topic, byte* payload, unsigned int length) {
 
   // set_mode and reset_emergency always allowed
   if (cmd == "set_mode") {
+    extern SystemState savedStateBeforeManual;
+    extern unsigned long savedStateStartTime;
+    extern uint8_t savedWaterTreatmentInProgress;
+    extern uint8_t savedBackwashInProgress;
+    extern uint32_t savedOzonationRemaining;
+    extern uint32_t savedAerationRemaining;
+    extern uint32_t savedSetlingRemaining;
+    extern uint32_t savedBackwashRemaining;
+    extern unsigned long manualModeEntryTime;
+    extern uint32_t currentOzonationRemaining;
+    extern uint32_t currentAerationRemaining;
+    extern uint32_t currentSetlingRemaining;
+    extern uint32_t currentBackwashRemaining;
+
     if (p == "manual") {
+      // Сохраняем текущее состояние для восстановления при возврате в авто
+      savedStateBeforeManual = systemContext.currentState;
+      savedStateStartTime = systemContext.stateStartTime;
+      savedWaterTreatmentInProgress = flags.waterTreatmentInProgress;
+      savedBackwashInProgress = flags.backwashInProgress;
+      savedOzonationRemaining = currentOzonationRemaining;
+      savedAerationRemaining = currentAerationRemaining;
+      savedSetlingRemaining = currentSetlingRemaining;
+      savedBackwashRemaining = currentBackwashRemaining;
+      manualModeEntryTime = millis();
+
       flags.manualMode = 1;
       if (systemContext.currentState != STATE_IDLE) changeState(STATE_IDLE);
       turnOffAllRelays();
@@ -77,6 +102,27 @@ static void onMqttMessage(char* topic, byte* payload, unsigned int length) {
       Serial.println("[VQTT] Mode set to MANUAL");
     } else if (p == "auto") {
       flags.manualMode = 0;
+      turnOffAllRelays();
+
+      // Восстанавливаем состояние, которое было до ручного режима
+      if (savedStateBeforeManual != STATE_IDLE) {
+        unsigned long timeInManual = millis() - manualModeEntryTime;
+        systemContext.previousState = systemContext.currentState;
+        systemContext.currentState = savedStateBeforeManual;
+        systemContext.stateStartTime = savedStateStartTime + timeInManual;
+
+        flags.waterTreatmentInProgress = savedWaterTreatmentInProgress;
+        flags.backwashInProgress = savedBackwashInProgress;
+        currentOzonationRemaining = savedOzonationRemaining;
+        currentAerationRemaining = savedAerationRemaining;
+        currentSetlingRemaining = savedSetlingRemaining;
+        currentBackwashRemaining = savedBackwashRemaining;
+
+        applyStateOutputs(systemContext.currentState);
+        Serial.printf("[VQTT] Restored state %d after manual mode\n", savedStateBeforeManual);
+      }
+
+      savedStateBeforeManual = STATE_IDLE;
       saveEventLog(LOG_INFO, EVENT_MANUAL_OPERATION, MANUAL_SET_AUTOMATIC, SRC_MQTT);
       Serial.println("[VQTT] Mode set to AUTO");
     }
