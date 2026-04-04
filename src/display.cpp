@@ -101,6 +101,13 @@ void displayDynamicData() {
   extern TankParams tank1, tank2;
   extern bool getRelayState(uint8_t relay);
   
+  // Ограничение частоты обновления LCD (не чаще 200мс)
+  // Снижает нагрузку на I2C шину и уменьшает вероятность зависания
+  static unsigned long lastDisplayUpdate = 0;
+  unsigned long now = millis();
+  if (now - lastDisplayUpdate < 200) return;
+  lastDisplayUpdate = now;
+  
   // Если дисплей заблокирован (меню или ручное управление) - не обновляем
   if (flags.displayLocked) {
     return;

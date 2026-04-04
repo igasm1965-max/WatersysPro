@@ -53,7 +53,58 @@ extern const char* getResetReason();
 
 /// Инициализирует I2C шину
 void initI2C() {
-  // silent in production builds
+  // Устанавливаем таймаут I2C (по умолчанию 50мс — слишком мало при помехах)
+  // 1000мс даёт I2C шине время восстановиться без бесконечного зависания
+  Wire.setTimeOut(1000);
+}
+
+// ============ I2C HEALTH CHECK & LCD RECOVERY ============
+
+// Счётчик последовательных сбоев I2C (для логики восстановления)
+static uint8_t i2cFailCount = 0;
+static const uint8_t I2C_FAIL_THRESHOLD = 3;  // после 3 подряд сбоев — реинит
+
+/// Проверяет доступность LCD по I2C и переинициализирует шину/дисплей при зависании
+void checkAndRecoverI2C() {
+  // Пинг LCD контроллера (PCF8574) по адресу 0x27
+  Wire.beginTransmission(LCD_ADDR);
+  uint8_t err = Wire.endTransmission();
+
+  if (err == 0) {
+    // Шина работает нормально
+    i2cFailCount = 0;
+    return;
+  }
+
+  // I2C ошибка (NACK, timeout и т.д.)
+  i2cFailCount++;
+  Serial.printf("[I2C] LCD ping failed (err=%u), fail count=%u\n", err, i2cFailCount);
+
+  if (i2cFailCount >= I2C_FAIL_THRESHOLD) {
+    Serial.println("[I2C] Recovery: reinitializing Wire + LCD...");
+
+    // Переинициализация I2C шины
+    Wire.end();
+    delay(50);
+    Wire.begin(I2C_SDA, I2C_SCL);
+    Wire.setTimeOut(1000);
+
+    // Переинициализация LCD
+    extern SafeLCD lcd;
+    lcd.init();
+    lcd.backlight();
+    lcd.display();
+
+    // Сбрасываем флаг инициализации экрана для перерисовки
+    extern SystemFlags flags;
+    flags.displayInitialized = 0;
+    flags.backwashScreenInitialized = 0;
+    extern void forceRedisplay();
+    forceRedisplay();
+
+    i2cFailCount = 0;
+    Serial.println("[I2C] Recovery complete");
+  }
 }
 
 /// Инициализация SD карты (SPI mode)
