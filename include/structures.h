@@ -8,6 +8,20 @@
 
 #include "config.h"
 
+// ============ СИНХРОНИЗАЦИЯ ДОСТУПА К SHARED FLAGS ============
+// Мьютекс (spinlock) для защиты SystemFlags от одновременного доступа
+// из main loop, WebSocket callback (AsyncTCP task) и MQTT callback.
+// Использование: FLAGS_LOCK(); flags.xxx = ...; FLAGS_UNLOCK();
+#ifdef ESP32
+#include <freertos/portmacro.h>
+extern portMUX_TYPE flagsMux;
+#define FLAGS_LOCK()   portENTER_CRITICAL(&flagsMux)
+#define FLAGS_UNLOCK() portEXIT_CRITICAL(&flagsMux)
+#else
+#define FLAGS_LOCK()
+#define FLAGS_UNLOCK()
+#endif
+
 // ============ ПЕРЕЧИСЛЕНИЯ СОСТОЯНИЙ ============
 
 /// Состояния системы (автомат состояний)

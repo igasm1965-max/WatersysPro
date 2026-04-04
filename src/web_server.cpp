@@ -84,6 +84,9 @@ static void broadcastStatus() {
   if (millis() - lastBroadcast < 2000)
     return;
   lastBroadcast = millis();
+
+  // Ограничиваем количество WS клиентов (макс 4), закрываем старые соединения
+  ws.cleanupClients(4);
   DynamicJsonDocument doc(768);
   doc["uptime"] = millis() / 1000;
   doc["ip"] = wifi_getIP();
@@ -379,28 +382,36 @@ static bool setControlMode(const String& mode, uint16_t& opCode) {
     // Сохраняем текущее состояние для восстановления при возврате в авто
     savedStateBeforeManual = systemContext.currentState;
     savedStateStartTime = systemContext.stateStartTime;
+    FLAGS_LOCK();
     savedWaterTreatmentInProgress = flags.waterTreatmentInProgress;
     savedBackwashInProgress = flags.backwashInProgress;
+    FLAGS_UNLOCK();
     savedOzonationRemaining = currentOzonationRemaining;
     savedAerationRemaining = currentAerationRemaining;
     savedSetlingRemaining = currentSetlingRemaining;
     savedBackwashRemaining = currentBackwashRemaining;
     manualModeEntryTime = millis();
 
+    FLAGS_LOCK();
     flags.manualMode = 1;
+    FLAGS_UNLOCK();
     // При входе в ручной режим останавливаем автоцикл и очищаем зависимые флаги.
     if (systemContext.currentState != STATE_IDLE) {
       changeState(STATE_IDLE);
     }
     turnOffAllRelays();
+    FLAGS_LOCK();
     flags.waterTreatmentInProgress = 0;
     flags.backwashInProgress = 0;
+    FLAGS_UNLOCK();
     opCode = MANUAL_SET_MANUAL;
     return true;
   }
 
   if (mode == "auto") {
+    FLAGS_LOCK();
     flags.manualMode = 0;
+    FLAGS_UNLOCK();
     turnOffAllRelays();
 
     // Восстанавливаем состояние, которое было до ручного режима
@@ -410,8 +421,10 @@ static bool setControlMode(const String& mode, uint16_t& opCode) {
       systemContext.currentState = savedStateBeforeManual;
       systemContext.stateStartTime = savedStateStartTime + timeInManual;
 
+      FLAGS_LOCK();
       flags.waterTreatmentInProgress = savedWaterTreatmentInProgress;
       flags.backwashInProgress = savedBackwashInProgress;
+      FLAGS_UNLOCK();
       currentOzonationRemaining = savedOzonationRemaining;
       currentAerationRemaining = savedAerationRemaining;
       currentSetlingRemaining = savedSetlingRemaining;
@@ -725,6 +738,13 @@ void onWsEvent(AsyncWebSocket* serverWS, AsyncWebSocketClient* client, AwsEventT
     Serial.printf("[Web] WS client disconnected: %u\n", client->id());
   } else if (type == WS_EVT_DATA) {
     AwsFrameInfo* info = (AwsFrameInfo*)arg;
+
+    // Ограничение размера WS фрейма (1 КБ) для защиты от OOM-атак
+    if (len > 1024) {
+      client->text("{\"responseTo\":\"error\",\"message\":\"payload too large\"}");
+      return;
+    }
+
     if (info->final && info->opcode == WS_TEXT) {
       // Copy payload into a String
       String msg = "";

@@ -30,9 +30,9 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
 const PORT = process.env.PORT || 3000;
-const MQTT_BROKER = process.env.MQTT_BROKER || 'mqtts://esp32:REDACTED_HIVEMQ_PASS@REDACTED_HIVEMQ_HOST:8883';
+const MQTT_BROKER = process.env.MQTT_BROKER || '';  // Must be configured via env
 const MQTT_TOPIC_BASE = process.env.MQTT_TOPIC_BASE || 'watersystem';
-const JWT_SECRET = process.env.JWT_SECRET || 'change_this_secret';
+const JWT_SECRET = process.env.JWT_SECRET || '';   // Must be configured via env
 const REMOTE_ADMIN_TOKEN = process.env.REMOTE_ADMIN_TOKEN || '';
 const REMOTE_REQUIRE_TOKEN = (process.env.REMOTE_REQUIRE_TOKEN || 'true') !== 'false';
 const REPO_ROOT = path.join(__dirname, '..', '..');

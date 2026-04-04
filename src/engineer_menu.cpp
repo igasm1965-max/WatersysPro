@@ -105,6 +105,7 @@ bool showPasswordScreen() {
     bool passwordCorrect = false;
     
     while (!passwordEntered && (millis() - startTime < PASSWORD_TIMEOUT)) {
+      WDT_RESET();
       // Обновляем только поле ввода если что-то изменилось
       bool digitsChanged = (currentDigit != lastCurrentDigit);
       for (int i = 0; i < PASSWORD_DIGITS && !digitsChanged; i++) {
@@ -245,6 +246,7 @@ static void editValue(const char* title, uint16_t* value, uint16_t minVal, uint1
   lcd.print("Turn=chg Click=save ");
   
   while (editing) {
+    WDT_RESET();
     // Обновляем только значение если изменилось
     if (tempValue != lastDisplayedValue) {
       lcd.setCursor(0, 1);
@@ -392,6 +394,7 @@ void showChangePasswordScreen() {
   int pwdFieldWidth = PASSWORD_DIGITS + 2; // [digits]
   int pwdStart = (LCD_COLS - pwdFieldWidth) / 2;  
   while (!confirmed) {
+    WDT_RESET();
     // Обновляем только если изменилось
     bool changed = (currentDigit != lastCurrentDigit);
     for (int i = 0; i < PASSWORD_DIGITS && !changed; i++) {
@@ -492,6 +495,7 @@ void showEventLogSettings() {
   flags.displayLocked = 1;
 
   while (!exit) {
+    WDT_RESET();
     if (needUpdate) {
       lcd.clear();
       lcd.setCursor(0, 0);
@@ -619,6 +623,7 @@ static void editString(const char* title, const char* prefKey, int maxLen, bool 
   bool cursorMode = false; // when true, encoder rotation moves cursor position
 
   while (editing) {
+    WDT_RESET();
     // Handle rotation and short-clicks via getEncoderState
     eEncoderState action = getEncoderState();
     if (action == eRight) {

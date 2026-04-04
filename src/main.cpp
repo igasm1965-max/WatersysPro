@@ -33,6 +33,9 @@
 #include "web_server.h"
 #ifdef ENABLE_WIFI
 #include "vqtt.h"
+#if ENABLE_OTA
+#include <ArduinoOTA.h>
+#endif
 #endif
 #include <SD.h>  // required for SD test in setup
 
@@ -69,6 +72,9 @@ Preferences preferences;
 SafeLCD lcd(LCD_ADDR, LCD_COLS, LCD_ROWS);
 
 // ============ ГЛОБАЛЬНЫЕ ФЛАГИ И СОСТОЯНИЕ ============
+
+/// Spinlock для синхронизации доступа к flags из разных задач (loop, WebSocket, MQTT)
+portMUX_TYPE flagsMux = portMUX_INITIALIZER_UNLOCKED;
 
 /// Флаги состояния системы
 SystemFlags flags;
@@ -418,6 +424,34 @@ void setup() {
     initWebServer();
     // VQTT (MQTT) client initialization - will connect when Wi-Fi is available
     initVQTT();
+
+    // OTA (Over-The-Air) обновление прошивки
+    #if ENABLE_OTA
+    {
+      ArduinoOTA.setHostname("watersys");
+      ArduinoOTA.setPassword("watersys_ota");  // Пароль для OTA (изменить в продакшене)
+      ArduinoOTA.onStart([]() {
+        turnOffAllRelays();  // Безопасность: выключаем все реле при начале обновления
+        Serial.println("[OTA] Update started — relays OFF");
+      });
+      ArduinoOTA.onEnd([]() {
+        Serial.println("[OTA] Update complete, rebooting...");
+      });
+      ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+        Serial.printf("[OTA] Progress: %u%%\r", (progress * 100) / total);
+      });
+      ArduinoOTA.onError([](ota_error_t error) {
+        Serial.printf("[OTA] Error[%u]: ", error);
+        if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+        else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+        else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+        else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+        else if (error == OTA_END_ERROR) Serial.println("End Failed");
+      });
+      ArduinoOTA.begin();
+      Serial.println("[OTA] Ready");
+    }
+    #endif
 #endif
 
     // ...existing code...
@@ -442,9 +476,6 @@ void setup() {
         flags.backwashInProgress = 0;
     }
 
-    // Watchdog
-    initWatchdog();
-
     // Инициализация энкодера
     initEncoder();
 
@@ -454,7 +485,7 @@ void setup() {
     // Инициализация дисплея
     initDisplay();
 
-    // Загрузка журнала событий
+    // Загрузка журнала событий (SD-карта — может быть медленно)
     loadEventLogs();
 
     // Инициализация аварийного мониторинга
@@ -464,9 +495,6 @@ void setup() {
     flags.backlightOn = true;
     flags.displayOn = true;
     flags.setupComplete = true;
-
-    // Ensure periodic services are scheduled
-    // wifi manager and web server will be polled from loop()
 
     // Принудительный старт из IDLE — очищаем флаги, которые могли остаться
     // от восстановленного состояния (loadRuntimeState восстанавливает флаги,
@@ -488,6 +516,10 @@ void setup() {
     lcd.print("System ready!");
     delay(2000);
     forceRedisplay();
+
+    // Watchdog включается ПОСЛЕДНИМ — после всех инициализаций,
+    // чтобы медленные операции (SD, I2C, WiFi) не вызвали WDT panic
+    initWatchdog();
 }
 
 // ============ LOOP - ОСНОВНОЙ ЦИКЛ ============
@@ -514,6 +546,11 @@ void loopESP32() {
     if (flags.watchdogEnabled) {
         WDT_RESET();
     }
+
+    // OTA: проверяем запросы на обновление прошивки по WiFi
+    #if defined(ENABLE_WIFI) && ENABLE_OTA
+    ArduinoOTA.handle();
+    #endif
 
     // Мигание для индикации (используется в отображении)
     static unsigned long blinkTimerLast = 0;

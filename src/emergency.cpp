@@ -317,14 +317,32 @@ void resetEmergency() {
 
 // ============ ЗАЩИТА ОТ ЗАВИСАНИЯ ============
 
-/// Проверяет зависание системы
+/// Проверяет зависание системы и выполняет аварийное восстановление
 void checkForHang() {
   extern unsigned long loopStartTime, hangDetectionTime;
+  extern SystemFlags flags;
   
-  // Если loop() не обновляется более 5 секунд, это зависание
   unsigned long currentTime = millis();
-  if (currentTime - loopStartTime > 5000) {
-    // Возможно зависание - требуется watchdog сброс
+  unsigned long loopDuration = currentTime - loopStartTime;
+  
+  // Если loop() выполняется дольше MAX_LOOP_TIME (2с) — потенциальное зависание
+  if (loopDuration > MAX_LOOP_TIME) {
+    flags.systemHangDetected = 1;
+    Serial.printf("[HANG] Loop took %lu ms! Forcing emergency relay shutdown\n", loopDuration);
+    
+    // Аварийное выключение всех реле для безопасности
+    turnOffAllRelays();
+    saveEventLog(LOG_ERROR, EVENT_WATCHDOG_RESET, (uint16_t)(loopDuration / 100));
+    
+    // Если зависание продолжается более 10 секунд — перезагрузка
+    if (loopDuration > 10000) {
+      Serial.println("[HANG] Critical hang detected (>10s). Rebooting...");
+      saveEventLog(LOG_ERROR, EVENT_WATCHDOG_RESET, 0xFFFF);
+      delay(100);  // Дать время записать лог
+      ESP.restart();
+    }
+  } else {
+    flags.systemHangDetected = 0;
   }
 }
 

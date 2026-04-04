@@ -35,6 +35,9 @@ using SafeLCD = LiquidCrystal_I2C;
   // WSS support: set to true to enable building with TLS (requires additional libraries/config)
   // WARNING: enabling requires mbedTLS/AsyncWebServerSecure and thorough testing
   #define ENABLE_WSS false
+
+  // OTA (Over-The-Air) обновление прошивки по WiFi
+  #define ENABLE_OTA true
 #endif
 
 // ============ MONITORING DEFAULTS ============
@@ -170,8 +173,8 @@ enum eEncoderState {
 #define DEFAULT_TIMEOUT_BACKWASH 30      ///< Таймаут промывки (мин)
 
 // ============ КОНСТАНТЫ WATCHDOG ДЛЯ ESP32 ============
-#define WDT_TIMEOUT_SECONDS 4
-#define WATCHDOG_ENABLED false  ///< ОТКЛЮЧЕНО ДЛЯ ОТЛАДКИ
+#define WDT_TIMEOUT_SECONDS 8             ///< Увеличен до 8с для menu loops
+#define WATCHDOG_ENABLED true  ///< Watchdog включён для продакшена
 /// Сброс watchdog таймера
 #define WDT_RESET() { if (WATCHDOG_ENABLED) esp_task_wdt_reset(); }
 /// Включение watchdog
@@ -237,7 +240,7 @@ enum eEncoderState {
 #define PREF_KEY_BACKLIGHT "backlight"
 #define PREF_KEY_FILTER_PERIOD "filter_per"
 #define PREF_KEY_ADMIN_TOKEN "admin_tok"
-#define DEFAULT_ADMIN_TOKEN "A7b9K3mN4pQrT6vX2zY8"
+#define DEFAULT_ADMIN_TOKEN ""  // Генерируется при первом запуске, задаётся через инженерное меню
 #define ADMIN_TOKEN_MAX_LEN 20  ///< Максимальная длина admin token (используется по всему коду)
 #define PREF_KEY_WIFI_SSID "wifi_ssid"
 #define PREF_KEY_WIFI_PASS "wifi_pass"
@@ -254,12 +257,12 @@ enum eEncoderState {
 #define PREF_KEY_MQTT_SECURE "mqtt_tls"         // TLS/SSL enabled flag
 #define PREF_KEY_MQTT_TLS_PORT "mqtt_tlsp"      // TLS port (e.g., 19161)
 #define PREF_KEY_MQTT_INSECURE "mqtt_insec"     // Skip TLS certificate verification
-#define DEFAULT_MQTT_BROKER "m1.wqtt.ru"
-#define DEFAULT_MQTT_USER "REDACTED_MQTT_USER"
-#define DEFAULT_MQTT_PASS "REDACTED_MQTT_PASS"
+#define DEFAULT_MQTT_BROKER ""   // Задаётся через инженерное меню или Preferences
+#define DEFAULT_MQTT_USER ""     // Задаётся через инженерное меню или Preferences
+#define DEFAULT_MQTT_PASS ""     // Задаётся через инженерное меню или Preferences
 #define DEFAULT_MQTT_PORT 19160
 #define DEFAULT_MQTT_TLS_PORT 19161              // wqtt.ru TLS port
-#define DEFAULT_MQTT_ENABLED 1
+#define DEFAULT_MQTT_ENABLED 0   // MQTT \u0432\u043a\u043b\u044e\u0447\u0430\u0435\u0442\u0441\u044f \u0432\u0440\u0443\u0447\u043d\u0443\u044e \u043f\u043e\u0441\u043b\u0435 \u043d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438 \u0431\u0440\u043e\u043a\u0435\u0440\u0430
 #define DEFAULT_MQTT_TOPIC_BASE "watersystem"
 #define DEFAULT_MQTT_SECURE 0                    // TLS disabled by default
 #define DEFAULT_MQTT_INSECURE 0                  // Validate certificates by default

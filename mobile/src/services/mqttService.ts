@@ -6,10 +6,23 @@
  */
 
 import { MqttWsClient } from './mqttClient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BROKER_URL = 'wss://m1.wqtt.ru:19163/mqtt';
-const MQTT_USER  = 'REDACTED_MQTT_USER';
-const MQTT_PASS  = 'REDACTED_MQTT_PASS';
+// MQTT credentials loaded from AsyncStorage (configured in Settings)
+let BROKER_URL = '';
+let MQTT_USER  = '';
+let MQTT_PASS  = '';
+
+/** Load MQTT settings from AsyncStorage. Must be called before connect(). */
+async function loadMqttSettings(): Promise<void> {
+  const broker = await AsyncStorage.getItem('mqttBroker');
+  const port   = await AsyncStorage.getItem('mqttPort');
+  const user   = await AsyncStorage.getItem('mqttUser');
+  const pass   = await AsyncStorage.getItem('mqttPass');
+  BROKER_URL = broker && port ? `wss://${broker}:${port}/mqtt` : '';
+  MQTT_USER  = user ?? '';
+  MQTT_PASS  = pass ?? '';
+}
 
 const TOPIC_TELEMETRY = 'watersystem/telemetry';
 const TOPIC_STATUS    = 'watersystem/status';
@@ -53,7 +66,7 @@ class MqttService {
   private telemetryListeners: TelemetryCallback[]  = [];
   private connListeners:      ConnectionCallback[]  = [];
 
-  /** Connect to wqtt.ru via WSS. Resolves when CONNACK received. */
+  /** Connect to MQTT broker via WSS. Resolves when CONNACK received. */
   connect(): Promise<void> {
     if (this.client && this._connected) return Promise.resolve();
     // If previous client exists but lost connection — stop its reconnect loop first
@@ -62,7 +75,12 @@ class MqttService {
       this.client = null;
     }
 
-    return new Promise((resolve) => {
+    return loadMqttSettings().then(() => {
+      if (!BROKER_URL || !MQTT_USER) {
+        console.warn('[MQTT] Broker not configured — check Settings');
+        return;
+      }
+      return new Promise<void>((resolve) => {
       const clientId = `mob_${Math.random().toString(16).slice(2, 10)}`;
 
       this.client = new MqttWsClient(
@@ -89,6 +107,7 @@ class MqttService {
       });
 
       this.client.connect();
+      });
     });
   }
 

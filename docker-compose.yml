@@ -17,8 +17,8 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_DB: watersys
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     ports:
       - '5432:5432'
     volumes:
@@ -32,14 +32,15 @@ services:
       - postgres
     environment:
       PORT: 3000
-      MQTT_BROKER: mqtt://REDACTED_MQTT_USER:REDACTED_MQTT_PASS@m1.wqtt.ru:19160
+      MQTT_BROKER: ${MQTT_BROKER:?Set MQTT_BROKER in .env}
       MQTT_TOPIC_BASE: watersystem
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       DEMO_FALLBACK_ENABLED: "false"
       REMOTE_REQUIRE_TOKEN: "true"
-      REMOTE_ADMIN_TOKEN: change_me_strong_token
+      REMOTE_ADMIN_TOKEN: ${REMOTE_ADMIN_TOKEN:?Set REMOTE_ADMIN_TOKEN in .env}
       PGHOST: postgres
-      PGUSER: postgres
-      PGPASSWORD: postgres
+      PGUSER: ${POSTGRES_USER:-postgres}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       PGDATABASE: watersys
       PGPORT: 5432
     ports:

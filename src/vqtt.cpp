@@ -85,23 +85,31 @@ static void onMqttMessage(char* topic, byte* payload, unsigned int length) {
       // Сохраняем текущее состояние для восстановления при возврате в авто
       savedStateBeforeManual = systemContext.currentState;
       savedStateStartTime = systemContext.stateStartTime;
+      FLAGS_LOCK();
       savedWaterTreatmentInProgress = flags.waterTreatmentInProgress;
       savedBackwashInProgress = flags.backwashInProgress;
+      FLAGS_UNLOCK();
       savedOzonationRemaining = currentOzonationRemaining;
       savedAerationRemaining = currentAerationRemaining;
       savedSetlingRemaining = currentSetlingRemaining;
       savedBackwashRemaining = currentBackwashRemaining;
       manualModeEntryTime = millis();
 
+      FLAGS_LOCK();
       flags.manualMode = 1;
+      FLAGS_UNLOCK();
       if (systemContext.currentState != STATE_IDLE) changeState(STATE_IDLE);
       turnOffAllRelays();
+      FLAGS_LOCK();
       flags.waterTreatmentInProgress = 0;
       flags.backwashInProgress = 0;
+      FLAGS_UNLOCK();
       saveEventLog(LOG_INFO, EVENT_MANUAL_OPERATION, MANUAL_SET_MANUAL, SRC_MQTT);
       Serial.println("[VQTT] Mode set to MANUAL");
     } else if (p == "auto") {
+      FLAGS_LOCK();
       flags.manualMode = 0;
+      FLAGS_UNLOCK();
       turnOffAllRelays();
 
       // Восстанавливаем состояние, которое было до ручного режима
@@ -111,8 +119,10 @@ static void onMqttMessage(char* topic, byte* payload, unsigned int length) {
         systemContext.currentState = savedStateBeforeManual;
         systemContext.stateStartTime = savedStateStartTime + timeInManual;
 
+        FLAGS_LOCK();
         flags.waterTreatmentInProgress = savedWaterTreatmentInProgress;
         flags.backwashInProgress = savedBackwashInProgress;
+        FLAGS_UNLOCK();
         currentOzonationRemaining = savedOzonationRemaining;
         currentAerationRemaining = savedAerationRemaining;
         currentSetlingRemaining = savedSetlingRemaining;
