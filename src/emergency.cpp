@@ -317,10 +317,13 @@ void resetEmergency() {
 
 // ============ ЗАЩИТА ОТ ЗАВИСАНИЯ ============
 
-/// Проверяет зависание системы и выполняет аварийное восстановление
+/// Проверяет зависание системы (только безопасность, без перезагрузки — WDT занимается перезагрузками)
 void checkForHang() {
   extern unsigned long loopStartTime, hangDetectionTime;
   extern SystemFlags flags;
+  
+  // Пропускаем проверку если находимся в меню (блокирующие циклы — это нормально)
+  if (flags.inMenu) return;
   
   unsigned long currentTime = millis();
   unsigned long loopDuration = currentTime - loopStartTime;
@@ -328,19 +331,14 @@ void checkForHang() {
   // Если loop() выполняется дольше MAX_LOOP_TIME (2с) — потенциальное зависание
   if (loopDuration > MAX_LOOP_TIME) {
     flags.systemHangDetected = 1;
-    Serial.printf("[HANG] Loop took %lu ms! Forcing emergency relay shutdown\n", loopDuration);
+    Serial.printf("[HANG] Loop took %lu ms! Safety relay shutdown\n", loopDuration);
     
     // Аварийное выключение всех реле для безопасности
     turnOffAllRelays();
     saveEventLog(LOG_ERROR, EVENT_WATCHDOG_RESET, (uint16_t)(loopDuration / 100));
     
-    // Если зависание продолжается более 10 секунд — перезагрузка
-    if (loopDuration > 10000) {
-      Serial.println("[HANG] Critical hang detected (>10s). Rebooting...");
-      saveEventLog(LOG_ERROR, EVENT_WATCHDOG_RESET, 0xFFFF);
-      delay(100);  // Дать время записать лог
-      ESP.restart();
-    }
+    // НЕ перезагружаем — WDT (аппаратный watchdog) сделает это если loop действительно завис.
+    // ESP.restart() здесь вызывал ложные перезагрузки после выхода из блокирующих меню.
   } else {
     flags.systemHangDetected = 0;
   }

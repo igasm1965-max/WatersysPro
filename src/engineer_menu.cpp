@@ -791,6 +791,7 @@ void showWiFiSetup() {
   int lastSelected = -1;
 
   while (!exitMenu) {
+    WDT_RESET();
     if (selected != lastSelected) {
       lcd.clear();
       lcd.setCursor(0,0);
@@ -854,6 +855,7 @@ void showMqttSetup() {
   int lastSelected = -1;
 
   while (!exitMenu) {
+    WDT_RESET();
     if (selected != lastSelected) {
       lcd.clear();
       lcd.setCursor(0,0);
@@ -1023,6 +1025,7 @@ void showSystemInfo() {
   bool viewing = true;
   
   while (viewing) {
+    WDT_RESET();
     // Перерисовываем только при смене страницы
     if (page != lastPage) {
       lcd.clear();
@@ -1126,6 +1129,7 @@ void showNetworkInfo() {
     const unsigned long encoderInterval = 20; // мс
 
     while (viewing) {
+        WDT_RESET();
         // Неблокирующий опрос энкодера
         if (millis() - lastEncoderCheck >= encoderInterval) {
             lastEncoderCheck = millis();
@@ -1298,6 +1302,7 @@ void performFactoryReset() {
   unsigned long startTime = millis();
   
   while (millis() - startTime < 10000) {
+    WDT_RESET();
     eEncoderState action = getEncoderState();
     
     if (action == eButton) {

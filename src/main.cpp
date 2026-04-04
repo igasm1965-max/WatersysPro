@@ -610,7 +610,9 @@ void loopESP32() {
         checkMenuIdleTimeout();
     } else {
         // Проверка энкодера для входа в меню
+        // (может вызвать блокирующий цикл меню — после выхода сбрасываем loopStartTime)
         checkEncoderForMenu();
+        loopStartTime = millis();  // Сброс после возможного блокирующего меню
 
         // Обновление дисплея
         if (!flags.emergencyMode && !flags.inFilterWashInfo) {

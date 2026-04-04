@@ -18,6 +18,7 @@
 // Faster, ISR-safe GPIO + timer access
 #include "driver/gpio.h"
 #include "esp_timer.h"
+#include <esp_task_wdt.h>
 
 // ============ ЭКСТЕРНЫ ============
 // FSM state migrated to `systemContext.currentState`
@@ -517,7 +518,10 @@ void onEncoderRight() {
     extern void turnOffAllRelays();
     turnOffAllRelays();
     
+    esp_task_wdt_delete(NULL);  // Отключаем WDT на время блокирующего меню
     runMenu(mainMenu, mainMenuLength, mkRoot);
+    esp_task_wdt_add(NULL);     // Включаем WDT обратно
+    esp_task_wdt_reset();
     
     // Очистим возможные накопленные шаги энкодера, чтобы избежать «прилипания» поворота после выхода
     extern int readEncoderDelta();
@@ -528,6 +532,8 @@ void onEncoderRight() {
     // FSM state accessed via systemContext
     applyStateOutputs(systemContext.currentState);
     
+    extern unsigned long loopStartTime;
+    loopStartTime = millis();
     flags.inMenu = false;
     forceRedisplay();
   }

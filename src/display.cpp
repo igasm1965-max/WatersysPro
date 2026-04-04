@@ -9,6 +9,7 @@
 #include "structures.h"
 #include "menu.h"
 #include "encoder.h"
+#include <esp_task_wdt.h>
 
 // ============ FORWARD DECLARATIONS ============
 
@@ -227,9 +228,14 @@ int inputValESP32(const char* title, int minVal, int maxVal, int initialVal) {
 /// Вход в режим меню
 void enterMenu() {
   extern SystemFlags flags;
+  extern unsigned long loopStartTime;
   flags.inMenu = true;
+  esp_task_wdt_delete(NULL);  // Отключаем WDT на время блокирующего меню
   runMenu(mainMenu, mainMenuLength, mkRoot);
+  esp_task_wdt_add(NULL);     // Включаем WDT обратно
+  esp_task_wdt_reset();
   flags.inMenu = false;
+  loopStartTime = millis();
   forceRedisplay();
 }
 
@@ -264,21 +270,28 @@ void handleMenuSelection() {
 void enterMenuMode() {
   extern SystemFlags flags;
   flags.inMenu = true;
+  esp_task_wdt_delete(NULL);  // Отключаем WDT на время меню
 }
 
 /// Выход из режима меню с восстановлением состояния
 void exitMenuMode() {
   extern SystemFlags flags;
+  extern unsigned long loopStartTime;
+  esp_task_wdt_add(NULL);     // Включаем WDT обратно
+  esp_task_wdt_reset();
   flags.inMenu = false;
+  loopStartTime = millis();
   restoreSystemStateAfterMenu();
   forceRedisplay();
 }
 
 /// Безопасное выполнение операции в меню
 void safeMenuOperation() {
+  extern unsigned long loopStartTime;
   enterMenuMode();
   runMenu(mainMenu, mainMenuLength, mkRoot);
   exitMenuMode();
+  loopStartTime = millis();
 }
 
 /// Выводит информацию о промывке фильтра
@@ -700,9 +713,14 @@ int getSelectedMenuItem() {
 /// Построение главного меню
 void buildMainMenu() {
   extern SystemFlags flags;
+  extern unsigned long loopStartTime;
   flags.inMenu = true;
+  esp_task_wdt_delete(NULL);  // Отключаем WDT на время меню
   runMenu(mainMenu, mainMenuLength, mkRoot);
+  esp_task_wdt_add(NULL);     // Включаем WDT обратно
+  esp_task_wdt_reset();
   flags.inMenu = false;
+  loopStartTime = millis();
 }
 
 /// Построение меню настроек

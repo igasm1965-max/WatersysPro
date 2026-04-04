@@ -14,6 +14,7 @@
 #include <ArduinoJson.h>
 #include <WiFi.h>
 #include <NetworkClientSecure.h>
+#include <esp_task_wdt.h>
 
 extern Preferences preferences;
 
@@ -286,6 +287,9 @@ static void connectToBroker() {
   const String user = safeGetPref(PREF_KEY_MQTT_USER, DEFAULT_MQTT_USER);
   const String pass = safeGetPref(PREF_KEY_MQTT_PASS, DEFAULT_MQTT_PASS);
   
+  // TLS handshake может занять 15+ секунд — снимаем задачу с WDT на время connect
+  esp_task_wdt_delete(NULL);
+  
   bool connectOk = false;
   if (user.length() > 0) {
     Serial.printf("[VQTT] Using credentials: user=%s\n", user.c_str());
@@ -293,6 +297,10 @@ static void connectToBroker() {
   } else {
     connectOk = activeMqtt->connect(mqttClientId.c_str());
   }
+  
+  // Возвращаем задачу под контроль WDT
+  esp_task_wdt_add(NULL);
+  esp_task_wdt_reset();
   
   if (connectOk) {
     Serial.println("[VQTT] ✓ Connected to broker!");
