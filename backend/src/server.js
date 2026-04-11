@@ -60,11 +60,16 @@ const REMOTE_TARGETS = new Set(['pump1', 'pump2', 'aeration', 'ozone', 'filter',
 
 
 const app = express();
-app.use(cors());
+
+// CORS: restrict to known origins in production
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',')
+  : ['http://localhost:3000', 'http://localhost:19006'];
+app.use(cors({ origin: ALLOWED_ORIGINS, credentials: true }));
 app.use(bodyParser.json());
 
 const server = http.createServer(app);
-const io = socketIo(server, { cors: { origin: '*' } });
+const io = socketIo(server, { cors: { origin: ALLOWED_ORIGINS, credentials: true } });
 
 // Simple in-memory cache for push tokens (also persisted to DB)
 let pushTokensCache = new Set();
@@ -103,7 +108,8 @@ function parseIncomingTopic(topic) {
 function remoteTokenOk(req) {
   if (!REMOTE_REQUIRE_TOKEN) return true;
   if (!REMOTE_ADMIN_TOKEN) return false;
-  const token = req.headers['x-admin-token'] || req.query.token || (req.body && req.body.token);
+  // Accept token ONLY from header to prevent leakage in URL logs/browser history
+  const token = req.headers['x-admin-token'];
   return token && token === REMOTE_ADMIN_TOKEN;
 }
 

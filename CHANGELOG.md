@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.2] - 2026-04-11
+
+### Security (P0 Hardening)
+- **MQTT TLS certificate validation**: replaced `setInsecure()` with ISRG Root X1 CA pinning — prevents MITM attacks on MQTT connection
+- **CORS restriction**: backend now only accepts requests from explicitly listed origins (`ALLOWED_ORIGINS` env var) instead of wildcard `*`
+- **Admin token header-only**: token accepted only from `x-admin-token` header; removed query string and body extraction to prevent leakage in logs/URLs
+- **Mosquitto authentication**: disabled anonymous access, added password file requirement (`mosquitto/config/passwd`)
+- **Removed HiveMQ credentials**: cleaned `backend/.env.example` from real broker credentials
+
 ## [1.2.1] - 2026-04-11
 
 ### Fixed (Firmware)
