@@ -4,6 +4,7 @@ import { Card, Title, Button, Switch, TextInput, List } from 'react-native-paper
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { saveSetting, loadSetting } from '../services/secureStorage';
 import { useAppContext } from '../context/AppContext';
+import MqttService from '../services/mqttService';
 
 export default function SettingsScreen(){
   const { lockApp } = useAppContext();
@@ -44,6 +45,7 @@ export default function SettingsScreen(){
     await AsyncStorage.setItem('mqttPort', mqttPort.trim());
     await saveSetting('mqttUser', mqttUser.trim());
     await saveSetting('mqttPass', mqttPass);
+    MqttService.reconnect();
     alert('Settings saved');
   };
 

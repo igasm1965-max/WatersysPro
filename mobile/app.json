@@ -17,7 +17,7 @@
     },
     "android": {
       "package": "com.igas65.watersysmobile",
-      "versionCode": 2,
+      "versionCode": 21,
       "permissions": [
         "INTERNET",
         "ACCESS_NETWORK_STATE",

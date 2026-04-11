@@ -55,12 +55,24 @@ export default function DashboardScreen() {
     prevEmergencyRef.current = isActive;
   }, [status?.emergency?.active]);
 
+  // Reconnect when the screen gains focus (e.g. after Settings change)
+  useFocusEffect(
+    useCallback(() => {
+      if (!mqttConnected) {
+        MqttService.connect().catch(() => {});
+      }
+    }, [mqttConnected])
+  );
+
   // Connect to MQTT on mount, disconnect on unmount
   useEffect(() => {
     let unsubTelemetry: (() => void) | null = null;
     let unsubConn: (() => void) | null = null;
 
     unsubConn = MqttService.onConnectionChange(setMqttConnected);
+    unsubTelemetry = MqttService.onTelemetry((data) => {
+      setStatus(data);
+    });
 
     const timeout = setTimeout(() => {
       setLoading(false);
@@ -70,9 +82,6 @@ export default function DashboardScreen() {
       .then(() => {
         setMqttConnected(true);
         setLoading(false);
-        unsubTelemetry = MqttService.onTelemetry((data) => {
-          setStatus(data);
-        });
       })
       .catch((err) => {
         console.warn('[MQTT] connect error', err);

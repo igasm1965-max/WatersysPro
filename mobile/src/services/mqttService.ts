@@ -138,6 +138,12 @@ class MqttService {
     this.client.publish(`${TOPIC_CMD_BASE}/${target}`, payload);
   }
 
+  /** Force reconnect with fresh settings (call after saving MQTT credentials). */
+  reconnect(): void {
+    this.disconnect();
+    this.connect();
+  }
+
   disconnect(): void {
     if (this.client) {
       this.client.disconnect();
