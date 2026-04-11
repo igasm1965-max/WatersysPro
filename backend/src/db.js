@@ -1,4 +1,6 @@
 const { Pool } = require('pg');
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
 
 const pool = process.env.DATABASE_URL
@@ -53,6 +55,52 @@ async function initDb() {
       created_at TIMESTAMPTZ DEFAULT now()
     );
   `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id SERIAL PRIMARY KEY,
+      ts TIMESTAMPTZ DEFAULT now(),
+      source TEXT NOT NULL,
+      action TEXT NOT NULL,
+      target TEXT,
+      value TEXT,
+      user_info TEXT,
+      ip TEXT,
+      details JSONB
+    );
+  `);
+
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_log_ts ON audit_log(ts DESC);`);
+
+  // Run SQL migrations
+  await runMigrations();
+}
+
+async function runMigrations() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      filename TEXT PRIMARY KEY,
+      applied_at TIMESTAMPTZ DEFAULT now()
+    );
+  `);
+
+  const migrationsDir = path.join(__dirname, '..', 'migrations');
+  if (!fs.existsSync(migrationsDir)) return;
+
+  const files = fs.readdirSync(migrationsDir)
+    .filter(f => f.endsWith('.sql'))
+    .sort();
+
+  for (const file of files) {
+    const { rows } = await pool.query('SELECT 1 FROM schema_migrations WHERE filename=$1', [file]);
+    if (rows.length > 0) continue;
+
+    console.log(`[DB] Applying migration: ${file}`);
+    const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
+    await pool.query(sql);
+    await pool.query('INSERT INTO schema_migrations(filename) VALUES($1)', [file]);
+    console.log(`[DB] Migration ${file} applied`);
+  }
 }
 
 

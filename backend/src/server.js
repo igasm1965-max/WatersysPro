@@ -14,6 +14,7 @@ const path = require('path');
 const fs = require('fs');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const rateLimit = require('express-rate-limit');
 const socketIo = require('socket.io');
 const mqtt = require('mqtt');
 let Expo;
@@ -67,6 +68,14 @@ const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
   : ['http://localhost:3000', 'http://localhost:19006'];
 app.use(cors({ origin: ALLOWED_ORIGINS, credentials: true }));
 app.use(bodyParser.json());
+
+// Rate limiting
+const apiLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100, standardHeaders: true, legacyHeaders: false });
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 5, message: { error: 'Too many attempts, try again later' } });
+const commandLimiter = rateLimit({ windowMs: 60 * 1000, max: 30, message: { error: 'Command rate limit exceeded' } });
+app.use('/api/', apiLimiter);
+app.use('/api/auth/', authLimiter);
+app.use('/api/remote/command', commandLimiter);
 
 const server = http.createServer(app);
 const io = socketIo(server, { cors: { origin: ALLOWED_ORIGINS, credentials: true } });
@@ -165,6 +174,7 @@ client.on('connect', () => {
 
 client.on('message', async (topic, payload) => {
   try {
+    metricsCounters.mqttMessages++;
     const txt = payload.toString();
     const parsed = parseIncomingTopic(topic);
     if (!parsed) return;
@@ -199,6 +209,7 @@ client.on('message', async (topic, payload) => {
       await sendPushNotification(`Alert on ${deviceId}: ${obj.type || 'alert'}`, obj.message || 'See device', { deviceId });
     }
   } catch (err) {
+    metricsCounters.mqttErrors++;
     console.error('MQTT message handler error', err);
   }
 });
@@ -266,11 +277,62 @@ app.post('/api/remote/command', requireRemoteToken, (req, res) => {
   if (!ok) {
     return res.status(500).json({ error: 'publish failed' });
   }
+  metricsCounters.commands++;
+
+  // Audit log
+  pool.query(
+    'INSERT INTO audit_log(source, action, target, value, ip) VALUES($1,$2,$3,$4,$5)',
+    ['remote_api', 'command', target, value, req.ip]
+  ).catch(err => console.error('Audit log error', err));
 
   res.json({ ok: true, topic, payload: value });
 });
 
 // --- REST API ---
+
+// Prometheus-compatible metrics endpoint
+let metricsCounters = { httpRequests: 0, mqttMessages: 0, mqttErrors: 0, commands: 0 };
+app.use((req, res, next) => { metricsCounters.httpRequests++; next(); });
+
+app.get('/metrics', (req, res) => {
+  const uptime = process.uptime();
+  const mem = process.memoryUsage();
+  const lines = [
+    '# HELP watersys_uptime_seconds Backend uptime in seconds',
+    '# TYPE watersys_uptime_seconds gauge',
+    `watersys_uptime_seconds ${uptime.toFixed(0)}`,
+    '# HELP watersys_http_requests_total Total HTTP requests',
+    '# TYPE watersys_http_requests_total counter',
+    `watersys_http_requests_total ${metricsCounters.httpRequests}`,
+    '# HELP watersys_mqtt_messages_total Total MQTT messages processed',
+    '# TYPE watersys_mqtt_messages_total counter',
+    `watersys_mqtt_messages_total ${metricsCounters.mqttMessages}`,
+    '# HELP watersys_mqtt_errors_total Total MQTT handler errors',
+    '# TYPE watersys_mqtt_errors_total counter',
+    `watersys_mqtt_errors_total ${metricsCounters.mqttErrors}`,
+    '# HELP watersys_commands_total Total commands sent to devices',
+    '# TYPE watersys_commands_total counter',
+    `watersys_commands_total ${metricsCounters.commands}`,
+    '# HELP watersys_memory_rss_bytes Process RSS memory',
+    '# TYPE watersys_memory_rss_bytes gauge',
+    `watersys_memory_rss_bytes ${mem.rss}`,
+    '# HELP watersys_memory_heap_used_bytes Heap used',
+    '# TYPE watersys_memory_heap_used_bytes gauge',
+    `watersys_memory_heap_used_bytes ${mem.heapUsed}`,
+    '# HELP watersys_db_ready Database connection status',
+    '# TYPE watersys_db_ready gauge',
+    `watersys_db_ready ${dbReady ? 1 : 0}`,
+    '# HELP watersys_mqtt_connected MQTT broker connection status',
+    '# TYPE watersys_mqtt_connected gauge',
+    `watersys_mqtt_connected ${client.connected ? 1 : 0}`,
+    '# HELP watersys_push_tokens_count Registered push tokens',
+    '# TYPE watersys_push_tokens_count gauge',
+    `watersys_push_tokens_count ${pushTokensCache.size}`,
+  ];
+  res.setHeader('Content-Type', 'text/plain; version=0.0.4');
+  res.send(lines.join('\n') + '\n');
+});
+
 app.get('/api/health', (req, res) => {
   res.json({
     ok: true,
@@ -280,11 +342,23 @@ app.get('/api/health', (req, res) => {
 });
 
 // Firmware metadata (used by devices to check updates)
-app.get('/api/firmware/latest', (req, res) => {
-  // In production store version in DB or CI pipeline
-  const version = '0.3.0';
-  const url = `${req.protocol}://${req.get('host')}/firmware/firmware.bin`;
-  res.json({ version, url });
+app.get('/api/firmware/latest', async (req, res) => {
+  try {
+    const fwPath = path.join(__dirname, '..', 'static', 'firmware.bin');
+    const versionPath = path.join(__dirname, '..', '..', 'VERSION');
+    let version = '0.3.0';
+    try { version = (await fs.promises.readFile(versionPath, 'utf8')).trim(); } catch {}
+    let sha256 = '';
+    try {
+      const crypto = require('crypto');
+      const buf = await fs.promises.readFile(fwPath);
+      sha256 = crypto.createHash('sha256').update(buf).digest('hex');
+    } catch {}
+    const url = `${req.protocol}://${req.get('host')}/firmware/firmware.bin`;
+    res.json({ version, url, sha256 });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to read firmware info' });
+  }
 });
 
 app.get('/api/devices', async (req, res) => {
@@ -323,7 +397,11 @@ app.post('/api/command/:deviceId', authenticate, async (req, res) => {
   const deviceId = req.params.deviceId;
   const cmd = req.body;
   client.publish(`device/${deviceId}/command`, JSON.stringify(cmd));
-  // optional: log who sent the command (req.user.email)
+  // Audit log
+  pool.query(
+    'INSERT INTO audit_log(source, action, target, value, user_info, ip) VALUES($1,$2,$3,$4,$5,$6)',
+    ['jwt_api', 'command', deviceId, JSON.stringify(cmd), req.user.email, req.ip]
+  ).catch(err => console.error('Audit log error', err));
   res.json({ ok: true });
 });
 
@@ -368,7 +446,13 @@ app.post('/api/auth/login', async (req, res) => {
     if (r.rows.length === 0) return res.status(401).json({ error: 'invalid credentials' });
     const u = r.rows[0];
     const ok = await bcrypt.compare(password, u.password_hash);
-    if (!ok) return res.status(401).json({ error: 'invalid credentials' });
+    if (!ok) {
+      pool.query('INSERT INTO audit_log(source, action, target, ip) VALUES($1,$2,$3,$4)',
+        ['auth', 'login_failed', email, req.ip]).catch(() => {});
+      return res.status(401).json({ error: 'invalid credentials' });
+    }
+    pool.query('INSERT INTO audit_log(source, action, target, user_info, ip) VALUES($1,$2,$3,$4,$5)',
+      ['auth', 'login_success', email, String(u.id), req.ip]).catch(() => {});
     const token = jwt.sign({ userId: u.id, email, role: u.role }, JWT_SECRET, { expiresIn: '8h' });
     res.json({ token });
   } catch (err) {

@@ -7,6 +7,7 @@
 
 import { MqttWsClient } from './mqttClient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { loadSetting } from './secureStorage';
 
 // Default MQTT credentials (can be overridden in Settings)
 const DEFAULT_BROKER = 'm1.wqtt.ru';
@@ -18,12 +19,12 @@ let BROKER_URL = `wss://${DEFAULT_BROKER}:${DEFAULT_PORT}/mqtt`;
 let MQTT_USER  = DEFAULT_USER;
 let MQTT_PASS  = DEFAULT_PASS;
 
-/** Load MQTT settings from AsyncStorage (falls back to defaults). */
+/** Load MQTT settings from AsyncStorage/SecureStore (falls back to defaults). */
 async function loadMqttSettings(): Promise<void> {
   const broker = await AsyncStorage.getItem('mqttBroker');
   const port   = await AsyncStorage.getItem('mqttPort');
-  const user   = await AsyncStorage.getItem('mqttUser');
-  const pass   = await AsyncStorage.getItem('mqttPass');
+  const user   = await loadSetting('mqttUser');
+  const pass   = await loadSetting('mqttPass');
   BROKER_URL = `wss://${broker || DEFAULT_BROKER}:${port || DEFAULT_PORT}/mqtt`;
   MQTT_USER  = user || DEFAULT_USER;
   MQTT_PASS  = pass || DEFAULT_PASS;

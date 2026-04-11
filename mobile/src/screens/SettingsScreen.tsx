@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ScrollView } from 'react-native';
 import { Card, Title, Button, Switch, TextInput, List } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { saveSetting, loadSetting } from '../services/secureStorage';
 import { useAppContext } from '../context/AppContext';
 
 export default function SettingsScreen(){
@@ -18,13 +19,13 @@ export default function SettingsScreen(){
   useEffect(()=>{ loadSettings(); }, []);
   const loadSettings = async () => {
     const url = await AsyncStorage.getItem('serverUrl');
-    const token = await AsyncStorage.getItem('adminToken');
+    const token = await loadSetting('adminToken');
     const notif = await AsyncStorage.getItem('notifications');
     const auto = await AsyncStorage.getItem('autoFlush');
     const broker = await AsyncStorage.getItem('mqttBroker');
     const port = await AsyncStorage.getItem('mqttPort');
-    const user = await AsyncStorage.getItem('mqttUser');
-    const pass = await AsyncStorage.getItem('mqttPass');
+    const user = await loadSetting('mqttUser');
+    const pass = await loadSetting('mqttPass');
     if (url) setServerUrl(url);
     if (token) setAdminToken(token);
     if (notif) setNotifications(notif === 'true');
@@ -36,13 +37,13 @@ export default function SettingsScreen(){
   };
   const saveSettings = async () => {
     await AsyncStorage.setItem('serverUrl', serverUrl);
-    await AsyncStorage.setItem('adminToken', adminToken.trim());
+    await saveSetting('adminToken', adminToken.trim());
     await AsyncStorage.setItem('notifications', String(notifications));
     await AsyncStorage.setItem('autoFlush', String(autoFlush));
     await AsyncStorage.setItem('mqttBroker', mqttBroker.trim());
     await AsyncStorage.setItem('mqttPort', mqttPort.trim());
-    await AsyncStorage.setItem('mqttUser', mqttUser.trim());
-    await AsyncStorage.setItem('mqttPass', mqttPass);
+    await saveSetting('mqttUser', mqttUser.trim());
+    await saveSetting('mqttPass', mqttPass);
     alert('Settings saved');
   };
 

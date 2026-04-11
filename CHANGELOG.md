@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.3.0] - 2026-04-11
+
+### Added (Backend)
+- **Rate limiting**: API (100 req/15min), auth (5 req/15min), commands (30 req/min) via express-rate-limit
+- **Audit log**: all commands, logins (success/failed) logged to `audit_log` table with IP, user, timestamp
+- **Prometheus metrics endpoint**: `/metrics` with uptime, HTTP/MQTT counters, memory, connection status
+- **Secure OTA**: `/api/firmware/latest` now reads version from VERSION file and returns SHA256 hash of firmware binary
+- **SQL migration runner**: auto-applies `backend/migrations/*.sql` on startup with `schema_migrations` tracking
+- **Grafana + Prometheus**: added to docker-compose with persistent volumes
+
+### Added (Mobile)
+- **Secure credential storage**: sensitive data (adminToken, mqttUser, mqttPass) stored in expo-secure-store (Keychain/Keystore) instead of AsyncStorage
+
+### Changed (Infrastructure)
+- **nginx.conf**: full HTTPS/TLS config with HTTP→HTTPS redirect, HSTS, WebSocket proxy for Socket.IO and MQTT
+- **docker-compose**: added Prometheus (port 9090) and Grafana (port 3001) services
+
+### Changed (Firmware)
+- **Watchdog timeout**: increased from 8s to 30s — prevents false resets during TLS handshake and menu operations
+
+### Added (Scripts)
+- **Database backup**: `scripts/backup_db.sh` with gzip, S3 upload, 30-day retention policy
+
 ## [1.2.2] - 2026-04-11
 
 ### Security (P0 Hardening)

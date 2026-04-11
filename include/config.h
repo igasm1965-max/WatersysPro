@@ -173,7 +173,7 @@ enum eEncoderState {
 #define DEFAULT_TIMEOUT_BACKWASH 30      ///< Таймаут промывки (мин)
 
 // ============ КОНСТАНТЫ WATCHDOG ДЛЯ ESP32 ============
-#define WDT_TIMEOUT_SECONDS 8             ///< Увеличен до 8с для menu loops
+#define WDT_TIMEOUT_SECONDS 30            ///< 30с — запас для TLS handshake и menu loops
 #define WATCHDOG_ENABLED true  ///< Watchdog включён для продакшена
 /// Сброс watchdog таймера
 #define WDT_RESET() { if (WATCHDOG_ENABLED) esp_task_wdt_reset(); }
