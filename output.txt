@@ -40,7 +40,7 @@ Initializing...
 [VQTT] DNS resolved: m1.wqtt.ru -> 212.67.17.19
 [VQTT] Configuring TLS client
 [VQTT] Connecting to m1.wqtt.ru:19161 (TLS=ON)...
-[VQTT] Using credentials: user=REDACTED_MQTT_USER
+[VQTT] Using credentials: user=***
 [VQTT] ✓ Connected to broker!
 [EventLog] saved to RAM idx=65 type=6 level=1 param=0 src=0
 [DEBUG] Event 6 skipped by log filter

@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.2.1] - 2026-04-11
+
+### Fixed (Firmware)
+- **MQTT keepalive too aggressive**: increased keepalive from 15s to 120s for both plain and TLS clients, reducing spurious disconnects on slow networks
+- **TLS handshake blocking main loop**: reduced TLS/TCP connect timeout from 30s to 5s; reset `loopStartTime` after `loopVQTT()` to prevent watchdog resets
+- **MQTT QoS 0 command loss**: upgraded command topic subscription to QoS 1 for guaranteed delivery
+
+### Changed (Firmware)
+- **Default admin token**: set to `"admin"` instead of empty string so device is accessible out-of-the-box; should be changed via engineer menu or web UI
+- **Admin token initial setup**: allow setting token without providing current token when none is configured
+- **Removed token check from /control**: relay toggle via HTTP no longer requires admin token (matches MQTT/WS behavior)
+
+### Fixed (Backend)
+- **MQTT reconnection**: added keepalive 120s, reconnect period 5s, connect timeout 10s, persistent session (`clean: false`)
+
+### Security
+- **Removed hardcoded MQTT credentials**: cleared default user/password from mobile app code and documentation; credentials must now be entered in Settings or loaded from `.env`
+
+### Fixed (Mobile App)
+- **MQTT reconnect storm**: implemented exponential backoff (5s → 60s) with reset on successful connect
+- **MQTT keepalive**: increased from 60s to 120s to match broker and firmware settings
+- **Default MQTT settings**: app now ships with default broker/credentials as fallback when AsyncStorage is empty
+
 ## [1.2.0] - 2026-03-31
 
 ### Fixed (Firmware)
@@ -119,7 +142,7 @@
   - Maintains similar memory savings without errors
 
 ### Tested
-- ✅ Plain MQTT: Connected to m1.wqpt.ru:19160 with credentials REDACTED_MQTT_USER/REDACTED_MQTT_PASS
+- ✅ Plain MQTT: Connected to m1.wqpt.ru:19160 with credentials (see .env)
 - ✅ TLS MQTT: Connected to m1.wqpt.ru:19161 (TLS verified working)
 - ✅ Telemetry publishing: JSON format with all metrics (uptime, IP, tank levels, relay states)
 - ✅ Command subscription: MQTT→device relay control working

@@ -120,9 +120,10 @@ export class MqttWsClient {
   private readonly keepalive: number;
 
   private reconnTimer: ReturnType<typeof setTimeout> | null = null;
+  private reconnectMs = 5000;  // Exponential backoff: 5s initial
   private destroyed = false;
 
-  constructor(url: string, clientId: string, user: string, pass: string, keepalive = 60) {
+  constructor(url: string, clientId: string, user: string, pass: string, keepalive = 120) {
     this.url       = url;
     this.clientId  = clientId;
     this.user      = user;
@@ -172,13 +173,16 @@ export class MqttWsClient {
         this._setConnected(false);
         this._stopPing();
         if (!this.destroyed) {
-          this.reconnTimer = setTimeout(() => this.connect(), 5000);
+          this.reconnTimer = setTimeout(() => this.connect(), this.reconnectMs);
+          // Exponential backoff: 5s → 10s → 20s → ... → 60s max
+          if (this.reconnectMs < 60000) this.reconnectMs = Math.min(this.reconnectMs * 2, 60000);
         }
       };
     } catch (e) {
       console.warn('[MqttWs] connect exception', e);
       if (!this.destroyed) {
-        this.reconnTimer = setTimeout(() => this.connect(), 5000);
+        this.reconnTimer = setTimeout(() => this.connect(), this.reconnectMs);
+        if (this.reconnectMs < 60000) this.reconnectMs = Math.min(this.reconnectMs * 2, 60000);
       }
     }
   }
@@ -246,6 +250,7 @@ export class MqttWsClient {
         if (buf[3] === 0x00) {
           this._setConnected(true);
           this._startPing();
+          this.reconnectMs = 5000;  // Reset backoff on successful connect
         } else {
           console.warn('[MqttWs] CONNACK error code:', buf[3]);
         }

@@ -287,7 +287,6 @@
       color: #e5e7eb;
       max-height: 170px;
       overflow-y: auto;
-      overflow-anchor: none;
     }
 
     #controls {
@@ -295,7 +294,6 @@
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       gap: 8px;
       margin-top: 6px;
-      overflow-anchor: none;
     }
 
     /* Relay control buttons: green when ON, red when OFF */
@@ -665,8 +663,7 @@
       border-radius: var(--radius-pill);
       background: rgba(15, 118, 110, 0.25);
       border: 1px solid rgba(34, 197, 94, 0.4);
-      min-height: 1.2em;
-      overflow-anchor: none;
+      min-height: 0;
     }
  
     .emergency-banner {
@@ -791,7 +788,7 @@
           <div class="card-body">
             <div class="status-grid">
               <div>
-                <div id="info"><span id="infoIP"></span><br><span id="infoMAC"></span><br><span id="infoUptime"></span><br><b><span id="infoMqtt"></span></b><br><b><span id="infoWifi"></span></b></div>
+                <div id="info">Loading...</div>
                 <div class="mode-switch">
                   <button id="modeManualBtn" class="btn-soft btn-sm" onclick="setMode('manual')">Ручной</button>
                   <button id="modeAutoBtn" class="btn-soft btn-sm" onclick="setMode('auto')">Автомат</button>
@@ -1044,20 +1041,12 @@
       const mode = modeRaw.toLowerCase() === 'manual' ? 'manual' : 'auto';
       applyControlMode(mode);
 
-      // Update info fields in-place (no innerHTML rebuild)
-      var infoIP = document.getElementById('infoIP');
-      var infoMAC = document.getElementById('infoMAC');
-      var infoUptime = document.getElementById('infoUptime');
-      var infoMqtt = document.getElementById('infoMqtt');
-      var infoWifi = document.getElementById('infoWifi');
-      if (infoIP) infoIP.textContent = 'IP:' + (j.ip || '');
-      if (infoMAC) infoMAC.textContent = 'MAC:' + (j.mac || '');
-      if (infoUptime) infoUptime.textContent = 'Uptime:' + (j.uptime || 0) + 's';
+      let s = 'IP:' + escapeHtml(j.ip || '') + '<br>MAC:' + escapeHtml(j.mac || '') + '<br>Uptime:' + (j.uptime || 0) + 's';
       // MQTT status
       if (j.mqtt) {
-        var ms = 'MQTT: ' + (j.mqtt.enabled ? 'enabled' : 'disabled') + ' - ' + (j.mqtt.connected ? 'connected' : 'offline');
-        if (j.mqtt.broker) ms += ' @ ' + (j.mqtt.broker);
-        if (infoMqtt) infoMqtt.textContent = ms;
+        let ms = 'MQTT: ' + (j.mqtt.enabled ? 'enabled' : 'disabled') + ' - ' + (j.mqtt.connected ? 'connected' : 'offline');
+        if (j.mqtt.broker) ms += ' @ ' + escapeHtml(j.mqtt.broker);
+        s += '<br><b>' + ms + '</b>';
         
         // Update MQTT indicator
         const mqttIndicatorEl = document.getElementById('mqttIndicator');
@@ -1073,10 +1062,10 @@
       }
 
       if (j.wifi) {
-        var ws = 'disconnected';
+        let ws = 'disconnected';
         if (j.wifi.connected) ws = 'STA connected';
         else if (j.wifi.ap_active) ws = 'AP mode';
-        if (infoWifi) infoWifi.textContent = 'Wi-Fi: ' + ws;
+        s += '<br><b>Wi-Fi: ' + ws + '</b>';
       }
       
       // Update Wi-Fi indicator
@@ -1092,51 +1081,29 @@
           wifiIndicatorEl.innerHTML = '<span class="status-dot sd-missing"></span>disconnected';
         }
       }
+      
+      document.getElementById('info').innerHTML = s;
 
-      // Relay controls: update existing buttons in-place to avoid scroll jump
-      const controlsEl = document.getElementById('controls');
+      // Relay controls: colored buttons instead of text status
+      let controls = '';
       if (j.relays) {
         const interactive = mode === 'manual';
-        const relayNames = Object.keys(j.relays).filter(function(k){ return Object.prototype.hasOwnProperty.call(j.relays, k); });
-        // Build set of expected button ids
-        const expectedIds = relayNames.map(function(n){ return 'relay-btn-' + n; });
-        // Remove buttons that no longer exist
-        const existing = controlsEl.querySelectorAll('.relay-btn[data-relay]');
-        existing.forEach(function(btn){
-          if (expectedIds.indexOf(btn.id) === -1) btn.remove();
-        });
-        // Remove emergency button if no longer needed
-        const oldEmBtn = controlsEl.querySelector('.btn-danger');
-        if (oldEmBtn && !(j.emergency && j.emergency.active)) oldEmBtn.remove();
-
-        relayNames.forEach(function(name){
+        for (let name in j.relays) {
+          if (!Object.prototype.hasOwnProperty.call(j.relays, name)) continue;
           const isOn = !!j.relays[name];
-          const btnId = 'relay-btn-' + name;
-          let btn = document.getElementById(btnId);
-          if (!btn) {
-            btn = document.createElement('button');
-            btn.id = btnId;
-            btn.setAttribute('data-relay', name);
-            btn.className = 'relay-btn';
-            btn.onclick = function(e){ e.preventDefault(); control(name, 'toggle'); };
-            btn.innerHTML = escapeHtml(name) + ' <span class="relay-state-label"></span>';
-            controlsEl.appendChild(btn);
-          }
-          btn.className = 'relay-btn ' + (isOn ? 'relay-on' : 'relay-off') + (interactive ? '' : ' relay-disabled');
-          btn.disabled = !interactive;
-          btn.querySelector('.relay-state-label').textContent = isOn ? 'ВКЛ' : 'ВЫКЛ';
-        });
+          const stateClass = (isOn ? 'relay-on' : 'relay-off') + (interactive ? '' : ' relay-disabled');
+          const stateLabel = isOn ? 'ВКЛ' : 'ВЫКЛ';
+          controls += '<button class="relay-btn ' + stateClass + '" ' + (interactive ? '' : 'disabled ') + 'onclick="control(\'' + name + '\',\'toggle\')">'
+                    + escapeHtml(name) + ' '
+                    + '<span class="relay-state-label">' + stateLabel + '</span>'
+                    + '</button>';
+        }
       }
       // Add reset emergency button if there's an active emergency
       if (j.emergency && j.emergency.active) {
-        if (!controlsEl.querySelector('.btn-danger')) {
-          const emBtn = document.createElement('button');
-          emBtn.className = 'btn-danger';
-          emBtn.onclick = function(e){ e.preventDefault(); resetEmergency(); };
-          emBtn.textContent = 'Сброс аварии';
-          controlsEl.appendChild(emBtn);
-        }
+        controls += '<button class="btn-danger" onclick="resetEmergency()">Сброс аварии</button>';
       }
+      document.getElementById('controls').innerHTML = controls;
       // Emergency indicator
       const em = j.emergency;
       const emEl = document.getElementById('emergencyBanner');
@@ -1478,6 +1445,7 @@
     const m = document.getElementById('msg');
     const current = (document.getElementById('admin_current').value || '').trim();
     const newToken = (document.getElementById('admin_new').value || '').trim();
+    if (!current) { if (m) { m.innerText = 'Current token required'; setTimeout(()=>{ m.innerText=''; }, 3000); } return; }
     // длина проверяется на сервере, здесь лишь алфавитно-цифровые символы
     const re = /^[A-Za-z0-9]+$/;
     if (!re.test(newToken)) { if (m) { m.innerText = 'Новый токен должен содержать только буквы и цифры'; setTimeout(()=>{ m.innerText=''; }, 3000); } return; }

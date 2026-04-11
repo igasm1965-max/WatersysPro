@@ -8,20 +8,25 @@
 import { MqttWsClient } from './mqttClient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// MQTT credentials loaded from AsyncStorage (configured in Settings)
-let BROKER_URL = '';
-let MQTT_USER  = '';
-let MQTT_PASS  = '';
+// Default MQTT credentials (can be overridden in Settings)
+const DEFAULT_BROKER = 'm1.wqtt.ru';
+const DEFAULT_PORT   = '19163';
+const DEFAULT_USER   = '';
+const DEFAULT_PASS   = '';
 
-/** Load MQTT settings from AsyncStorage. Must be called before connect(). */
+let BROKER_URL = `wss://${DEFAULT_BROKER}:${DEFAULT_PORT}/mqtt`;
+let MQTT_USER  = DEFAULT_USER;
+let MQTT_PASS  = DEFAULT_PASS;
+
+/** Load MQTT settings from AsyncStorage (falls back to defaults). */
 async function loadMqttSettings(): Promise<void> {
   const broker = await AsyncStorage.getItem('mqttBroker');
   const port   = await AsyncStorage.getItem('mqttPort');
   const user   = await AsyncStorage.getItem('mqttUser');
   const pass   = await AsyncStorage.getItem('mqttPass');
-  BROKER_URL = broker && port ? `wss://${broker}:${port}/mqtt` : '';
-  MQTT_USER  = user ?? '';
-  MQTT_PASS  = pass ?? '';
+  BROKER_URL = `wss://${broker || DEFAULT_BROKER}:${port || DEFAULT_PORT}/mqtt`;
+  MQTT_USER  = user || DEFAULT_USER;
+  MQTT_PASS  = pass || DEFAULT_PASS;
 }
 
 const TOPIC_TELEMETRY = 'watersystem/telemetry';
@@ -76,7 +81,7 @@ class MqttService {
     }
 
     return loadMqttSettings().then(() => {
-      if (!BROKER_URL || !MQTT_USER) {
+      if (!BROKER_URL) {
         console.warn('[MQTT] Broker not configured — check Settings');
         return;
       }
@@ -84,7 +89,7 @@ class MqttService {
       const clientId = `mob_${Math.random().toString(16).slice(2, 10)}`;
 
       this.client = new MqttWsClient(
-        BROKER_URL, clientId, MQTT_USER, MQTT_PASS, 60
+        BROKER_URL, clientId, MQTT_USER, MQTT_PASS, 120
       );
 
       this.client.onConnChange((connected) => {

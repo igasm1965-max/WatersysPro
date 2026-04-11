@@ -10,7 +10,7 @@ export default function SettingsScreen(){
   const [serverUrl, setServerUrl] = useState('http://192.168.0.103:3000');
   const [adminToken, setAdminToken] = useState('');
   const [autoFlush, setAutoFlush] = useState(false);
-  const [mqttBroker, setMqttBroker] = useState('');
+  const [mqttBroker, setMqttBroker] = useState('m1.wqtt.ru');
   const [mqttPort, setMqttPort] = useState('19163');
   const [mqttUser, setMqttUser] = useState('');
   const [mqttPass, setMqttPass] = useState('');

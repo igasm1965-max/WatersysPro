@@ -272,10 +272,12 @@ static void connectToBroker() {
   if (useTLS) {
     Serial.println("[VQTT] Configuring TLS client");
     wifiClientSecure.setInsecure(); // Skip cert verification
+    wifiClientSecure.setTimeout(5); // TLS handshake timeout: 5 секунд (вместо дефолтных 30)
     mqttClientSecure.setServer(broker.c_str(), port);
     mqttClientSecure.setCallback(onMqttMessage);
     activeMqtt = &mqttClientSecure;
   } else {
+    wifiClient.setTimeout(5); // TCP connect timeout: 5 секунд
     mqttClient.setServer(broker.c_str(), port);
     mqttClient.setCallback(onMqttMessage);
     activeMqtt = &mqttClient;
@@ -307,10 +309,10 @@ static void connectToBroker() {
     mqttConnected = true;
     saveEventLog(LOG_INFO, EVENT_SETTINGS_CHANGE, 0);
     
-    // Subscribe to commands
+    // Subscribe to commands with QoS 1 (guaranteed delivery)
     String cmdTopic = mqttTopicBase + "/cmd/#";
-    activeMqtt->subscribe(cmdTopic.c_str());
-    Serial.printf("[VQTT] Subscribed to: %s\n", cmdTopic.c_str());
+    activeMqtt->subscribe(cmdTopic.c_str(), 1);
+    Serial.printf("[VQTT] Subscribed to: %s (QoS 1)\n", cmdTopic.c_str());
     
     // Publish online status
     String statusTopic = mqttTopicBase + "/status";
@@ -370,7 +372,9 @@ void initVQTT() {
   mqttClient.setServer("", 0);
   mqttClient.setCallback(onMqttMessage);
   mqttClient.setBufferSize(512);
+  mqttClient.setKeepAlive(120);          // 120s keepalive (default 15s too aggressive)
   mqttClientSecure.setBufferSize(512);
+  mqttClientSecure.setKeepAlive(120);
   activeMqtt = &mqttClient;
   
   // Initial connection attempt only if WiFi is ready

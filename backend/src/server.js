@@ -143,7 +143,12 @@ async function sendPushNotification(title, body, data = {}) {
 }
 
 // --- MQTT client ---
-const client = mqtt.connect(MQTT_BROKER);
+const client = mqtt.connect(MQTT_BROKER, {
+  keepalive: 120,           // 120s (default 60s too aggressive for mobile networks)
+  reconnectPeriod: 5000,    // 5s initial reconnect
+  connectTimeout: 10000,    // 10s connect timeout
+  clean: false,             // Persistent session — broker keeps subscriptions on disconnect
+});
 client.on('connect', () => {
   console.log('MQTT connected to', MQTT_BROKER);
   console.log('Remote topic base:', MQTT_TOPIC_BASE);

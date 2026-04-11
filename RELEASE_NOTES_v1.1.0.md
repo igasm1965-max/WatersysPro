@@ -36,7 +36,7 @@ A full month of troubleshooting MQTT TLS connectivity issues has been completely
 **Tested Configuration:**
 ```
 Broker: m1.wqpt.ru
-Credentials: REDACTED_MQTT_USER / REDACTED_MQTT_PASS
+Credentials: <see .env file>
 Plain mode: Port 19160 ✅ Connected
 TLS mode: Port 19161 ✅ Connected (TLS verified)
 Telemetry: Publishing every 10s to watersystem/telemetry
@@ -209,7 +209,7 @@ platformio run -t upload
 - Navigate to MQTT settings
 - Set broker: m1.wqpt.ru
 - Set port: 19160 (plain) or 19161 (TLS)
-- Set credentials: REDACTED_MQTT_USER / REDACTED_MQTT_PASS
+- Set credentials: <your MQTT user / password>
 - Enable TLS: Yes/No
 - Save configuration
 

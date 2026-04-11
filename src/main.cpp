@@ -602,7 +602,9 @@ void loopESP32() {
 
     webServerPeriodic();
     // Handle MQTT client periodic tasks
+    // (connectToBroker может блокировать 5-15с при TLS handshake — сбрасываем loopStartTime после)
     loopVQTT();
+    loopStartTime = millis();
 #endif
 
     // Обработка меню

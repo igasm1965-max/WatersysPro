@@ -240,7 +240,7 @@ enum eEncoderState {
 #define PREF_KEY_BACKLIGHT "backlight"
 #define PREF_KEY_FILTER_PERIOD "filter_per"
 #define PREF_KEY_ADMIN_TOKEN "admin_tok"
-#define DEFAULT_ADMIN_TOKEN ""  // Генерируется при первом запуске, задаётся через инженерное меню
+#define DEFAULT_ADMIN_TOKEN "admin"  // Дефолтный токен; сменить через инженерное меню или веб-интерфейс
 #define ADMIN_TOKEN_MAX_LEN 20  ///< Максимальная длина admin token (используется по всему коду)
 #define PREF_KEY_WIFI_SSID "wifi_ssid"
 #define PREF_KEY_WIFI_PASS "wifi_pass"

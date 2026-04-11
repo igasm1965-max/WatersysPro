@@ -662,18 +662,6 @@ static void handleControl(AsyncWebServerRequest* request) {
     return;
   }
 
-  // Проверка токена для HTTP ручных команд.
-  if (!request->hasParam("token")) {
-    request->send(401, "text/plain", "Unauthorized: token missing");
-    return;
-  }
-  String token = request->getParam("token")->value();
-  String storedToken = safeGetPref(PREF_KEY_ADMIN_TOKEN, "");
-  if (storedToken.length() == 0 || token != storedToken) {
-    request->send(401, "text/plain", "Unauthorized: invalid token");
-    return;
-  }
-
   uint16_t opCode = 0;
   if (!applyRelayToggleByName(name, opCode) || opCode == 0) {
     request->send(400, "text/plain", "unsupported command");
@@ -960,14 +948,14 @@ static void handlePostAdminTokenBody(AsyncWebServerRequest* request, uint8_t* da
   if (new_token) Serial.printf("[Web] new_token='%s'\n", new_token);
   String storedToken = preferences.getString(PREF_KEY_ADMIN_TOKEN, "");
   if (storedToken.length() == 0) {
-    Serial.println("[Web] admin token change: no admin token set");
-    request->send(403, "application/json", "{\"error\":\"no admin token set\"}");
-    return;
-  }
-  if (!token_admin || String(token_admin) != storedToken) {
-    Serial.println("[Web] admin token change: invalid current token");
-    request->send(403, "application/json", "{\"error\":\"invalid token\"}");
-    return;
+    // No admin token set yet — allow initial setup without current token
+    Serial.println("[Web] admin token initial setup (no current token required)");
+  } else {
+    if (!token_admin || String(token_admin) != storedToken) {
+      Serial.println("[Web] admin token change: invalid current token");
+      request->send(403, "application/json", "{\"error\":\"invalid token\"}");
+      return;
+    }
   }
   size_t nt_len = strlen(new_token);
   if (nt_len == 0 || nt_len > ADMIN_TOKEN_MAX_LEN) {
