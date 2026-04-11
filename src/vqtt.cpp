@@ -364,7 +364,8 @@ static void connectToBroker() {
 void initVQTT() {
   // One-time migration: update broker to current defaults if outdated value is stored.
   const String oldBroker = preferences.getString(PREF_KEY_MQTT_BROKER, "");
-  bool needsMigration = (oldBroker == "REDACTED_HIVEMQ_HOST")
+  // Check for legacy broker addresses that need migration to current defaults
+  bool needsMigration = oldBroker.endsWith(".hivemq.cloud")
                      || (oldBroker == "192.168.0.103");
   if (needsMigration) {
     preferences.putBool(PREF_KEY_MQTT_ENABLED, true);
