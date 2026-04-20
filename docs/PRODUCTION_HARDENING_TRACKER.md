@@ -170,3 +170,5 @@
 
 ## Журнал выполнения
 - 2026-03-19: Трекер создан.
+- 2026-04-20: Добавлен pre-release checklist (`docs/PRODUCTION_RELEASE_CHECKLIST.md`), удалены из индекса git runtime-артефакты Mosquitto (`mosquitto.log`, `mosquitto.db`), обновлен `.gitignore`, убрана жесткая локальная привязка `upload_port` в `platformio.ini`.
+- 2026-04-20: Сформирован финальный отчёт готовности к релизу `docs/PRODUCTION_READINESS_REPORT_2026-04-20.md` с Go/No-Go условиями.

@@ -33,6 +33,17 @@
    - Приоритеты P0/P1/P2
    - Owner, estimate, статус, DoD
    - Чекбоксы исполнения по каждой задаче
+- **[docs/PRODUCTION_RELEASE_CHECKLIST.md](docs/PRODUCTION_RELEASE_CHECKLIST.md)** - Обязательный pre-release checklist перед production
+   - Security gate
+   - Build/smoke gate
+   - Sign-off перед релизом
+- **[docs/PRODUCTION_READINESS_REPORT_2026-04-20.md](docs/PRODUCTION_READINESS_REPORT_2026-04-20.md)** - Финальный отчёт готовности к production
+   - Go/No-Go вердикт
+   - Подтверждённые проверки
+   - Оставшиеся обязательные шаги
+- **[docs/SAFE_RELEASE_COMMIT_PLAN_2026-04-20.md](docs/SAFE_RELEASE_COMMIT_PLAN_2026-04-20.md)** - Безопасный план разбиения изменений на коммиты
+   - Порядок коммитов перед релизом
+   - Готовые команды `git add`/`git commit`
 
 ---
 

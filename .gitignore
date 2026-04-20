@@ -44,3 +44,14 @@ Thumbs.db
 # Local serial monitor dumps
 monitor_error.txt
 monitor_output.txt
+
+# Local diagnostics artifacts
+## GitHub Copilot Chat.md
+
+# Runtime broker artifacts
+mosquitto/log/*.log
+mosquitto/data/*.db
+
+# Mobile secrets (must be provided out-of-band)
+mobile/google-services.json
+mobile/*firebase-adminsdk*.json
