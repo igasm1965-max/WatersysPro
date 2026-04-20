@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WaterSysPro — Executive Presentation</title>
+  <style>
+    :root {
+      --bg: #f5f8fa;
+      --paper: #ffffff;
+      --ink: #132531;
+      --muted: #4b6778;
+      --brand: #0f766e;
+      --brand2: #204f74;
+      --line: #d8e2e8;
+      --ok: #1b8d4e;
+      --warn: #a46d00;
+      --risk: #a63232;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Noto Sans", Arial, sans-serif;
+      background:
+        radial-gradient(1000px 420px at 0% -10%, #dcf5e9 0%, transparent 55%),
+        radial-gradient(900px 360px at 100% 0%, #dbeeff 0%, transparent 52%),
+        var(--bg);
+      color: var(--ink);
+      line-height: 1.45;
+    }
+    .wrap { display: grid; grid-template-columns: 300px 1fr; min-height: 100vh; }
+    .side {
+      position: sticky; top: 0; height: 100vh; overflow: auto;
+      background: linear-gradient(170deg, #113741 0%, #1d4f63 100%);
+      color: #eaf4f8; padding: 16px 14px;
+      border-right: 1px solid rgba(255,255,255,0.12);
+    }
+    .logo { font-weight: 700; font-size: 22px; margin-bottom: 4px; }
+    .sub { color: #bdd6dd; font-size: 13px; margin-bottom: 10px; }
+    .chip {
+      display: inline-block; font-size: 12px; border-radius: 999px;
+      padding: 4px 10px; margin-bottom: 10px;
+      border: 1px solid rgba(255,255,255,0.28); background: rgba(255,255,255,0.12);
+    }
+    .search {
+      width: 100%; border: 1px solid rgba(255,255,255,0.35); border-radius: 10px;
+      background: rgba(255,255,255,0.12); color: #fff; padding: 10px; margin-bottom: 10px;
+      outline: none;
+    }
+    .search::placeholder { color: #d2e4ea; }
+    .nav { list-style: none; margin: 0; padding: 0; }
+    .nav a {
+      display: block; color: #eef8fa; text-decoration: none; font-size: 14px;
+      padding: 9px 10px; border-radius: 8px; margin-bottom: 5px;
+      border: 1px solid transparent;
+    }
+    .nav a:hover, .nav a.active {
+      background: rgba(255,255,255,0.15);
+      border-color: rgba(255,255,255,0.26);
+    }
+    .main { padding: 24px; }
+    .hero {
+      background: linear-gradient(145deg, var(--brand) 0%, var(--brand2) 62%, #2b3e60 100%);
+      color: #fff; border-radius: 16px; padding: 24px; margin-bottom: 14px;
+      box-shadow: 0 10px 28px rgba(12, 38, 53, 0.2);
+    }
+    .hero h1 { margin: 0 0 8px; font-size: 31px; }
+    .hero p { margin: 0; color: #d7ecf4; max-width: 980px; }
+    .badges { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .badges span {
+      border: 1px solid rgba(255,255,255,0.32); background: rgba(255,255,255,0.12);
+      border-radius: 999px; padding: 4px 10px; font-size: 12px;
+    }
+    .section {
+      background: var(--paper); border: 1px solid var(--line); border-radius: 14px;
+      margin-bottom: 12px; overflow: hidden;
+      box-shadow: 0 2px 10px rgba(15, 43, 59, 0.04);
+    }
+    .section h2 {
+      margin: 0; padding: 13px 15px; font-size: 20px;
+      background: #f7fbfd; border-bottom: 1px solid var(--line);
+    }
+    .body { padding: 14px 15px 16px; }
+    .grid { display: grid; gap: 12px; }
+    .g2 { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+    .g3 { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+    .card {
+      border: 1px solid var(--line); border-radius: 11px; background: #fff; padding: 11px;
+    }
+    .card h3 { margin: 0 0 8px; font-size: 16px; }
+    .muted { color: var(--muted); }
+    .kpi {
+      border: 1px solid var(--line); border-radius: 11px; background: #fff; padding: 10px;
+    }
+    .kpi .name { color: var(--muted); font-size: 12px; }
+    .kpi .value { font-size: 22px; font-weight: 700; }
+    .ok { color: var(--ok); font-weight: 700; }
+    .warn { color: var(--warn); font-weight: 700; }
+    .risk { color: var(--risk); font-weight: 700; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { border: 1px solid var(--line); padding: 8px; text-align: left; vertical-align: top; }
+    th { background: #f1f6f9; }
+    details {
+      border: 1px solid var(--line); border-radius: 10px; background: #fcfeff;
+      padding: 8px 10px; margin-bottom: 10px;
+    }
+    summary { cursor: pointer; font-weight: 600; }
+    .foot { text-align: center; color: var(--muted); font-size: 13px; padding: 10px 0 20px; }
+    @media (max-width: 980px) {
+      .wrap { grid-template-columns: 1fr; }
+      .side { position: static; height: auto; }
+      .main { padding: 12px; }
+      .hero h1 { font-size: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <aside class="side">
+      <div class="logo">WaterSysPro</div>
+      <div class="sub">Executive версия для руководства</div>
+      <div class="chip">Фокус: KPI, риски, roadmap</div>
+      <input id="menuSearch" class="search" placeholder="Поиск раздела..." />
+      <ul id="menu" class="nav">
+        <li><a href="#summary">1. Executive Summary</a></li>
+        <li><a href="#value">2. Бизнес-ценность</a></li>
+        <li><a href="#kpi">3. KPI и зрелость</a></li>
+        <li><a href="#menu-section">4. UI-меню и инженерное меню</a></li>
+        <li><a href="#risk">5. Риски и меры</a></li>
+        <li><a href="#economics">6. Экономический эффект</a></li>
+        <li><a href="#roadmap">7. Roadmap 90 дней</a></li>
+        <li><a href="#ask">8. Решения от руководства</a></li>
+      </ul>
+    </aside>
+
+    <main class="main">
+      <section class="hero">
+        <h1>WaterSysPro — Executive Presentation</h1>
+        <p>
+          Платформа автоматизации водоочистки с удаленным управлением и мониторингом.
+          Решение объединяет edge-контроллер, облачный/backend контур и мобильный интерфейс.
+        </p>
+        <div class="badges">
+          <span>ESP32 + FSM</span>
+          <span>Web + MQTT</span>
+          <span>Backend + Mobile</span>
+          <span>Готово к pilot rollout</span>
+        </div>
+      </section>
+
+      <section id="summary" class="section">
+        <h2>1. Executive Summary</h2>
+        <div class="body">
+          <div class="grid g2">
+            <div class="card">
+              <h3>Что уже работает</h3>
+              <ul>
+                <li>Автоматический цикл обработки воды (FSM)</li>
+                <li>Мониторинг и управление через web</li>
+                <li>Удаленный контур через MQTT/backend/mobile</li>
+                <li>Сервисные и инженерные режимы</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h3>Что важно для бизнеса</h3>
+              <ul>
+                <li>Снижение ручных операций оператора</li>
+                <li>Прозрачность состояния узлов и аварий</li>
+                <li>База для тиражирования на объекты</li>
+                <li>Контроль параметров в реальном времени</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="value" class="section">
+        <h2>2. Бизнес-ценность</h2>
+        <div class="body">
+          <div class="grid g3">
+            <div class="kpi"><div class="name">Операционная выгода</div><div class="value">- ручные обходы</div><div class="muted">Часть операций переводится в автоматику</div></div>
+            <div class="kpi"><div class="name">Прозрачность</div><div class="value">Live status</div><div class="muted">Состояние узлов и этапов доступно онлайн</div></div>
+            <div class="kpi"><div class="name">Устойчивость</div><div class="value">Safety + WDT</div><div class="muted">Защита от зависаний/нештатных сценариев</div></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="kpi" class="section">
+        <h2>3. KPI и зрелость решения</h2>
+        <div class="body">
+          <table>
+            <thead><tr><th>Метрика</th><th>Текущий уровень</th><th>Комментарий</th></tr></thead>
+            <tbody>
+              <tr><td>Функциональная полнота</td><td class="ok">Высокая</td><td>Edge + Web + MQTT + Backend + Mobile доступны</td></tr>
+              <tr><td>Эксплуатационная готовность</td><td class="warn">Средне-высокая</td><td>Требуется финальный hardening перед масштабированием</td></tr>
+              <tr><td>Наблюдаемость</td><td class="ok">Высокая</td><td>Логи, статусы, сервисные экраны и remote-каналы</td></tr>
+              <tr><td>Масштабируемость</td><td class="warn">Средняя</td><td>Нужны стандарты rollout и шаблоны конфигурации</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="menu-section" class="section">
+        <h2>4. UI-меню и инженерное меню</h2>
+        <div class="body">
+          <details open>
+            <summary>Обычное меню (операторский контур)</summary>
+            <table>
+              <thead><tr><th>Блок</th><th>Ключевые пункты</th><th>Назначение</th></tr></thead>
+              <tbody>
+                <tr><td>Setting up timers</td><td>Setling/Aeration/Ozonation/Backlight</td><td>Настройка рабочих длительностей</td></tr>
+                <tr><td>Cleaning the filter</td><td>Filter wash timer, Wash period</td><td>Регламент обслуживания фильтра</td></tr>
+                <tr><td>Setting tank level</td><td>Tank 1, Tank 2</td><td>Пороги уровней и калибровка</td></tr>
+                <tr><td>Date & Time</td><td>Time/Date/Timezone/View</td><td>Корректная временная логика</td></tr>
+                <tr><td>System Logging</td><td>Event Logs, Prune, Format SD</td><td>Диагностика и обслуживание</td></tr>
+                <tr><td>Schedule + Night mode</td><td>Start/End/Enable</td><td>Эксплуатационные режимы по времени</td></tr>
+              </tbody>
+            </table>
+          </details>
+
+          <details>
+            <summary>Инженерное меню (защищенный сервисный контур)</summary>
+            <table>
+              <thead><tr><th>Блок</th><th>Пункты</th><th>Управленческая ценность</th></tr></thead>
+              <tbody>
+                <tr><td>Safety Timeouts</td><td>Timeout Filling/Ozonation/Aeration/Settling/Filtration/Backwash</td><td>Снижение риска технологического зависания</td></tr>
+                <tr><td>Pump Protection</td><td>Pump Dry Timeout, Min Delta, Consecutive Checks</td><td>Защита оборудования и снижение аварий</td></tr>
+                <tr><td>Watchdog Settings</td><td>Enable/Disable, Timeout</td><td>Контроль отказоустойчивости ПО</td></tr>
+                <tr><td>Connectivity</td><td>Wi-Fi Setup, MQTT Setup</td><td>Управляемая удаленная связность</td></tr>
+                <tr><td>Diagnostics</td><td>System Info, Network Info, Log Filter</td><td>Быстрое сервисное расследование</td></tr>
+                <tr><td>Recovery</td><td>Change Password, Factory Reset</td><td>Контроль доступа и восстановление</td></tr>
+              </tbody>
+            </table>
+          </details>
+
+          <details>
+            <summary>Рекомендуемая модель эксплуатации меню</summary>
+            <ol>
+              <li>Оператор работает только в обычном меню (порог/таймер/журнал).</li>
+              <li>Инженерное меню доступно только сервисному персоналу по паролю.</li>
+              <li>Все изменения Safety/Watchdog/Wi-Fi/MQTT фиксируются в протоколе пусконаладки.</li>
+            </ol>
+          </details>
+        </div>
+      </section>
+
+      <section id="risk" class="section">
+        <h2>5. Риски и меры</h2>
+        <div class="body">
+          <table>
+            <thead><tr><th>Риск</th><th>Влияние</th><th>Мера снижения</th></tr></thead>
+            <tbody>
+              <tr><td>Неполный hardening перед масштабированием</td><td class="warn">Средний</td><td>Тест-протокол, freeze-конфиг, staged rollout</td></tr>
+              <tr><td>Ошибка параметров в инженерном меню</td><td class="risk">Высокий</td><td>Ролевая модель, контрольный лист изменений, review</td></tr>
+              <tr><td>Проблемы связности MQTT/сети</td><td class="warn">Средний</td><td>Fallback процедуры, network health checks</td></tr>
+              <tr><td>Человеческий фактор при пуске</td><td class="warn">Средний</td><td>Полевые чек-листы и единый протокол испытаний</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="economics" class="section">
+        <h2>6. Экономический эффект (оценочно)</h2>
+        <div class="body">
+          <div class="grid g2">
+            <div class="card">
+              <h3>Основные источники эффекта</h3>
+              <ul>
+                <li>Снижение ручных переключений и обходов</li>
+                <li>Снижение времени диагностики инцидентов</li>
+                <li>Сокращение простоя при нештатных ситуациях</li>
+                <li>Более предсказуемый регламент обслуживания</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h3>KPI для контроля эффекта</h3>
+              <ul>
+                <li>MTTR (среднее время восстановления)</li>
+                <li>Количество ручных вмешательств в смену</li>
+                <li>Количество аварийных остановов/месяц</li>
+                <li>Доля прохода планового тест-протокола</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="roadmap" class="section">
+        <h2>7. Roadmap на 90 дней</h2>
+        <div class="body">
+          <table>
+            <thead><tr><th>Период</th><th>Цель</th><th>Результат</th></tr></thead>
+            <tbody>
+              <tr><td>Недели 1-2</td><td>Stabilization + hardening</td><td>Фиксация baseline, тесты, контроль конфигураций</td></tr>
+              <tr><td>Недели 3-6</td><td>Pilot rollout</td><td>Пилот на ограниченном числе объектов</td></tr>
+              <tr><td>Недели 7-10</td><td>Operational tuning</td><td>Коррекция safety/MQTT и сервисных регламентов</td></tr>
+              <tr><td>Недели 11-13</td><td>Scale decision</td><td>Решение о масштабировании на основе KPI</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="ask" class="section">
+        <h2>8. Решения от руководства</h2>
+        <div class="body">
+          <ol>
+            <li>Утвердить pilot rollout и критерии успешности.</li>
+            <li>Определить владельца эксплуатационных KPI.</li>
+            <li>Утвердить регламент доступа к инженерному меню.</li>
+            <li>Утвердить бюджет/ресурс на этап hardening + сопровождение.</li>
+          </ol>
+        </div>
+      </section>
+
+      <div class="foot">WaterSysPro • Executive Presentation • Self-contained HTML</div>
+    </main>
+  </div>
+
+  <script>
+    const links = Array.from(document.querySelectorAll('#menu a'));
+    const sections = links.map(a => document.querySelector(a.getAttribute('href'))).filter(Boolean);
+
+    function activate() {
+      const pos = window.scrollY + 120;
+      let cur = sections[0];
+      for (const s of sections) if (s.offsetTop <= pos) cur = s;
+      links.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + cur.id));
+    }
+
+    window.addEventListener('scroll', activate);
+    activate();
+
+    const input = document.getElementById('menuSearch');
+    input.addEventListener('input', () => {
+      const q = input.value.trim().toLowerCase();
+      links.forEach(a => {
+        a.parentElement.style.display = a.textContent.toLowerCase().includes(q) ? '' : 'none';
+      });
+    });
+  </script>
+</body>
+</html>

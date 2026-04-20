@@ -117,6 +117,33 @@
       justify-content: flex-start;
     }
 
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .page-view {
+      display: block;
+    }
+
+    .settings-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .settings-title {
+      font-size: 1rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-main);
+    }
+
     .pill-meta {
       font-size: 0.78rem;
       text-transform: uppercase;
@@ -287,6 +314,7 @@
       color: #e5e7eb;
       max-height: 170px;
       overflow-y: auto;
+      overflow-anchor: none;
     }
 
     #controls {
@@ -294,6 +322,7 @@
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       gap: 8px;
       margin-top: 6px;
+      overflow-anchor: none;
     }
 
     /* Relay control buttons: green when ON, red when OFF */
@@ -649,6 +678,14 @@
       margin-top: 3px;
     }
 
+    .danger-inline-hint {
+      color: #ff2020;
+      font-weight: 700;
+      font-size: 0.78rem;
+      line-height: 1.2;
+      text-shadow: 0 0 6px rgba(255, 0, 0, 0.35);
+    }
+
     .section-footer-note {
       font-size: 0.75rem;
       color: var(--text-muted);
@@ -663,7 +700,8 @@
       border-radius: var(--radius-pill);
       background: rgba(15, 118, 110, 0.25);
       border: 1px solid rgba(34, 197, 94, 0.4);
-      min-height: 0;
+      min-height: 1.2em;
+      overflow-anchor: none;
     }
  
     .emergency-banner {
@@ -736,9 +774,71 @@
       color: #fed7aa;
       font-size: 0.82rem;
     }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 6, 23, 0.78);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      padding: 16px;
+    }
+
+    .modal-card {
+      width: 100%;
+      max-width: 420px;
+      border-radius: var(--radius-lg);
+      border: 1px solid rgba(148, 163, 184, 0.55);
+      background: radial-gradient(circle at top, rgba(56, 189, 248, 0.14), transparent 55%), rgba(2, 6, 23, 0.98);
+      box-shadow: 0 22px 45px rgba(0, 0, 0, 0.55);
+      padding: 14px;
+    }
+
+    .modal-title {
+      font-size: 0.95rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 6px;
+    }
+
+    .modal-subtitle {
+      font-size: 0.82rem;
+      color: var(--text-soft);
+      margin-bottom: 10px;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    #settingsTokenError {
+      min-height: 1.1em;
+      color: #ff6b6b;
+      font-size: 0.78rem;
+      margin-top: 8px;
+    }
   </style>
 </head>
 <body>
+  <div id="settingsTokenModal" class="modal-overlay" onclick="handleSettingsModalBackdrop(event)">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="settingsTokenTitle">
+      <div id="settingsTokenTitle" class="modal-title">Доступ к Settings</div>
+      <div class="modal-subtitle">Введите мастер токен для открытия страницы настроек.</div>
+      <input id="settingsTokenInput" type="password" placeholder="Master token" autocomplete="current-password">
+      <div id="settingsTokenError"></div>
+      <div class="modal-actions">
+        <button class="btn-ghost btn-sm" onclick="closeSettingsTokenModal()">Отмена</button>
+        <button id="settingsTokenSubmitBtn" class="btn-primary btn-sm" onclick="submitSettingsToken()">Войти</button>
+      </div>
+    </div>
+  </div>
+
   <main class="app-shell">
     <header class="app-header">
       <div class="app-title-block">
@@ -748,15 +848,19 @@
         </div>
         <div class="app-subtitle">Мониторинг уровней, реле, Wi‑Fi, MQTT и логов системы</div>
       </div>
-      <div class="pill-meta-row">
-        <div class="pill-meta">
-          <span class="pill-dot"></span>
-          LIVE STATUS
+      <div class="header-actions">
+        <div class="pill-meta-row">
+          <div class="pill-meta">
+            <span class="pill-dot"></span>
+            LIVE STATUS
+          </div>
+          <div class="pill-meta" id="clockPill">--</div>
         </div>
-        <div class="pill-meta" id="clockPill">--</div>
+        <button id="openSettingsBtn" class="btn-outline btn-sm" onclick="openSettingsPage()">Setting</button>
       </div>
     </header>
 
+    <div id="mainPage" class="page-view">
     <!-- LCD и Система на одной строке -->
     <div class="layout-grid-lcd-system">
       <section class="card">
@@ -788,7 +892,7 @@
           <div class="card-body">
             <div class="status-grid">
               <div>
-                <div id="info">Loading...</div>
+                <div id="info"><span id="infoIP"></span><br><span id="infoMAC"></span><br><span id="infoUptime"></span><br><b><span id="infoMqtt"></span></b><br><b><span id="infoWifi"></span></b></div>
                 <div class="mode-switch">
                   <button id="modeManualBtn" class="btn-soft btn-sm" onclick="setMode('manual')">Ручной</button>
                   <button id="modeAutoBtn" class="btn-soft btn-sm" onclick="setMode('auto')">Автомат</button>
@@ -819,6 +923,14 @@
         </div>
       </section>
     </div>
+
+    </div>
+
+    <div id="settingsPage" class="page-view" style="display:none;">
+      <div class="settings-header">
+        <div class="settings-title">Settings</div>
+        <button class="btn-soft btn-sm" onclick="closeSettingsPage()">Back</button>
+      </div>
 
     <!-- Смена мастер токена и Wi-Fi на одной строке -->
     <div class="layout-grid-pair">
@@ -864,9 +976,6 @@
               <div class="field-label"><strong>Password</strong></div>
               <div><input id="pass" type="password" placeholder="password"></div>
 
-              <div class="field-label"><strong>Device token</strong></div>
-              <div><input id="token" type="text" placeholder="access token"></div>
-
               <div class="field-label"><strong>Timezone (UTC)</strong></div>
               <div><input id="timezone" type="number" min="-12" max="12" placeholder="0" style="max-width: 80px"></div>
             </div>
@@ -875,6 +984,8 @@
               <button class="btn-primary" onclick="saveWifi()">Save Wi‑Fi</button>
               <button class="btn-soft btn-sm" onclick="saveTimezone()">Save Timezone</button>
             </div>
+
+            <div class="hint-text">Если устройство работает в режиме точки доступа и не подключено к роутеру, сохранение новых Wi‑Fi данных доступно без токена.</div>
 
             <div class="section-footer-note">После изменения настроек устройство может перезапустить соединение.</div>
           </div>
@@ -922,6 +1033,12 @@
               <div class="field-label"><strong>TLS Enable</strong></div>
               <div><input id="mqtt_secure" type="checkbox"></div>
 
+              <div class="field-label"><strong>TLS Insecure (diag)</strong></div>
+              <div style="display:flex; align-items:center; gap:10px; flex-wrap:nowrap;">
+                <input id="mqtt_insecure" type="checkbox">
+                <span class="danger-inline-hint" style="white-space: nowrap;">Использовать только для диагностики !!!</span>
+              </div>
+
               <div class="field-label"><strong>Will message</strong></div>
               <div><input id="mqtt_will" type="checkbox"></div>
 
@@ -963,6 +1080,7 @@
         </div>
       </section>
     </div>
+    </div>
 
     <div id="msg"></div>
 
@@ -979,6 +1097,8 @@
   // Enhanced status update: prefer WebSocket (push) and pause polling when page hidden to reduce load
   var pollingEnabled = true;
   var currentControlMode = 'auto';
+  var settingsAdminToken = '';
+  var settingsSessionId = '';
 
   function setUiMessage(text, timeoutMs) {
     const msg = document.getElementById('msg');
@@ -986,6 +1106,101 @@
     msg.innerText = text;
     setTimeout(function(){ msg.innerText = ''; }, timeoutMs || 3000);
   }
+
+  async function verifyAdminToken(token) {
+    try {
+      const verifyResp = await fetch('/api/settings_auth', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ token: token })
+      });
+      if (!verifyResp.ok) return false;
+      const verifyJson = await verifyResp.json();
+      if (!verifyJson.ok || !verifyJson.session) return false;
+      settingsSessionId = String(verifyJson.session);
+      return true;
+    } catch (e) {
+      console.warn('verifyAdminToken error', e);
+      return false;
+    }
+  }
+
+  function openSettingsPage() {
+    const modal = document.getElementById('settingsTokenModal');
+    const input = document.getElementById('settingsTokenInput');
+    const err = document.getElementById('settingsTokenError');
+    if (err) err.textContent = '';
+    if (input) {
+      input.value = '';
+      setTimeout(function(){ input.focus(); }, 0);
+    }
+    if (modal) modal.style.display = 'flex';
+  }
+
+  function closeSettingsTokenModal() {
+    const modal = document.getElementById('settingsTokenModal');
+    const err = document.getElementById('settingsTokenError');
+    if (err) err.textContent = '';
+    if (modal) modal.style.display = 'none';
+  }
+
+  function handleSettingsModalBackdrop(event) {
+    if (event.target && event.target.id === 'settingsTokenModal') {
+      closeSettingsTokenModal();
+    }
+  }
+
+  async function submitSettingsToken() {
+    const input = document.getElementById('settingsTokenInput');
+    const err = document.getElementById('settingsTokenError');
+    const btn = document.getElementById('settingsTokenSubmitBtn');
+    const enteredToken = input ? (input.value || '').trim() : '';
+
+    if (!enteredToken) {
+      if (err) err.textContent = 'Введите мастер токен';
+      return;
+    }
+
+    if (btn) btn.disabled = true;
+    if (err) err.textContent = 'Проверка токена...';
+    const ok = await verifyAdminToken(enteredToken);
+    if (btn) btn.disabled = false;
+
+    if (!ok) {
+      if (err) err.textContent = 'Неверный мастер токен';
+      return;
+    }
+
+    settingsAdminToken = enteredToken;
+    closeSettingsTokenModal();
+    const main = document.getElementById('mainPage');
+    const settings = document.getElementById('settingsPage');
+    if (main) main.style.display = 'none';
+    if (settings) settings.style.display = 'block';
+    loadMqtt();
+    loadTimezone();
+  }
+
+  function closeSettingsPage() {
+    const main = document.getElementById('mainPage');
+    const settings = document.getElementById('settingsPage');
+    settingsAdminToken = '';
+    settingsSessionId = '';
+    if (settings) settings.style.display = 'none';
+    if (main) main.style.display = 'block';
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    const tokenInput = document.getElementById('settingsTokenInput');
+    if (tokenInput) {
+      tokenInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          submitSettingsToken();
+        }
+      });
+    }
+  });
 
   function applyControlMode(mode) {
     currentControlMode = (mode === 'manual') ? 'manual' : 'auto';
@@ -1028,9 +1243,7 @@
   }
 
   function getControlToken() {
-    var tokenEl = document.getElementById('token');
-    if (!tokenEl) return '';
-    return (tokenEl.value || '').trim();
+    return '';
   }
   function escapeHtml(s) {
     return s == null ? '' : String(s);
@@ -1041,12 +1254,20 @@
       const mode = modeRaw.toLowerCase() === 'manual' ? 'manual' : 'auto';
       applyControlMode(mode);
 
-      let s = 'IP:' + escapeHtml(j.ip || '') + '<br>MAC:' + escapeHtml(j.mac || '') + '<br>Uptime:' + (j.uptime || 0) + 's';
+      // Update info fields in-place (no innerHTML rebuild)
+      var infoIP = document.getElementById('infoIP');
+      var infoMAC = document.getElementById('infoMAC');
+      var infoUptime = document.getElementById('infoUptime');
+      var infoMqtt = document.getElementById('infoMqtt');
+      var infoWifi = document.getElementById('infoWifi');
+      if (infoIP) infoIP.textContent = 'IP:' + (j.ip || '');
+      if (infoMAC) infoMAC.textContent = 'MAC:' + (j.mac || '');
+      if (infoUptime) infoUptime.textContent = 'Uptime:' + (j.uptime || 0) + 's';
       // MQTT status
       if (j.mqtt) {
-        let ms = 'MQTT: ' + (j.mqtt.enabled ? 'enabled' : 'disabled') + ' - ' + (j.mqtt.connected ? 'connected' : 'offline');
-        if (j.mqtt.broker) ms += ' @ ' + escapeHtml(j.mqtt.broker);
-        s += '<br><b>' + ms + '</b>';
+        var ms = 'MQTT: ' + (j.mqtt.enabled ? 'enabled' : 'disabled') + ' - ' + (j.mqtt.connected ? 'connected' : 'offline');
+        if (j.mqtt.broker) ms += ' @ ' + (j.mqtt.broker);
+        if (infoMqtt) infoMqtt.textContent = ms;
         
         // Update MQTT indicator
         const mqttIndicatorEl = document.getElementById('mqttIndicator');
@@ -1062,10 +1283,10 @@
       }
 
       if (j.wifi) {
-        let ws = 'disconnected';
+        var ws = 'disconnected';
         if (j.wifi.connected) ws = 'STA connected';
         else if (j.wifi.ap_active) ws = 'AP mode';
-        s += '<br><b>Wi-Fi: ' + ws + '</b>';
+        if (infoWifi) infoWifi.textContent = 'Wi-Fi: ' + ws;
       }
       
       // Update Wi-Fi indicator
@@ -1081,29 +1302,51 @@
           wifiIndicatorEl.innerHTML = '<span class="status-dot sd-missing"></span>disconnected';
         }
       }
-      
-      document.getElementById('info').innerHTML = s;
 
-      // Relay controls: colored buttons instead of text status
-      let controls = '';
+      // Relay controls: update existing buttons in-place to avoid scroll jump
+      const controlsEl = document.getElementById('controls');
       if (j.relays) {
         const interactive = mode === 'manual';
-        for (let name in j.relays) {
-          if (!Object.prototype.hasOwnProperty.call(j.relays, name)) continue;
+        const relayNames = Object.keys(j.relays).filter(function(k){ return Object.prototype.hasOwnProperty.call(j.relays, k); });
+        // Build set of expected button ids
+        const expectedIds = relayNames.map(function(n){ return 'relay-btn-' + n; });
+        // Remove buttons that no longer exist
+        const existing = controlsEl.querySelectorAll('.relay-btn[data-relay]');
+        existing.forEach(function(btn){
+          if (expectedIds.indexOf(btn.id) === -1) btn.remove();
+        });
+        // Remove emergency button if no longer needed
+        const oldEmBtn = controlsEl.querySelector('.btn-danger');
+        if (oldEmBtn && !(j.emergency && j.emergency.active)) oldEmBtn.remove();
+
+        relayNames.forEach(function(name){
           const isOn = !!j.relays[name];
-          const stateClass = (isOn ? 'relay-on' : 'relay-off') + (interactive ? '' : ' relay-disabled');
-          const stateLabel = isOn ? 'ВКЛ' : 'ВЫКЛ';
-          controls += '<button class="relay-btn ' + stateClass + '" ' + (interactive ? '' : 'disabled ') + 'onclick="control(\'' + name + '\',\'toggle\')">'
-                    + escapeHtml(name) + ' '
-                    + '<span class="relay-state-label">' + stateLabel + '</span>'
-                    + '</button>';
-        }
+          const btnId = 'relay-btn-' + name;
+          let btn = document.getElementById(btnId);
+          if (!btn) {
+            btn = document.createElement('button');
+            btn.id = btnId;
+            btn.setAttribute('data-relay', name);
+            btn.className = 'relay-btn';
+            btn.onclick = function(e){ e.preventDefault(); control(name, 'toggle'); };
+            btn.innerHTML = escapeHtml(name) + ' <span class="relay-state-label"></span>';
+            controlsEl.appendChild(btn);
+          }
+          btn.className = 'relay-btn ' + (isOn ? 'relay-on' : 'relay-off') + (interactive ? '' : ' relay-disabled');
+          btn.disabled = !interactive;
+          btn.querySelector('.relay-state-label').textContent = isOn ? 'ВКЛ' : 'ВЫКЛ';
+        });
       }
       // Add reset emergency button if there's an active emergency
       if (j.emergency && j.emergency.active) {
-        controls += '<button class="btn-danger" onclick="resetEmergency()">Сброс аварии</button>';
+        if (!controlsEl.querySelector('.btn-danger')) {
+          const emBtn = document.createElement('button');
+          emBtn.className = 'btn-danger';
+          emBtn.onclick = function(e){ e.preventDefault(); resetEmergency(); };
+          emBtn.textContent = 'Сброс аварии';
+          controlsEl.appendChild(emBtn);
+        }
       }
-      document.getElementById('controls').innerHTML = controls;
       // Emergency indicator
       const em = j.emergency;
       const emEl = document.getElementById('emergencyBanner');
@@ -1386,10 +1629,17 @@
   }
 
   function saveWifi(){
+    if (!settingsSessionId) {
+      setUiMessage('Сначала откройте Settings и введите мастер токен');
+      return;
+    }
     const payload = { ssid: document.getElementById('ssid').value,
-                      pass: document.getElementById('pass').value,
-                      token: document.getElementById('token').value };
-    fetch('/api/wifi', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)})
+                      pass: document.getElementById('pass').value };
+    fetch('/api/wifi', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Settings-Session': settingsSessionId},
+      body: JSON.stringify(payload)
+    })
       .then(r=>r.json())
       .then(j=>{
         const msg = document.getElementById('msg');
@@ -1412,12 +1662,17 @@
       document.getElementById('mqtt_interval').value = j.interval || '';
       document.getElementById('mqtt_secure').checked = !!j.secure;
       document.getElementById('mqtt_tls_port').value = j.tls_port || '';
+      document.getElementById('mqtt_insecure').checked = !!j.insecure;
       document.getElementById('mqtt_will').checked = !!j.will;
       document.getElementById('mqtt_enabled').checked = !!j.enabled;
     } catch(e) { console.warn('loadMqtt error', e); }
   }
 
   function saveMqtt(){
+    if (!settingsSessionId) {
+      setUiMessage('Сначала откройте Settings и введите мастер токен');
+      return;
+    }
     const payload = {
       enabled: document.getElementById('mqtt_enabled').checked,
       broker: document.getElementById('mqtt_broker').value,
@@ -1429,10 +1684,15 @@
       interval: parseInt(document.getElementById('mqtt_interval').value) || 10,
       secure: document.getElementById('mqtt_secure').checked,
       tls_port: parseInt(document.getElementById('mqtt_tls_port').value) || 8883,
+      insecure: document.getElementById('mqtt_insecure').checked,
       will: document.getElementById('mqtt_will').checked
     // no admin token field anymore
     };
-    fetch('/api/mqtt', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)})
+    fetch('/api/mqtt', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Settings-Session': settingsSessionId},
+      body: JSON.stringify(payload)
+    })
       .then(r=>r.json())
       .then(j=>{
         const msg = document.getElementById('mqttMsg'); msg.innerText = JSON.stringify(j); setTimeout(()=>{ msg.innerText=''; }, 3000);
@@ -1445,7 +1705,6 @@
     const m = document.getElementById('msg');
     const current = (document.getElementById('admin_current').value || '').trim();
     const newToken = (document.getElementById('admin_new').value || '').trim();
-    if (!current) { if (m) { m.innerText = 'Current token required'; setTimeout(()=>{ m.innerText=''; }, 3000); } return; }
     // длина проверяется на сервере, здесь лишь алфавитно-цифровые символы
     const re = /^[A-Za-z0-9]+$/;
     if (!re.test(newToken)) { if (m) { m.innerText = 'Новый токен должен содержать только буквы и цифры'; setTimeout(()=>{ m.innerText=''; }, 3000); } return; }
@@ -1464,6 +1723,7 @@
       }
       if (j.ok) {
         if (m) m.innerText = 'Admin token updated';
+        settingsAdminToken = newToken;
       } else {
         if (m) m.innerText = 'Error: ' + (j.error || text || JSON.stringify(j));
       }
@@ -1482,7 +1742,8 @@
 
   // Load MQTT settings on page load
   // If WebSocket is not available/open, start polling fallback so UI stays in sync.
-if (!(wsClient && wsClient.readyState === WebSocket.OPEN)) { fetchStatus(); loadMqtt(); loadTimezone(); } else { loadMqtt(); loadTimezone(); }
+  // Settings data is loaded only after successful admin token check in openSettingsPage().
+  if (!(wsClient && wsClient.readyState === WebSocket.OPEN)) { fetchStatus(); }
 
   // Download readable logs and trigger file save
   async function downloadLogs(){
@@ -1567,10 +1828,17 @@ if (!(wsClient && wsClient.readyState === WebSocket.OPEN)) { fetchStatus(); load
   }
 
   async function clearLogs(){
-    const token = prompt('Admin token:'); if (!token) return;
+    if (!settingsSessionId) {
+      setUiMessage('Сначала откройте Settings и введите мастер токен');
+      return;
+    }
     if (!confirm('Clear all logs? This cannot be undone.')) return;
     try {
-      const resp = await fetch('/api/logs', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({token: token, action: 'clear'}) });
+      const resp = await fetch('/api/logs', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json', 'X-Settings-Session': settingsSessionId},
+        body: JSON.stringify({action: 'clear'})
+      });
       const j = await resp.json();
       const lm = document.getElementById('logMsg'); lm.innerText = JSON.stringify(j); setTimeout(()=>{ lm.innerText=''; }, 3000);
     } catch(e) { console.warn('clearLogs error', e); }
@@ -1604,8 +1872,10 @@ if (!(wsClient && wsClient.readyState === WebSocket.OPEN)) { fetchStatus(); load
   }
 
   function saveTimezone(){
-    const token = prompt('Admin token:'); 
-    if (!token) return;
+    if (!settingsSessionId) {
+      setUiMessage('Сначала откройте Settings и введите мастер токен');
+      return;
+    }
     const tz = parseInt(document.getElementById('timezone').value) || 0;
     if (tz < -12 || tz > 12) { 
       const msg = document.getElementById('msg');
@@ -1613,8 +1883,12 @@ if (!(wsClient && wsClient.readyState === WebSocket.OPEN)) { fetchStatus(); load
       setTimeout(()=>{ msg.innerText=''; }, 3000);
       return; 
     }
-    const payload = { timezone: tz, token: token };
-    fetch('/api/timezone', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)})
+    const payload = { timezone: tz };
+    fetch('/api/timezone', {
+      method:'POST',
+      headers:{'Content-Type':'application/json', 'X-Settings-Session': settingsSessionId},
+      body: JSON.stringify(payload)
+    })
       .then(r=>r.json())
       .then(j=>{
         const msg = document.getElementById('msg');

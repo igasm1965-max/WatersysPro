@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WaterSysPro — Презентация проекта</title>
+  <style>
+    :root {
+      --bg: #f4f7f9;
+      --paper: #ffffff;
+      --ink: #13212a;
+      --muted: #4b6573;
+      --brand: #0d7f75;
+      --line: #d7e1e6;
+      --ok: #1d8b4d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(1000px 400px at 5% -10%, #d9f5e8 0%, transparent 55%),
+        radial-gradient(900px 300px at 95% 0%, #dbeeff 0%, transparent 52%),
+        var(--bg);
+      font-family: "Segoe UI", "Noto Sans", Arial, sans-serif;
+      line-height: 1.45;
+    }
+    .layout { display: grid; grid-template-columns: 300px 1fr; min-height: 100vh; }
+    .side {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow: auto;
+      background: linear-gradient(170deg, #12343b 0%, #1f4d5e 100%);
+      color: #eaf4f7;
+      border-right: 1px solid rgba(255,255,255,0.12);
+      padding: 16px 14px;
+    }
+    .logo { font-size: 21px; font-weight: 700; margin: 0 0 6px; }
+    .sub { font-size: 13px; color: #b8d2da; margin-bottom: 10px; }
+    .chip {
+      display: inline-block;
+      font-size: 12px;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.24);
+      border-radius: 999px;
+      padding: 4px 10px;
+      margin-bottom: 10px;
+    }
+    .search {
+      width: 100%;
+      border: 1px solid rgba(255,255,255,0.35);
+      border-radius: 10px;
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+      padding: 10px;
+      outline: none;
+      margin-bottom: 10px;
+    }
+    .search::placeholder { color: #d2e4e9; }
+    .nav { list-style: none; margin: 0; padding: 0; }
+    .nav a {
+      display: block;
+      text-decoration: none;
+      color: #eef7f9;
+      padding: 9px 10px;
+      border-radius: 8px;
+      margin-bottom: 5px;
+      border: 1px solid transparent;
+      font-size: 14px;
+    }
+    .nav a:hover, .nav a.active {
+      background: rgba(255,255,255,0.14);
+      border-color: rgba(255,255,255,0.25);
+    }
+    .main { padding: 24px; }
+    .hero {
+      background: linear-gradient(145deg, #0f756f 0%, #255775 58%, #2a3d5e 100%);
+      color: #fff;
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 14px;
+      box-shadow: 0 10px 28px rgba(12, 37, 53, 0.2);
+    }
+    .hero h1 { margin: 0 0 7px; font-size: 30px; }
+    .hero p { margin: 0; color: #d6ebf4; }
+    .badges { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 8px; }
+    .badges span {
+      border: 1px solid rgba(255,255,255,0.32);
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 12px;
+      background: rgba(255,255,255,0.12);
+    }
+    .section {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      margin-bottom: 12px;
+      overflow: hidden;
+      box-shadow: 0 2px 10px rgba(14, 44, 60, 0.04);
+    }
+    .section h2 {
+      margin: 0;
+      padding: 13px 15px;
+      background: #f7fbfc;
+      border-bottom: 1px solid var(--line);
+      font-size: 20px;
+    }
+    .body { padding: 14px 15px 16px; }
+    .grid { display: grid; gap: 12px; }
+    .two { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 11px;
+      background: #fff;
+    }
+    .card h3 { margin: 0 0 8px; font-size: 16px; }
+    .muted { color: var(--muted); }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { border: 1px solid var(--line); padding: 8px; text-align: left; vertical-align: top; }
+    th { background: #f1f6f8; }
+    details {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 8px 10px;
+      background: #fcfeff;
+      margin-bottom: 10px;
+    }
+    summary { cursor: pointer; font-weight: 600; }
+    .kpi { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-top: 10px; }
+    .kpi .item { border: 1px solid var(--line); border-radius: 10px; background: #fff; padding: 10px; }
+    .kpi .v { font-size: 20px; font-weight: 700; }
+    .ok { color: var(--ok); font-weight: 700; }
+    .foot { text-align: center; color: var(--muted); font-size: 13px; padding: 10px 0 20px; }
+    @media (max-width: 980px) {
+      .layout { grid-template-columns: 1fr; }
+      .side { position: static; height: auto; }
+      .main { padding: 12px; }
+      .hero h1 { font-size: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="side">
+      <div class="logo">WaterSysPro</div>
+      <div class="sub">Интерактивная презентация</div>
+      <div class="chip">Версия: 1.1.0+ / Active</div>
+      <input id="search" class="search" placeholder="Поиск раздела..." />
+      <ul id="nav" class="nav">
+        <li><a href="#overview">1. Обзор проекта</a></li>
+        <li><a href="#stack">2. Архитектура и стек</a></li>
+        <li><a href="#firmware">3. Прошивка и FSM</a></li>
+        <li><a href="#menu">4. Подробно: меню и инженерное меню</a></li>
+        <li><a href="#api">5. Backend, API, Mobile</a></li>
+        <li><a href="#demo">6. Демонстрация</a></li>
+        <li><a href="#risks">7. Риски и hardening</a></li>
+        <li><a href="#docs">8. Документация</a></li>
+      </ul>
+    </aside>
+
+    <main class="main">
+      <section class="hero">
+        <h1>WaterSysPro — система управления водоочисткой</h1>
+        <p>Full-stack решение: ESP32 firmware + Node.js backend + React Native mobile, с поддержкой MQTT, web UI, журналирования и сервисных режимов.</p>
+        <div class="badges">
+          <span>ESP32</span>
+          <span>MQTT + Web UI</span>
+          <span>Node.js + Docker</span>
+          <span>React Native</span>
+        </div>
+      </section>
+
+      <section id="overview" class="section">
+        <h2>1. Обзор проекта</h2>
+        <div class="body">
+          <div class="grid two">
+            <div class="card">
+              <h3>Назначение</h3>
+              <p class="muted">Автоматизация цикла водоочистки с удаленным мониторингом и управлением.</p>
+            </div>
+            <div class="card">
+              <h3>Три уровня системы</h3>
+              <ul>
+                <li>Прошивка ESP32: FSM, реле, датчики, web, MQTT</li>
+                <li>Backend Node.js: REST API, WebSocket, Docker</li>
+                <li>Mobile React Native: login, dashboard, settings</li>
+              </ul>
+            </div>
+          </div>
+          <div class="kpi">
+            <div class="item"><div class="muted">Статус</div><div class="v ok">Active</div></div>
+            <div class="item"><div class="muted">Релизная база</div><div class="v">1.1.0</div></div>
+            <div class="item"><div class="muted">Контур</div><div class="v">ESP32 + Cloud</div></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="stack" class="section">
+        <h2>2. Архитектура и стек</h2>
+        <div class="body">
+          <details open>
+            <summary>Поток данных</summary>
+            <p>ESP32 собирает телеметрию, FSM формирует состояние, данные отдаются через MQTT и web/API, клиенты backend/mobile отображают состояние и отправляют команды.</p>
+          </details>
+          <div class="grid two">
+            <div class="card">
+              <h3>Firmware</h3>
+              <ul>
+                <li>PlatformIO + Arduino</li>
+                <li>Web UI на устройстве</li>
+                <li>MQTT telem + cmd</li>
+                <li>Логирование и сервисные режимы</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h3>Application</h3>
+              <ul>
+                <li>Backend Node.js + WebSocket</li>
+                <li>Docker Compose инфраструктура</li>
+                <li>Mobile React Native + EAS build</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="firmware" class="section">
+        <h2>3. Прошивка и FSM</h2>
+        <div class="body">
+          <div class="card">
+            <h3>Ключевые возможности прошивки</h3>
+            <ul>
+              <li>Управление 7 реле</li>
+              <li>Два ультразвуковых датчика уровня</li>
+              <li>FSM для рабочих циклов водоочистки</li>
+              <li>MQTT и web управление</li>
+              <li>Текстовый журнал событий</li>
+            </ul>
+          </div>
+          <details>
+            <summary>FSM контур</summary>
+            <p>IDLE -> FILLING -> OZONATION -> AERATION -> SETTLING -> FILTRATION -> BACKWASH</p>
+          </details>
+        </div>
+      </section>
+
+      <section id="menu" class="section">
+        <h2>4. Подробно: меню и инженерное меню</h2>
+        <div class="body">
+          <p>Источник: src/menu_data.cpp, include/structures.h, include/engineer_menu.h</p>
+
+          <details open>
+            <summary>Обычное меню (пользовательское)</summary>
+            <table>
+              <thead><tr><th>Группа</th><th>Пункты</th><th>Назначение</th></tr></thead>
+              <tbody>
+                <tr><td>Setting up timers</td><td>Setling Water timer, Aeration timer, Ozonation timer, Backlight timer</td><td>Настройка базовых длительностей и подсветки</td></tr>
+                <tr><td>Cleaning the filter</td><td>Filter wash timer, Wash period</td><td>Параметры промывки фильтра</td></tr>
+                <tr><td>Setting tank level</td><td>Tank 1, Tank 2</td><td>Калибровка/пороги уровней баков</td></tr>
+                <tr><td>Manual operation</td><td>Ручные операции</td><td>Сервисное управление реле и узлами</td></tr>
+                <tr><td>Date & Time</td><td>Set Current Time, Set Current Date, Set Time Zone, View Date/Time</td><td>Системное время и часовой пояс</td></tr>
+                <tr><td>System Logging</td><td>Event Logs, Clear Event Logs, Prune Event Logs, Format SD Card</td><td>Журналы и обслуживание хранилища</td></tr>
+                <tr><td>Schedule Settings</td><td>Set Start Time, Set End Time, Enable/Disable</td><td>Работа по расписанию</td></tr>
+                <tr><td>Night Mode</td><td>Set Start Time, Set End Time, Enable/Disable</td><td>Ночной режим ограничений</td></tr>
+                <tr><td>Reset Settings / EXIT</td><td>Reset Settings, Engineer Menu, EXIT</td><td>Сброс и переходы</td></tr>
+              </tbody>
+            </table>
+          </details>
+
+          <details>
+            <summary>Инженерное меню (с защитой паролем)</summary>
+            <table>
+              <thead><tr><th>Подраздел</th><th>Пункты</th><th>Практическое применение</th></tr></thead>
+              <tbody>
+                <tr><td>Safety Timeouts</td><td>Timeout Filling, Ozonation, Aeration, Settling, Filtration, Backwash</td><td>Ограничение длительностей фаз, защита от зависаний</td></tr>
+                <tr><td>Pump Protection</td><td>Pump Dry Timeout, Pump Min Delta, Pump Dry Consec.</td><td>Защита от сухого хода и нештатной работы насосов</td></tr>
+                <tr><td>Watchdog Settings</td><td>Enable/Disable, Timeout (sec)</td><td>Контроль живости цикла и авто-восстановление</td></tr>
+                <tr><td>Access Control</td><td>Change Password</td><td>Разграничение сервисного доступа</td></tr>
+                <tr><td>System Diagnostics</td><td>System Info, Network Info</td><td>Оперативная диагностика и проверка сетевого статуса</td></tr>
+                <tr><td>Connectivity Setup</td><td>Wi-Fi Setup, MQTT Setup</td><td>Настройка каналов связи и телеметрии</td></tr>
+                <tr><td>Log Filter</td><td>Event Log Settings</td><td>Тонкая настройка состава логируемых событий</td></tr>
+                <tr><td>Recovery</td><td>Factory Reset (!)</td><td>Возврат к заводскому состоянию</td></tr>
+              </tbody>
+            </table>
+          </details>
+
+          <details>
+            <summary>Критичный сценарий эксплуатации меню</summary>
+            <ol>
+              <li>Ввод базовых таймеров и уровней баков в обычном меню.</li>
+              <li>Переход в Engineer Menu и настройка safety timeouts.</li>
+              <li>Проверка Pump Protection на тестовом запуске без нагрузки.</li>
+              <li>Настройка Wi-Fi/MQTT, затем Log Filter под нужный объем телеметрии.</li>
+              <li>Фиксация конфигурации и контрольный прогон FSM.</li>
+            </ol>
+          </details>
+        </div>
+      </section>
+
+      <section id="api" class="section">
+        <h2>5. Backend, API, Mobile</h2>
+        <div class="body">
+          <div class="grid two">
+            <div class="card">
+              <h3>Backend</h3>
+              <ul>
+                <li>REST API для внешней интеграции</li>
+                <li>WebSocket канал реального времени</li>
+                <li>Docker сценарий локального развертывания</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h3>Mobile</h3>
+              <ul>
+                <li>Экраны Login, Dashboard, Settings</li>
+                <li>API и WebSocket клиенты</li>
+                <li>Android build scripts + EAS cloud build</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="demo" class="section">
+        <h2>6. Демонстрация</h2>
+        <div class="body">
+          <ol>
+            <li>Показ статуса узлов и датчиков в web UI.</li>
+            <li>Переход по пунктам обычного меню и изменение одного таймера.</li>
+            <li>Вход в инженерное меню по паролю и проверка Safety/Watchdog.</li>
+            <li>Проверка MQTT канала и тестовой команды.</li>
+            <li>Отображение состояния в mobile/или backend канале.</li>
+          </ol>
+        </div>
+      </section>
+
+      <section id="risks" class="section">
+        <h2>7. Риски и hardening</h2>
+        <div class="body">
+          <ul>
+            <li>Ревизия секретов и учетных данных перед production.</li>
+            <li>Фиксация стабильной конфигурации timeout и watchdog.</li>
+            <li>Прохождение полного тест-протокола перед вводом в работу.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="docs" class="section">
+        <h2>8. Документация</h2>
+        <div class="body">
+          <p>Рекомендуемые документы в проекте WatersysPro:</p>
+          <ul>
+            <li>README_RU.md</li>
+            <li>DOCUMENTATION_INDEX.md</li>
+            <li>CHANGELOG.md / CHANGELOG_RU.md</li>
+            <li>docs/* по SD, hardening и эксплуатационным сценариям</li>
+          </ul>
+          <p class="muted">Этот HTML можно отправлять по email как один файл и открывать браузером без дополнительных зависимостей.</p>
+        </div>
+      </section>
+
+      <div class="foot">WaterSysPro • Interactive Project Presentation • Self-contained HTML</div>
+    </main>
+  </div>
+
+  <script>
+    const links = Array.from(document.querySelectorAll('#nav a'));
+    const sections = links.map(a => document.querySelector(a.getAttribute('href'))).filter(Boolean);
+
+    function markActive() {
+      const pos = window.scrollY + 120;
+      let current = sections[0];
+      for (const s of sections) if (s.offsetTop <= pos) current = s;
+      links.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + current.id));
+    }
+
+    window.addEventListener('scroll', markActive);
+    markActive();
+
+    const search = document.getElementById('search');
+    search.addEventListener('input', () => {
+      const q = search.value.trim().toLowerCase();
+      links.forEach(a => {
+        a.parentElement.style.display = a.textContent.toLowerCase().includes(q) ? '' : 'none';
+      });
+    });
+  </script>
+</body>
+</html>
