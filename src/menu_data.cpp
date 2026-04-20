@@ -106,6 +106,7 @@ sMenuItem mainMenu[] = {
   { mkPumpDryTimeout, mkSafetyTimeouts, "Pump Dry Timeout", editPumpDryTimeout },
   { mkPumpMinLevelDelta, mkSafetyTimeouts, "Pump Min Delta", editPumpMinLevelDelta },
   { mkPumpDryConsecutiveChecks, mkSafetyTimeouts, "Pump Dry Consec.", editPumpDryConsecutiveChecks },
+  { mkSensorPollPeriod, mkSafetyTimeouts, "Sensor Poll Period", editSensorPollPeriod },
   { mkBack, mkSafetyTimeouts, "Back", NULL },
   
   // Подменю Watchdog

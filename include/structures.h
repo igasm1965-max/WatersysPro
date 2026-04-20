@@ -97,6 +97,7 @@ enum MenuItem {
   mkPumpDryTimeout = 320,
   mkPumpMinLevelDelta = 321,
   mkPumpDryConsecutiveChecks = 322,
+  mkSensorPollPeriod = 323,
   mkWatchdogSettings = 309,
   mkToggleWatchdog = 310,
   mkWatchdogTimeout = 311,
@@ -224,7 +225,7 @@ struct SafetySettings {
   uint8_t pumpDryConsecutiveChecks; ///< Количество подряд неудачных проверок для триггера
 
   // Настройки опроса датчиков (фильтрация удалена — используется только период опроса)
-  uint16_t sensorPollPeriod;      ///< Период опроса датчиков в секундах
+  uint16_t sensorPollPeriod;      ///< Период опроса датчиков в единицах 0.1 сек (1..20)
   
   // Настройки часового пояса
   int8_t timeZoneOffset;          ///< Смещение часового пояса в часах от UTC (-12 до +14)

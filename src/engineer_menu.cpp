@@ -343,6 +343,16 @@ void editPumpDryConsecutiveChecks() {
   saveSafetySettings();
 }
 
+void editSensorPollPeriod() {
+  // Stored in 0.1s units: 1..20 => 0.1..2.0s
+  uint16_t temp = safetySettings.sensorPollPeriod;
+  if (temp < 1) temp = 1;
+  if (temp > 20) temp = 20;
+  editValue("Sensor Poll x0.1s", &temp, 1, 20, 1, "");
+  safetySettings.sensorPollPeriod = temp;
+  saveSafetySettings();
+}
+
 
 // ============ WATCHDOG НАСТРОЙКИ ============
 
@@ -1390,8 +1400,14 @@ void loadSafetySettings() {
   safetySettings.pumpMinLevelDeltaCm = preferences.getUChar("sf_pump_delta", DEFAULT_PUMP_MIN_LEVEL_DELTA_CM);
   safetySettings.pumpDryConsecutiveChecks = preferences.getUChar("sf_pump_cons", DEFAULT_PUMP_DRY_CONSECUTIVE_CHECKS);
 
-  // Sensor filter settings
-  safetySettings.sensorPollPeriod = preferences.getUShort("sf_sen_poll", DEFAULT_SENSOR_POLL_PERIOD);
+  // Sensor poll period (0.1s units). Migrate legacy seconds values (1..10) to deciseconds.
+  uint16_t pollRaw = preferences.getUShort("sf_sen_poll", DEFAULT_SENSOR_POLL_PERIOD);
+  if (pollRaw >= 1 && pollRaw <= 10) {
+    pollRaw = (uint16_t)(pollRaw * 10U);
+  }
+  if (pollRaw < 1) pollRaw = 1;
+  if (pollRaw > 20) pollRaw = 20;
+  safetySettings.sensorPollPeriod = pollRaw;
   
   // Time zone offset
   safetySettings.timeZoneOffset = preferences.getChar("sf_tz", 0);  // Default: UTC

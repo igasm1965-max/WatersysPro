@@ -59,6 +59,9 @@ void editPumpMinLevelDelta();
 /// Редактирует количество подряд неудачных проверок для сухого хода
 void editPumpDryConsecutiveChecks();
 
+/// Редактирует период опроса датчиков (0.1..2.0 сек)
+void editSensorPollPeriod();
+
 
 /// Показывает меню настроек Watchdog
 void showWatchdogMenu();

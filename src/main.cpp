@@ -560,9 +560,9 @@ void loopESP32() {
 
     loopStartTime = millis();
 
-    // Чтение датчиков по настраиваемому периоду
-    unsigned long pollMs = (unsigned long)safetySettings.sensorPollPeriod * 1000UL;
-    if (pollMs < 250) pollMs = 250;  // нижняя граница
+    // Чтение датчиков по настраиваемому периоду (0.1s units: 1..20 -> 100..2000 ms)
+    unsigned long pollMs = (unsigned long)safetySettings.sensorPollPeriod * 100UL;
+    if (pollMs < 100) pollMs = 100;  // нижняя граница
     if (isTimeElapsed(sensorPollTimerLast, pollMs)) {
         readUltrasonicSensors();
         checkTankEmptyStatus();

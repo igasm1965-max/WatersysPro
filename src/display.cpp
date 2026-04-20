@@ -149,6 +149,8 @@ void displayDynamicData() {
   lcd.print("Aeration  Ozon   Lv1");
 
   lcd.setCursor(0, 1);
+  lcd.print("                    ");
+  lcd.setCursor(0, 1);
   if (systemContext.currentState == STATE_AERATION) {
     uint8_t h, m, s;
     secondsToHMS(currentAerationRemaining, h, m, s);
@@ -186,6 +188,8 @@ void displayDynamicData() {
   } else
     lcd.print("Setling  PNAOFC  Lv2");
 
+  lcd.setCursor(0, 3);
+  lcd.print("                    ");
   lcd.setCursor(0, 3);
   if (systemContext.currentState == STATE_SETTLING) {
     uint8_t h, m, s;
@@ -675,6 +679,10 @@ void displayEmergencyScreen() {
     char emBuf[21];
     strncpy(emBuf, emergencyMessage, 20);
     emBuf[20] = '\0';
+    // Полностью очищаем строку перед выводом, чтобы не оставались хвосты
+    // от предыдущих более длинных аварийных сообщений.
+    lcd.print("                    ");
+    lcd.setCursor(0, 1);
     lcd.print(emBuf);
 
     lcd.setCursor(0, 2);

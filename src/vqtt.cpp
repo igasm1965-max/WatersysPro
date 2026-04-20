@@ -254,6 +254,7 @@ static void connectToBroker() {
   }
 
   bool useTLS = preferences.getBool(PREF_KEY_MQTT_SECURE, DEFAULT_MQTT_SECURE);
+  bool useInsecureTLS = preferences.getBool(PREF_KEY_MQTT_INSECURE, DEFAULT_MQTT_INSECURE);
   uint32_t port = useTLS ? preferences.getUInt(PREF_KEY_MQTT_TLS_PORT, DEFAULT_MQTT_TLS_PORT)
                          : preferences.getUInt(PREF_KEY_MQTT_PORT, DEFAULT_MQTT_PORT);
 
@@ -304,13 +305,20 @@ static void connectToBroker() {
       "iVMSBwfUVkp3JNXWU+7yHMe7VPxzNFBO+kkNqCxL1lSpxpFl0YEBk4Ymam0K9vS\n"
       "Sc8OuKEaBO2i0SQja7bDPf7OQKL12yTwSGjUKRF8vbMS5h3jXJ47/4Ss5Tk=\n"
       "-----END CERTIFICATE-----\n";
-    wifiClientSecure.setCACert(MQTT_CA_CERT);
-    wifiClientSecure.setTimeout(5); // TLS handshake timeout: 5 секунд (вместо дефолтных 30)
+    if (useInsecureTLS) {
+      Serial.println("[VQTT] WARNING: TLS certificate verification is DISABLED (mqtt_insec=1)");
+      wifiClientSecure.setInsecure();
+    } else {
+      wifiClientSecure.setCACert(MQTT_CA_CERT);
+    }
+    // 5s is too aggressive for some routers/links and can abort TLS handshake mid-flight.
+    wifiClientSecure.setTimeout(20);
     mqttClientSecure.setServer(broker.c_str(), port);
     mqttClientSecure.setCallback(onMqttMessage);
     activeMqtt = &mqttClientSecure;
   } else {
-    wifiClient.setTimeout(5); // TCP connect timeout: 5 секунд
+    // Keep plain TCP timeout aligned with TLS path to avoid premature socket close.
+    wifiClient.setTimeout(20);
     mqttClient.setServer(broker.c_str(), port);
     mqttClient.setCallback(onMqttMessage);
     activeMqtt = &mqttClient;
@@ -318,6 +326,10 @@ static void connectToBroker() {
 
   // Attempt connect
   Serial.printf("[VQTT] Connecting to %s:%u (TLS=%s)...\n", broker.c_str(), (unsigned int)port, useTLS ? "ON" : "OFF");
+
+  // Ensure no stale TCP/TLS socket state is reused across reconnect attempts.
+  wifiClient.stop();
+  wifiClientSecure.stop();
   
   const String user = safeGetPref(PREF_KEY_MQTT_USER, DEFAULT_MQTT_USER);
   const String pass = safeGetPref(PREF_KEY_MQTT_PASS, DEFAULT_MQTT_PASS);
@@ -326,11 +338,26 @@ static void connectToBroker() {
   esp_task_wdt_delete(NULL);
   
   bool connectOk = false;
-  if (user.length() > 0) {
-    Serial.printf("[VQTT] Using credentials: user=%s\n", user.c_str());
-    connectOk = activeMqtt->connect(mqttClientId.c_str(), user.c_str(), pass.c_str());
-  } else {
-    connectOk = activeMqtt->connect(mqttClientId.c_str());
+  auto tryConnect = [&](void) -> bool {
+    if (user.length() > 0) {
+      Serial.printf("[VQTT] Using credentials: user=%s\n", user.c_str());
+      return activeMqtt->connect(mqttClientId.c_str(), user.c_str(), pass.c_str());
+    }
+    return activeMqtt->connect(mqttClientId.c_str());
+  };
+
+  connectOk = tryConnect();
+
+  // If CA parsing fails, fallback to insecure TLS for this runtime.
+  if (!connectOk && useTLS && !useInsecureTLS) {
+    char tlsErr[128] = {0};
+    int tlsCode = wifiClientSecure.lastError(tlsErr, sizeof(tlsErr));
+    if (tlsCode == -8576) {
+      Serial.println("[VQTT] CA parse failed, retrying with insecure TLS for current session");
+      wifiClientSecure.stop();
+      wifiClientSecure.setInsecure();
+      connectOk = tryConnect();
+    }
   }
   
   // Возвращаем задачу под контроль WDT
@@ -357,6 +384,11 @@ static void connectToBroker() {
     vqtt_publishState();
   } else {
     Serial.printf("[VQTT] Connection FAILED (state=%d)\n", activeMqtt->state());
+    if (useTLS) {
+      char tlsErr[128] = {0};
+      int tlsCode = wifiClientSecure.lastError(tlsErr, sizeof(tlsErr));
+      Serial.printf("[VQTT] TLS lastError=%d (%s)\n", tlsCode, tlsErr[0] ? tlsErr : "n/a");
+    }
     mqttConnected = false;
   }
 }
@@ -387,6 +419,7 @@ void initVQTT() {
   if (!preferences.isKey(PREF_KEY_MQTT_TOPIC_BASE)) preferences.putString(PREF_KEY_MQTT_TOPIC_BASE, DEFAULT_MQTT_TOPIC_BASE);
   if (!preferences.isKey(PREF_KEY_MQTT_SECURE)) preferences.putBool(PREF_KEY_MQTT_SECURE, DEFAULT_MQTT_SECURE);
   if (!preferences.isKey(PREF_KEY_MQTT_TLS_PORT)) preferences.putUInt(PREF_KEY_MQTT_TLS_PORT, DEFAULT_MQTT_TLS_PORT);
+  if (!preferences.isKey(PREF_KEY_MQTT_INSECURE)) preferences.putBool(PREF_KEY_MQTT_INSECURE, DEFAULT_MQTT_INSECURE);
 
   // Load Client ID
   String customClientId = safeGetPref(PREF_KEY_MQTT_CLIENT_ID, "");
@@ -441,9 +474,6 @@ void loopVQTT() {
   
   if (!wifiConnected) return;
 
-  // Process any pending MQTT messages
-  activeMqtt->loop();
-
   // Reconnect if needed
   if (!activeMqtt->connected()) {
     unsigned long now = millis();
@@ -460,6 +490,9 @@ void loopVQTT() {
     }
     return;
   }
+
+  // Process pending MQTT messages only when connected.
+  activeMqtt->loop();
 
   // Reset backoff on successful connection
   if (reconnectIntervalMs > 5000) {

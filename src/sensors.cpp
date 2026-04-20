@@ -84,47 +84,15 @@ void readUltrasonicSensors() {
     extern int tank1Level, tank2Level;
     extern int tank1RawDistance, tank2RawDistance;
 
-    // Счётчики последовательных ошибок чтения (raw==0 = нет эхо)
-    static uint8_t s1ZeroCount = 0;
-    static uint8_t s2ZeroCount = 0;
-    // Максимум подряд нулевых чтений, после которых считаем датчик реально отключённым
-    static const uint8_t MAX_ZERO_READS = 5;
-
     // Читаем сырые значения (0 == нет эхо/вне диапазона)
     int raw1 = readFilteredSensor1();
     int raw2 = readFilteredSensor2();
     tank1RawDistance = raw1;
     tank2RawDistance = raw2;
 
-    // Датчик 1: при raw==0 сохраняем предыдущее значение (до MAX_ZERO_READS подряд)
-    if (raw1 == 0) {
-        s1ZeroCount++;
-        if (s1ZeroCount >= MAX_ZERO_READS) {
-            // Датчик реально не отвечает — ставим 0 (аварийное значение)
-            tank1Level = 0;
-            if (s1ZeroCount == MAX_ZERO_READS) {
-                Serial.println("[SENSOR] Sensor1 offline: no echo for 5 consecutive reads");
-            }
-        }
-        // Иначе tank1Level остаётся прежним (предыдущее валидное значение)
-    } else {
-        s1ZeroCount = 0;
-        tank1Level = raw1;
-    }
-
-    // Датчик 2: аналогичная логика
-    if (raw2 == 0) {
-        s2ZeroCount++;
-        if (s2ZeroCount >= MAX_ZERO_READS) {
-            tank2Level = 0;
-            if (s2ZeroCount == MAX_ZERO_READS) {
-                Serial.println("[SENSOR] Sensor2 offline: no echo for 5 consecutive reads");
-            }
-        }
-    } else {
-        s2ZeroCount = 0;
-        tank2Level = raw2;
-    }
+    // Защита от ложных нулей отключена: применяем сырое значение сразу.
+    tank1Level = raw1;
+    tank2Level = raw2;
 
     Serial.printf("[SENSOR] raw1=%d raw2=%d -> tank1=%d tank2=%d\n", tank1RawDistance,
                   tank2RawDistance, tank1Level, tank2Level);

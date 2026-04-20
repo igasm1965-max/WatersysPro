@@ -46,7 +46,7 @@ using SafeLCD = LiquidCrystal_I2C;
 #define DEFAULT_PUMP_DRY_CONSECUTIVE_CHECKS 3 ///< Number of consecutive failing checks before triggering dry-run
 
 // Default sensor polling (filtering removed — kept for compatibility)
-#define DEFAULT_SENSOR_POLL_PERIOD 2           ///< Default sensor poll period (seconds)
+#define DEFAULT_SENSOR_POLL_PERIOD 20          ///< Default sensor poll period (0.1s units); 20 = 2.0s
 // ============ КОДЫ СОБЫТИЙ ============
 /// Событие: начало промывки фильтра
 #define EVENT_FILTER_WASH_START 1

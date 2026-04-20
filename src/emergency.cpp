@@ -177,8 +177,12 @@ void exitEmergencyMode() {
   turnOffAllRelays();
   // Ensure the emergency screen will be reinitialized next time it appears
   flags.emergencyScreenInitialized = 0;
+  // После аварийного экрана принудительно переинициализируем главный экран,
+  // чтобы стереть возможные артефакты от аварийных строк.
+  flags.displayInitialized = 0;
   // Reset global blink state for predictable behavior
   flags.blinkState = 1;
+  forceRedisplay();
 }
 
 /// Проверяет возможность выхода из аварии (при длительном нажатии кнопки)

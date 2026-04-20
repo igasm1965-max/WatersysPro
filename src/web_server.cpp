@@ -25,6 +25,7 @@ static String safeGetPref(const char *key, const String &def = "") {
 #include <ArduinoJson.h>
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
+#include <esp_system.h>
 // removed SPIFFS-specific code
 #include <SD.h>
 #include <freertos/FreeRTOS.h>
@@ -78,6 +79,57 @@ static bool isStaReallyConnected() {
   IPAddress staIp = WiFi.localIP();
   if ((uint32_t)staIp == 0) return false;
   return true;
+}
+
+static bool isClientOnSoftApSubnet(const IPAddress& remoteIp) {
+  IPAddress apIp = WiFi.softAPIP();
+  if ((uint32_t)apIp == 0) return false;
+  return (remoteIp[0] == apIp[0] && remoteIp[1] == apIp[1] && remoteIp[2] == apIp[2]);
+}
+
+static bool isWifiRecoveryMode() {
+  wifi_mode_t mode = WiFi.getMode();
+  bool apActive = (mode == WIFI_MODE_AP || mode == WIFI_MODE_APSTA);
+  return apActive && !isStaReallyConnected();
+}
+
+static String settingsSessionId = "";
+static IPAddress settingsSessionIp(0, 0, 0, 0);
+static unsigned long settingsSessionExpiryMs = 0;
+static const unsigned long SETTINGS_SESSION_TTL_MS = 30UL * 60UL * 1000UL;
+
+static String createSettingsSession(const IPAddress& ip) {
+  char sid[17];
+  uint32_t a = esp_random();
+  uint32_t b = esp_random();
+  snprintf(sid, sizeof(sid), "%08lx%08lx", (unsigned long)a, (unsigned long)b);
+  settingsSessionId = String(sid);
+  settingsSessionIp = ip;
+  settingsSessionExpiryMs = millis() + SETTINGS_SESSION_TTL_MS;
+  return settingsSessionId;
+}
+
+static bool hasValidSettingsSession(AsyncWebServerRequest* request) {
+  if (settingsSessionId.length() == 0) return false;
+  if ((long)(millis() - settingsSessionExpiryMs) > 0) return false;
+  if (!request->hasHeader("X-Settings-Session")) return false;
+  String provided = request->getHeader("X-Settings-Session")->value();
+  if (provided.length() == 0 || provided != settingsSessionId) return false;
+  IPAddress clientIp = request->client()->remoteIP();
+  if (clientIp != settingsSessionIp) return false;
+  settingsSessionExpiryMs = millis() + SETTINGS_SESSION_TTL_MS;
+  return true;
+}
+
+static bool isValidAdminTokenValue(const String& tokenValue) {
+  String storedToken = safeGetPref(PREF_KEY_ADMIN_TOKEN, "");
+  if (storedToken.length() == 0) return false;
+  return tokenValue.length() > 0 && tokenValue == storedToken;
+}
+
+static bool isAuthorizedSettingsRequest(AsyncWebServerRequest* request, const char* providedToken) {
+  if (hasValidSettingsSession(request)) return true;
+  return isValidAdminTokenValue(String(providedToken ? providedToken : ""));
 }
 
 static void broadcastStatus() {
@@ -816,18 +868,24 @@ void onWsEvent(AsyncWebSocket* serverWS, AsyncWebSocketClient* client, AwsEventT
         const char* ssid = doc["ssid"];
         const char* pass = doc["pass"];
         const char* token = doc["token"];
+        IPAddress clientIP = client->remoteIP();
         if (!ssid) {
           client->text("{\"responseTo\":\"wifi\",\"ok\":false,\"message\":\"no ssid\"}");
           return;
         }
-        String storedToken = safeGetPref(PREF_KEY_ADMIN_TOKEN, "");
-        if (storedToken.length() == 0) {
-          client->text("{\"responseTo\":\"wifi\",\"ok\":false,\"message\":\"no admin token set\"}");
-          return;
-        }
-        if (!token || String(token) != storedToken) {
-          client->text("{\"responseTo\":\"wifi\",\"ok\":false,\"message\":\"invalid token\"}");
-          return;
+        bool allowRecoveryWrite = isWifiRecoveryMode() && isClientOnSoftApSubnet(clientIP);
+        if (!allowRecoveryWrite) {
+          String storedToken = safeGetPref(PREF_KEY_ADMIN_TOKEN, "");
+          if (storedToken.length() == 0) {
+            client->text("{\"responseTo\":\"wifi\",\"ok\":false,\"message\":\"no admin token set\"}");
+            return;
+          }
+          if (!token || String(token) != storedToken) {
+            client->text("{\"responseTo\":\"wifi\",\"ok\":false,\"message\":\"invalid token\"}");
+            return;
+          }
+        } else {
+          Serial.printf("[Web] WS wifi recovery write from %s (token bypass in AP mode)\n", clientIP.toString().c_str());
         }
         wifi_setCredentials(String(ssid), String(pass ? pass : ""));
         client->text("{\"responseTo\":\"wifi\",\"ok\":true,\"queued\":true}");
@@ -870,16 +928,24 @@ static void handlePostWifiBody(AsyncWebServerRequest* request, uint8_t* data, si
     request->send(400, "application/json", "{\"error\":\"no ssid\"}");
     return;
   }
-  String storedToken = safeGetPref(PREF_KEY_ADMIN_TOKEN, "");
-  if (storedToken.length() == 0) {
-    Serial.println("[Web] /api/wifi no admin token set");
-    request->send(403, "application/json", "{\"error\":\"no admin token set\"}");
-    return;
-  }
-  if (!token || String(token) != storedToken) {
-    Serial.println("[Web] /api/wifi invalid token");
-    request->send(403, "application/json", "{\"error\":\"invalid token\"}");
-    return;
+  bool allowRecoveryWrite = isWifiRecoveryMode() && isClientOnSoftApSubnet(clientIP);
+  bool sessionOk = hasValidSettingsSession(request);
+  if (!allowRecoveryWrite && !sessionOk) {
+    String storedToken = safeGetPref(PREF_KEY_ADMIN_TOKEN, "");
+    if (storedToken.length() == 0) {
+      Serial.println("[Web] /api/wifi no admin token set");
+      request->send(403, "application/json", "{\"error\":\"no admin token set\"}");
+      return;
+    }
+    if (!token || String(token) != storedToken) {
+      Serial.println("[Web] /api/wifi invalid token");
+      request->send(403, "application/json", "{\"error\":\"invalid token\"}");
+      return;
+    }
+  } else if (allowRecoveryWrite) {
+    Serial.printf("[Web] /api/wifi recovery write from %s (token bypass in AP mode)\n", clientIP.toString().c_str());
+  } else {
+    Serial.printf("[Web] /api/wifi accepted by settings session from %s\n", clientIP.toString().c_str());
   }
   wifi_setCredentials(String(ssid), String(pass ? pass : ""));
   // update language preference if requested
@@ -993,6 +1059,7 @@ static void handleGetMqtt(AsyncWebServerRequest* request) {
   doc["interval"] = preferences.getUInt(PREF_KEY_MQTT_PUB_INTERVAL, 10);
   doc["secure"] = preferences.getBool(PREF_KEY_MQTT_SECURE, DEFAULT_MQTT_SECURE);
   doc["tls_port"] = preferences.getUInt(PREF_KEY_MQTT_TLS_PORT, DEFAULT_MQTT_TLS_PORT);
+  doc["insecure"] = preferences.getBool(PREF_KEY_MQTT_INSECURE, DEFAULT_MQTT_INSECURE);
   String out;
   serializeJson(doc, out);
   request->send(200, "application/json", out);
@@ -1028,6 +1095,19 @@ static void handlePostMqttBody(AsyncWebServerRequest* request, uint8_t* data, si
   int interval = doc["interval"] | 10;
   bool secure = doc["secure"] | false;
   int tls_port = doc["tls_port"] | DEFAULT_MQTT_TLS_PORT;
+  const char* token_admin = doc["token_admin"] | "";
+
+  bool sessionOk = hasValidSettingsSession(request);
+  if (!sessionOk) {
+    if (!isValidAdminTokenValue(String(token_admin ? token_admin : ""))) {
+      request->send(403, "application/json", "{\"error\":\"invalid token\"}");
+      return;
+    }
+  }
+
+  bool currentInsecure = preferences.getBool(PREF_KEY_MQTT_INSECURE, DEFAULT_MQTT_INSECURE);
+  bool requestedInsecure = doc.containsKey("insecure") ? (bool)(doc["insecure"] | false) : currentInsecure;
+
   preferences.putBool(PREF_KEY_MQTT_ENABLED, enabled);
   preferences.putString(PREF_KEY_MQTT_BROKER, broker);
   preferences.putUInt(PREF_KEY_MQTT_PORT, (uint32_t)port);
@@ -1039,6 +1119,7 @@ static void handlePostMqttBody(AsyncWebServerRequest* request, uint8_t* data, si
   preferences.putUInt(PREF_KEY_MQTT_PUB_INTERVAL, (uint32_t)interval);
   preferences.putBool(PREF_KEY_MQTT_SECURE, secure);
   preferences.putUInt(PREF_KEY_MQTT_TLS_PORT, (uint32_t)tls_port);
+  preferences.putBool(PREF_KEY_MQTT_INSECURE, requestedInsecure);
   saveEventLog(LOG_INFO, EVENT_SETTINGS_CHANGE, 0);
   request->send(200, "application/json", "{\"ok\":true}\n");
   // Re-init VQTT so new settings are applied immediately
@@ -1092,6 +1173,40 @@ void initWebServer() {
     // Ничего не отправляем здесь, обработка и send() происходят в handlePostAdminTokenBody().
   }, NULL, handlePostAdminTokenBody);
 
+  // API: start/refresh settings session after a single master token validation.
+  server.on("/api/settings_auth", HTTP_POST, [](AsyncWebServerRequest* request) {
+    // Response is sent by body handler
+  }, NULL, [](AsyncWebServerRequest* request, uint8_t* data, size_t len, size_t index, size_t total) {
+    if (!prefsIsAvailable()) {
+      request->send(503, "application/json", "{\"error\":\"preferences unavailable\"}");
+      return;
+    }
+    if (len == 0) {
+      request->send(400, "application/json", "{\"error\":\"empty body\"}");
+      return;
+    }
+    DynamicJsonDocument doc(256);
+    DeserializationError err = deserializeJson(doc, data, len);
+    if (err) {
+      request->send(400, "application/json", "{\"error\":\"invalid json\"}");
+      return;
+    }
+    const char* token = doc["token"] | "";
+    if (!isValidAdminTokenValue(String(token ? token : ""))) {
+      request->send(403, "application/json", "{\"error\":\"invalid token\"}");
+      return;
+    }
+
+    String sid = createSettingsSession(request->client()->remoteIP());
+    DynamicJsonDocument resp(160);
+    resp["ok"] = true;
+    resp["session"] = sid;
+    resp["ttl_sec"] = (uint32_t)(SETTINGS_SESSION_TTL_MS / 1000UL);
+    String out;
+    serializeJson(resp, out);
+    request->send(200, "application/json", out);
+  });
+
   // Register MQTT handlers
   server.on("/api/mqtt", HTTP_GET, [](AsyncWebServerRequest* request) { handleGetMqtt(request); });
   server.on("/api/mqtt", HTTP_POST, [](AsyncWebServerRequest* request) {
@@ -1136,10 +1251,7 @@ void initWebServer() {
     DeserializationError err = deserializeJson(doc, data, len);
     if (err) { request->send(400, "application/json", "{\"error\":\"invalid json\"}"); return; }
     const char* token = doc["token"];
-    if (!token) { request->send(403, "application/json", "{\"error\":\"token required\"}"); return; }
-    String storedToken = preferences.getString(PREF_KEY_ADMIN_TOKEN, "");
-    if (storedToken.length() == 0) { request->send(403, "application/json", "{\"error\":\"no admin token set\"}"); return; }
-    if (String(token) != storedToken) { request->send(403, "application/json", "{\"error\":\"invalid token\"}"); return; }
+    if (!isAuthorizedSettingsRequest(request, token)) { request->send(403, "application/json", "{\"error\":\"invalid token\"}"); return; }
     if (doc.containsKey("mask")) {
       uint32_t mask = doc["mask"] | 0;
       preferences.putULong(PREF_KEY_LOG_FILTER, mask);
@@ -1247,10 +1359,7 @@ void initWebServer() {
       DeserializationError err = deserializeJson(doc, data, len);
       if (err) { request->send(400, "application/json", "{\"error\":\"invalid json\"}"); return; }
       const char* token = doc["token"];
-      if (!token) { request->send(403, "application/json", "{\"error\":\"token required\"}"); return; }
-      String storedToken = preferences.getString(PREF_KEY_ADMIN_TOKEN, "");
-      if (storedToken.length() == 0) { request->send(403, "application/json", "{\"error\":\"no admin token set\"}"); return; }
-      if (String(token) != storedToken) { request->send(403, "application/json", "{\"error\":\"invalid token\"}"); return; }
+      if (!isAuthorizedSettingsRequest(request, token)) { request->send(403, "application/json", "{\"error\":\"invalid token\"}"); return; }
       const char* action = doc["action"];
       if (!action) { request->send(400, "application/json", "{\"error\":\"no action\"}"); return; }
       String act = String(action);
@@ -1294,10 +1403,7 @@ void initWebServer() {
     DeserializationError err = deserializeJson(doc, data, len);
     if (err) { request->send(400, "application/json", "{\"error\":\"invalid json\"}"); return; }
     const char* token = doc["token"];
-    if (!token) { request->send(403, "application/json", "{\"error\":\"token required\"}"); return; }
-    String storedToken = preferences.getString(PREF_KEY_ADMIN_TOKEN, "");
-    if (storedToken.length() == 0) { request->send(403, "application/json", "{\"error\":\"no admin token set\"}"); return; }
-    if (String(token) != storedToken) { request->send(403, "application/json", "{\"error\":\"invalid token\"}"); return; }
+    if (!isAuthorizedSettingsRequest(request, token)) { request->send(403, "application/json", "{\"error\":\"invalid token\"}"); return; }
     const char* action = doc["action"];
     if (!action) { request->send(400, "application/json", "{\"error\":\"no action\"}"); return; }
     String act = String(action);
@@ -1333,10 +1439,7 @@ void initWebServer() {
     DeserializationError err = deserializeJson(doc, data, len);
     if (err) { request->send(400, "application/json", "{\"error\":\"invalid json\"}"); return; }
     const char* token = doc["token"];
-    if (!token) { request->send(403, "application/json", "{\"error\":\"token required\"}"); return; }
-    String storedToken = preferences.getString(PREF_KEY_ADMIN_TOKEN, "");
-    if (storedToken.length() == 0) { request->send(403, "application/json", "{\"error\":\"no admin token set\"}"); return; }
-    if (String(token) != storedToken) { request->send(403, "application/json", "{\"error\":\"invalid token\"}"); return; }
+    if (!isAuthorizedSettingsRequest(request, token)) { request->send(403, "application/json", "{\"error\":\"invalid token\"}"); return; }
     
     extern SafetySettings safetySettings;
     extern void recalculateRTCForTimezone(int8_t, int8_t);

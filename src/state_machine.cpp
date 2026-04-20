@@ -224,12 +224,8 @@ void processAutomaticControl() {
     extern uint32_t filterWashDuration;
     extern SafetySettings safetySettings;  // Настройки таймаутов безопасности
 
-    // refresh sensor measurements on every invocation so FSM always works with
-    // up-to-date distances (pump decisions depend on these values)
-    extern void readUltrasonicSensors();
-    extern void checkTankEmptyStatus();
-    readUltrasonicSensors();
-    checkTankEmptyStatus();
+    // Sensor values are updated in loopESP32() by configurable sensorPollPeriod.
+    // FSM consumes the latest cached values here without forcing extra reads.
 
     // Внешние функции
     extern void turnOffAllRelays();
