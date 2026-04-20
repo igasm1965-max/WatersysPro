@@ -33,6 +33,7 @@ const jwt = require('jsonwebtoken');
 const PORT = process.env.PORT || 3000;
 const MQTT_BROKER = process.env.MQTT_BROKER || '';  // Must be configured via env
 const MQTT_TOPIC_BASE = process.env.MQTT_TOPIC_BASE || 'watersystem';
+const MQTT_CLIENT_ID = process.env.MQTT_CLIENT_ID || `watersys-backend-${Math.random().toString(16).slice(2, 10)}`;
 const JWT_SECRET = process.env.JWT_SECRET || '';   // Must be configured via env
 const REMOTE_ADMIN_TOKEN = process.env.REMOTE_ADMIN_TOKEN || '';
 const REMOTE_REQUIRE_TOKEN = (process.env.REMOTE_REQUIRE_TOKEN || 'true') !== 'false';
@@ -92,6 +93,7 @@ let latestRemote = {
   lastSeenTopic: '',
   lastSeenAt: null,
 };
+const emergencyActiveByDevice = new Map();
 
 function updateRemoteSeen(topic) {
   latestRemote.lastSeenTopic = topic;
@@ -159,6 +161,7 @@ async function sendPushNotification(title, body, data = {}) {
 
 // --- MQTT client ---
 const client = mqtt.connect(MQTT_BROKER, {
+  clientId: MQTT_CLIENT_ID,
   keepalive: 120,           // 120s (default 60s too aggressive for mobile networks)
   reconnectPeriod: 5000,    // 5s initial reconnect
   connectTimeout: 10000,    // 10s connect timeout
@@ -198,6 +201,15 @@ client.on('message', async (topic, payload) => {
       latestRemote.deviceId = deviceId;
       await pool.query('INSERT INTO telemetry(device_id, payload) VALUES($1,$2)', [deviceId, obj]);
       io.emit('status_update', { deviceId, payload: obj });
+
+      const em = obj && obj.emergency ? obj.emergency : null;
+      const emActive = !!(em && em.active);
+      const emPrev = !!emergencyActiveByDevice.get(deviceId);
+      if (emActive && !emPrev) {
+        const emMessage = (em && em.message) ? String(em.message) : 'Аварийный режим на устройстве';
+        await sendPushNotification(`Авария: ${deviceId}`, emMessage, { deviceId, type: 'emergency' });
+      }
+      emergencyActiveByDevice.set(deviceId, emActive);
     } else if (kind === 'state') {
       latestRemote.state = obj;
       latestRemote.deviceId = deviceId;

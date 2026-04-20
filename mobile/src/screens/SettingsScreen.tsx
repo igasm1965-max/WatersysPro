@@ -2,9 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { ScrollView } from 'react-native';
 import { Card, Title, Button, Switch, TextInput, List } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 import { saveSetting, loadSetting } from '../services/secureStorage';
 import { useAppContext } from '../context/AppContext';
 import MqttService from '../services/mqttService';
+import api from '../services/api';
 
 export default function SettingsScreen(){
   const { lockApp } = useAppContext();
@@ -49,8 +52,81 @@ export default function SettingsScreen(){
     alert('Settings saved');
   };
 
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const getExpoTokenWithRetry = async (projectId?: string) => {
+    const maxAttempts = 4;
+    let lastError: any;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await Notifications.getExpoPushTokenAsync(
+          projectId ? { projectId } : undefined
+        );
+      } catch (error: any) {
+        lastError = error;
+        const msg = String(error?.message || error || '').toUpperCase();
+        const retryable =
+          msg.includes('SERVICE_NOT_AVAILABLE') ||
+          msg.includes('TIMEOUT') ||
+          msg.includes('ECONNRESET') ||
+          msg.includes('NETWORK');
+
+        if (!retryable || attempt === maxAttempts) {
+          throw error;
+        }
+
+        // Short backoff helps when Google services temporarily fail.
+        await sleep(attempt * 1200);
+      }
+    }
+
+    throw lastError;
+  };
+
   const registerPush = async () => {
-    alert('В Expo Go remote push недоступен. Для push нужен development build.');
+    try {
+      const current = await Notifications.getPermissionsAsync();
+      let status = current.status;
+      if (status !== 'granted') {
+        const req = await Notifications.requestPermissionsAsync();
+        status = req.status;
+      }
+
+      if (status !== 'granted') {
+        alert('Разрешите уведомления в настройках телефона.');
+        return;
+      }
+
+      const projectId =
+        Constants.expoConfig?.extra?.eas?.projectId ||
+        (Constants as any)?.easConfig?.projectId;
+
+      const tokenData = await getExpoTokenWithRetry(projectId);
+      const token = tokenData?.data || '';
+      if (!token) {
+        alert('Не удалось получить push token.');
+        return;
+      }
+
+      await api.registerPushToken(token);
+      await saveSetting('expoPushToken', token);
+      alert('Push token зарегистрирован.');
+    } catch (e: any) {
+      const msg = String(e?.message || e || 'unknown error');
+      if (msg.toLowerCase().includes('expo go')) {
+        alert('В Expo Go remote push недоступен. Для push нужен development build или APK.');
+      } else if (msg.toUpperCase().includes('SERVICE_NOT_AVAILABLE')) {
+        alert('Google Push Service временно недоступен (SERVICE_NOT_AVAILABLE). Проверьте интернет на телефоне, отключите VPN/Private DNS и повторите через 1-2 минуты.');
+      } else if (
+        msg.includes('Default FirebaseApp is not initialized') ||
+        msg.toLowerCase().includes('fcm-credentials')
+      ) {
+        alert('FCM для Android не настроен. Добавьте google-services.json в проект mobile и загрузите FCM credentials в EAS (Firebase service account), затем пересоберите APK.');
+      } else {
+        alert('Ошибка регистрации push: ' + msg);
+      }
+    }
   };
 
   return (

@@ -3,10 +3,15 @@ const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
 
-const pool = process.env.DATABASE_URL
+const databaseUrl = process.env.DATABASE_URL;
+const useDatabaseSsl = process.env.DATABASE_SSL
+  ? process.env.DATABASE_SSL === 'true'
+  : !!(databaseUrl && !/localhost|127\.0\.0\.1/.test(databaseUrl));
+
+const pool = databaseUrl
   ? new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: { rejectUnauthorized: false },
+      connectionString: databaseUrl,
+      ...(useDatabaseSsl ? { ssl: { rejectUnauthorized: false } } : {}),
     })
   : new Pool({
       host: process.env.PGHOST || 'localhost',
