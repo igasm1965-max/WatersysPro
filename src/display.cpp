@@ -436,7 +436,7 @@ static void displayFilterWashScreen1() {
         printTwoDigits(m);
         lcd.print("m ");
         printTwoDigits(s);
-        lcd.print("s    ");
+        lcd.print("s   ");
     } else if (flags.backwashInProgress) {
         lcd.print("Wash in progress  ");
     } else {
@@ -508,7 +508,7 @@ static void displayFilterWashScreen2() {
         printTwoDigits(scheduleEnd[0]);
         lcd.print(":");
         printTwoDigits(scheduleEnd[1]);
-        lcd.print("      ");
+        lcd.print("    ");
 
         // Строка 2: Night ON/OFF
         lcd.setCursor(0, 2);
@@ -655,7 +655,7 @@ void displayBackwashScreen() {
         lcd.print(":");
         if (s < 10) lcd.print("0");
         lcd.print(s);
-        lcd.print("  (mm:ss)       ");
+        lcd.print("  (mm:ss)      ");
 
         // Нижняя строка: уровень бака 2 + подсказка «нажмите для отмены» (мигает)
         lcd.setCursor(0, 3);
@@ -691,20 +691,24 @@ void displayEmergencyScreen() {
         lcd.setCursor(0, 0);
         lcd.print("EMERGENCY STOP!     ");
 
-        lcd.setCursor(0, 1);
-        char emBuf[21];
-        strncpy(emBuf, emergencyMessage, 20);
-        emBuf[20] = '\0';
-        // Полностью очищаем строку перед выводом, чтобы не оставались хвосты
-        // от предыдущих более длинных аварийных сообщений.
-        lcd.print("                    ");
-        lcd.setCursor(0, 1);
-        lcd.print(emBuf);
+        // Кэшируем emergencyMessage, чтобы не формировать строку каждый раз
+        static char lastEmergencyMessage[41] = "";
+        if (strcmp(emergencyMessage, lastEmergencyMessage) != 0) {
+            // Сообщение изменилось — формируем и выводим новую строку
+            char emBuf[21];
+            // Форматируем строку фиксированной ширины 20 символов
+            snprintf(emBuf, sizeof(emBuf), "%-20.20s", emergencyMessage);
+            lcd.setCursor(0, 1);
+            lcd.print(emBuf);
+            // Сохраняем новое сообщение
+            strncpy(lastEmergencyMessage, emergencyMessage, sizeof(lastEmergencyMessage) - 1);
+            lastEmergencyMessage[sizeof(lastEmergencyMessage) - 1] = '\0';
+        }
 
         lcd.setCursor(0, 2);
         lcd.print("Tank1: ");
         printThreeDigits(tank1Level);
-        lcd.print(" cm         ");
+        lcd.print(" cm       ");
 
         lcd.setCursor(0, 3);
         if (flags.blinkState)
