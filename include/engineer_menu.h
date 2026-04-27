@@ -35,20 +35,8 @@ void showSafetyTimeoutsMenu();
 /// Редактирует таймаут заполнения
 void editTimeoutFilling();
 
-/// Редактирует таймаут озонации
-void editTimeoutOzonation();
-
-/// Редактирует таймаут аэрации
-void editTimeoutAeration();
-
-/// Редактирует таймаут отстаивания
-void editTimeoutSettling();
-
 /// Редактирует таймаут фильтрации
 void editTimeoutFiltration();
-
-/// Редактирует таймаут промывки
-void editTimeoutBackwash();
 
 /// Редактирует таймаут сухого хода насоса (сек)
 void editPumpDryTimeout();
@@ -61,7 +49,6 @@ void editPumpDryConsecutiveChecks();
 
 /// Редактирует период опроса датчиков (0.1..2.0 сек)
 void editSensorPollPeriod();
-
 
 /// Показывает меню настроек Watchdog
 void showWatchdogMenu();
@@ -110,8 +97,6 @@ void testMqttPublish();
 /// Event Log settings (select which event types are persisted to SPIFFS)
 void showEventLogSettings();
 
-
-
 /// Выполняет сброс к заводским настройкам
 void performFactoryReset();
 
@@ -123,4 +108,4 @@ void saveSafetySettings();
 /// Загружает настройки безопасности из Preferences
 void loadSafetySettings();
 
-#endif // ENGINEER_MENU_H
+#endif  // ENGINEER_MENU_H

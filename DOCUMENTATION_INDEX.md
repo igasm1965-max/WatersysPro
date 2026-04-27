@@ -92,6 +92,7 @@
 ### Прошивка
 - **[docs/SD_INTEGRATION.md](docs/SD_INTEGRATION.md)** - Интеграция SD карты
 - **[docs/REFRACTOR_AND_SMOKE_SUMMARY.md](docs/REFRACTOR_AND_SMOKE_SUMMARY.md)** - Рефакторинг и smoke тесты
+- **[MENU_GUIDE_RU.md](MENU_GUIDE_RU.md)** - Подробное руководство по работе с меню системы
 
 ### Backend
 - **[backend/README.md](backend/README.md)** - Backend сервер
@@ -141,6 +142,7 @@
 ├── RELEASE_NOTES_v1.1.0.md        🇬🇧 Релиз (английский)
 ├── PROJECT_STATUS.md               Статус проекта
 ├── DOCUMENTATION_INDEX.md           📍 Этот файл
+├── MENU_GUIDE_RU.md                📋 Руководство по работе с меню
 │
 └── mobile/                         📱 Мобильное приложение
     ├── START_HERE.md               ⭐ Начните отсюда
@@ -179,6 +181,9 @@
 ### Хотите развить бэкенд?
 → Смотрите **[backend/README.md](backend/README.md)**
 
+### Хотите научиться работать с меню системы?
+→ Изучите **[MENU_GUIDE_RU.md](MENU_GUIDE_RU.md)** - подробное руководство по меню
+
 ---
 
 ## 🔗 Важные IP и порты
@@ -216,6 +221,6 @@
 
 ---
 
-**Последнее обновление: 13 марта 2026 г.**
+**Последнее обновление: 26 апреля 2026 г.**
 
 Вся документация актуальна и полна! 🚀

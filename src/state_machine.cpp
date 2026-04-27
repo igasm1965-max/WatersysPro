@@ -399,13 +399,6 @@ void processAutomaticControl() {
                 changeState(STATE_AERATION);
                 currentAerationRemaining = aerationDuration;  // Инициализируем таймер аэрации
             }
-            // Таймаут безопасности (настраиваемый)
-            else if (currentTime - systemContext.stateStartTime >
-                     (unsigned long)safetySettings.timeoutOzonation * 60UL * 1000UL) {
-                changeState(STATE_IDLE);
-                flags.waterTreatmentInProgress = 0;
-                triggerEmergency("OZONATION TIMEOUT");
-            }
             break;
 
         case STATE_AERATION:
@@ -413,13 +406,6 @@ void processAutomaticControl() {
             if (currentAerationRemaining == 0) {
                 changeState(STATE_SETTLING);
                 currentSetlingRemaining = setlingDuration;  // Инициализируем таймер отстаивания
-            }
-            // Таймаут безопасности (настраиваемый)
-            else if (currentTime - systemContext.stateStartTime >
-                     (unsigned long)safetySettings.timeoutAeration * 60UL * 1000UL) {
-                changeState(STATE_IDLE);
-                flags.waterTreatmentInProgress = 0;
-                triggerEmergency("AERATION TIMEOUT");
             }
             break;
 
@@ -446,13 +432,6 @@ void processAutomaticControl() {
                 else {
                     changeState(STATE_IDLE);
                 }
-            }
-            // Таймаут безопасности (настраиваемый)
-            else if (currentTime - systemContext.stateStartTime >
-                     (unsigned long)safetySettings.timeoutSettling * 60UL * 1000UL) {
-                changeState(STATE_IDLE);
-                flags.waterTreatmentInProgress = 0;
-                triggerEmergency("SETTLING TIMEOUT");
             }
             break;
 
@@ -507,14 +486,6 @@ void processAutomaticControl() {
                 } else {
                     changeState(STATE_IDLE);
                 }
-            }
-            // Таймаут безопасности (настраиваемый)
-            else if (currentTime - systemContext.stateStartTime >
-                     (unsigned long)safetySettings.timeoutBackwash * 60UL * 1000UL) {
-                stopPump2EmergencyMonitoring();
-                changeState(STATE_IDLE);
-                flags.backwashInProgress = 0;
-                triggerEmergency("BACKWASH TIMEOUT");
             }
             break;
     }
