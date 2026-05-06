@@ -109,15 +109,18 @@ WDTStats wdtStats;
 /// Настройки безопасности (инженерное меню)
 SafetySettings safetySettings = {
     DEFAULT_TIMEOUT_FILLING,              // timeoutFilling (минуты)
+    DEFAULT_TIMEOUT_OZONATION,            // timeoutOzonation
+    DEFAULT_TIMEOUT_AERATION,             // timeoutAeration
+    DEFAULT_TIMEOUT_SETTLING,             // timeoutSettling
     DEFAULT_TIMEOUT_FILTRATION,           // timeoutFiltration
+    DEFAULT_TIMEOUT_BACKWASH,             // timeoutBackwash
     ENGINEER_PASSWORD,                    // engineerPassword
     WATCHDOG_ENABLED,                     // watchdogEnabled
     WDT_TIMEOUT_SECONDS,                  // watchdogTimeout
     DEFAULT_PUMP_DRY_TIMEOUT_SECONDS,     // pumpDryTimeoutSeconds
     DEFAULT_PUMP_MIN_LEVEL_DELTA_CM,      // pumpMinLevelDeltaCm
     DEFAULT_PUMP_DRY_CONSECUTIVE_CHECKS,  // pumpDryConsecutiveChecks
-    DEFAULT_SENSOR_POLL_PERIOD,           // sensorPollPeriod
-    0                                     // timeZoneOffset (UTC)
+    DEFAULT_SENSOR_POLL_PERIOD            // sensorPollPeriod
 };
 
 /// Флаг авторизации в инженерном меню
@@ -396,11 +399,10 @@ void setup() {
     initI2C();
 
     // Файловая система (SPIFFS) - optional
-    initSPIFFS();
+    // removed SPIFFS-specific code
 
     // SD card (SPI) - optional; mounts if present and prints status to Serial
     initSD();
-    migrateUiFromSdToSpiffs();
 
     // Инициализация массива событий нулями
     memset(eventLogs, 0, sizeof(eventLogs));
@@ -423,36 +425,33 @@ void setup() {
     // VQTT (MQTT) client initialization - will connect when Wi-Fi is available
     initVQTT();
 
-// OTA (Over-The-Air) обновление прошивки
-#if ENABLE_OTA
+    // OTA (Over-The-Air) обновление прошивки
+    #if ENABLE_OTA
     {
-        ArduinoOTA.setHostname("watersys");
-        ArduinoOTA.setPassword("watersys_ota");  // Пароль для OTA (изменить в продакшене)
-        ArduinoOTA.onStart([]() {
-            turnOffAllRelays();  // Безопасность: выключаем все реле при начале обновления
-            Serial.println("[OTA] Update started — relays OFF");
-        });
-        ArduinoOTA.onEnd([]() { Serial.println("[OTA] Update complete, rebooting..."); });
-        ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-            Serial.printf("[OTA] Progress: %u%%\r", (progress * 100) / total);
-        });
-        ArduinoOTA.onError([](ota_error_t error) {
-            Serial.printf("[OTA] Error[%u]: ", error);
-            if (error == OTA_AUTH_ERROR)
-                Serial.println("Auth Failed");
-            else if (error == OTA_BEGIN_ERROR)
-                Serial.println("Begin Failed");
-            else if (error == OTA_CONNECT_ERROR)
-                Serial.println("Connect Failed");
-            else if (error == OTA_RECEIVE_ERROR)
-                Serial.println("Receive Failed");
-            else if (error == OTA_END_ERROR)
-                Serial.println("End Failed");
-        });
-        ArduinoOTA.begin();
-        Serial.println("[OTA] Ready");
+      ArduinoOTA.setHostname("watersys");
+      ArduinoOTA.setPassword("watersys_ota");  // Пароль для OTA (изменить в продакшене)
+      ArduinoOTA.onStart([]() {
+        turnOffAllRelays();  // Безопасность: выключаем все реле при начале обновления
+        Serial.println("[OTA] Update started — relays OFF");
+      });
+      ArduinoOTA.onEnd([]() {
+        Serial.println("[OTA] Update complete, rebooting...");
+      });
+      ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+        Serial.printf("[OTA] Progress: %u%%\r", (progress * 100) / total);
+      });
+      ArduinoOTA.onError([](ota_error_t error) {
+        Serial.printf("[OTA] Error[%u]: ", error);
+        if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+        else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+        else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+        else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+        else if (error == OTA_END_ERROR) Serial.println("End Failed");
+      });
+      ArduinoOTA.begin();
+      Serial.println("[OTA] Ready");
     }
-#endif
+    #endif
 #endif
 
     // ...existing code...
@@ -548,10 +547,10 @@ void loopESP32() {
         WDT_RESET();
     }
 
-// OTA: проверяем запросы на обновление прошивки по WiFi
-#if defined(ENABLE_WIFI) && ENABLE_OTA
+    // OTA: проверяем запросы на обновление прошивки по WiFi
+    #if defined(ENABLE_WIFI) && ENABLE_OTA
     ArduinoOTA.handle();
-#endif
+    #endif
 
     // Мигание для индикации (используется в отображении)
     static unsigned long blinkTimerLast = 0;

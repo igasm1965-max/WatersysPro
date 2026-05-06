@@ -5,162 +5,123 @@
  */
 
 #include "emergency.h"
-
 #include "config.h"
-#include "display.h"
-#include "encoder.h"
-#include "event_logging.h"
-#include "relay_control.h"
-#include "state_machine.h"
 #include "structures.h"
+#include "relay_control.h"
+#include "event_logging.h"
+#include "encoder.h"
 #include "utils.h"
+#include "state_machine.h"
+#include "display.h"
 
 // ============ ИНИЦИАЛИЗАЦИЯ АВАРИЙНОГО МОНИТОРИНГА ============
 
 /// Локальные переменные мониторинга насосов (видимы в рамках файла для диагностики)
 static bool pumpMonitoringActive[2] = {false, false};
-static int pumpStartLevel[2] = {0, 0};
+static int  pumpStartLevel[2] = {0, 0};
 static unsigned long pumpStartTime[2] = {0, 0};
-static int pumpConsecutiveFails[2] = {0, 0};
+static int  pumpConsecutiveFails[2] = {0, 0};
 
 /// Инициализирует систему аварийного мониторинга
 void initEmergencyMonitoring() {
-    extern SystemFlags flags;
-    extern char emergencyMessage[41];
-
-    flags.emergencyMode = 0;
-    emergencyMessage[0] = '\0';
-    flags.emergencyScreenInitialized = 0;
-    flags.emergencyBlinkState = 1;
+  extern SystemFlags flags;
+  extern char emergencyMessage[41];
+  
+  flags.emergencyMode = 0;
+  emergencyMessage[0] = '\0';
+  flags.emergencyScreenInitialized = 0;
+  flags.emergencyBlinkState = 1;
+  
 }
 
 // ============ ОБНАРУЖЕНИЕ АВАРИЙНЫХ СИТУАЦИЙ ============
 
 /// Проверяет аварийные ситуации (сухой ход насосов)
 void checkEmergencySituations() {
-    extern int tank1Level, tank2Level;
-    extern bool getPump1State();
-    extern bool getPump2State();
-    extern SystemContext systemContext;
-    extern SafetySettings safetySettings;
-    const unsigned long timeoutMs = (unsigned long)safetySettings.pumpDryTimeoutSeconds * 1000UL;
-    const int minDelta = safetySettings.pumpMinLevelDeltaCm;
+  extern int tank1Level, tank2Level;
+  extern bool getPump1State();
+  extern bool getPump2State();
 
-    // Generic pump monitoring for pump index 0 (pump1) and 1 (pump2)
-    for (int p = 0; p < 2; ++p) {
-        bool pumpState = (p == 0) ? getPump1State() : getPump2State();
-        int currentLevel;
-        const char* pumpName;
-        if (p == 0) {
-            // Насос 1 всегда работает с баком 1
-            currentLevel = tank1Level;
-            pumpName = "Pump1";
-        } else {
-            // Насос 2 может работать с разными баками в зависимости от состояния
-            if (systemContext.currentState == STATE_BACKWASH) {
-                // Обратная промывка: забор из бака 2
-                currentLevel = tank2Level;
-            } else {
-                // Фильтрация и другие состояния (по умолчанию бак 1)
-                currentLevel = tank1Level;
-            }
-            pumpName = "Pump2";
-        }
+  extern SafetySettings safetySettings;
+  const unsigned long timeoutMs = (unsigned long)safetySettings.pumpDryTimeoutSeconds * 1000UL;
+  const int minDelta = safetySettings.pumpMinLevelDeltaCm;
 
-        if (pumpState) {
-            if (!pumpMonitoringActive[p]) {
-                pumpMonitoringActive[p] = true;
-                pumpStartLevel[p] = currentLevel;
-                pumpStartTime[p] = millis();
-                pumpConsecutiveFails[p] = 0;
-                Serial.printf("[DRYRUN] %s monitoring started. Level=%d timeout=%ds minDelta=%d\n",
-                              pumpName, currentLevel, safetySettings.pumpDryTimeoutSeconds,
-                              minDelta);
-            } else {
-                unsigned long elapsedMs = millis() - pumpStartTime[p];
-                if (elapsedMs >= timeoutMs) {
-                    int delta = abs(currentLevel - pumpStartLevel[p]);
-                    if (delta < minDelta) {
-                        pumpConsecutiveFails[p]++;
-                        Serial.printf(
-                            "[DRYRUN] %s dry-run check #%d: start=%d now=%d delta=%d "
-                            "elapsed=%lus\n",
-                            pumpName, pumpConsecutiveFails[p], pumpStartLevel[p], currentLevel,
-                            delta, elapsedMs / 1000);
-                        if (pumpConsecutiveFails[p] >= safetySettings.pumpDryConsecutiveChecks) {
-                            Serial.printf(
-                                "[EMERGENCY] %s dry-run detected: start=%d now=%d delta=%d "
-                                "elapsed=%lus timeout=%ds\n",
-                                pumpName, pumpStartLevel[p], currentLevel, delta, elapsedMs / 1000,
-                                safetySettings.pumpDryTimeoutSeconds);
-                            saveEventLog(LOG_ERROR,
-                                         (p == 0) ? EVENT_PUMP1_DRYRUN : EVENT_PUMP2_DRYRUN,
-                                         (uint8_t)delta);
-                            // Создаем подробное сообщение для лога, но для дисплея оставляем
-                            // короткое
-                            char detailedMsg[60];
-                            snprintf(detailedMsg, sizeof(detailedMsg), "%s DRY RUN: %dsec",
-                                     pumpName, elapsedMs / 1000);
-                            triggerEmergency(detailedMsg);
-                            pumpMonitoringActive[p] = false;
-                        }
-                    } else {
-                        if (pumpConsecutiveFails[p] > 0) {
-                            Serial.printf("[DRYRUN] %s level changed %d >= %d, reset fails\n",
-                                          pumpName, delta, minDelta);
-                            pumpConsecutiveFails[p] = 0;
-                        }
-                    }
-                }
+  // Generic pump monitoring for pump index 0 (pump1) and 1 (pump2)
+  for (int p = 0; p < 2; ++p) {
+    bool pumpState = (p == 0) ? getPump1State() : getPump2State();
+    int currentLevel = (p == 0) ? tank1Level : tank2Level;
+    const char* pumpName = (p == 0) ? "Pump1" : "Pump2";
+
+    if (pumpState) {
+      if (!pumpMonitoringActive[p]) {
+        pumpMonitoringActive[p] = true;
+        pumpStartLevel[p] = currentLevel;
+        pumpStartTime[p] = millis();
+        pumpConsecutiveFails[p] = 0;
+      } else {
+        unsigned long elapsedMs = millis() - pumpStartTime[p];
+        if (elapsedMs >= timeoutMs) {
+          int delta = abs(currentLevel - pumpStartLevel[p]);
+          if (delta < minDelta) {
+            pumpConsecutiveFails[p]++;
+            if (pumpConsecutiveFails[p] >= safetySettings.pumpDryConsecutiveChecks) {
+              Serial.printf("[EMERGENCY] %s dry-run detected: start=%d now=%d delta=%d elapsed=%lus timeout=%ds\n", pumpName, pumpStartLevel[p], currentLevel, delta, elapsedMs / 1000, safetySettings.pumpDryTimeoutSeconds);
+              saveEventLog(LOG_ERROR, (p == 0) ? EVENT_PUMP1_DRYRUN : EVENT_PUMP2_DRYRUN, (uint8_t)delta);
+              triggerEmergency((p == 0) ? "PUMP1 DRY RUN" : "PUMP2 DRY RUN");
+              pumpMonitoringActive[p] = false;
             }
-        } else {
-            if (pumpMonitoringActive[p]) {
-                pumpMonitoringActive[p] = false;
-                pumpConsecutiveFails[p] = 0;
-            }
+          } else {
+            if (pumpConsecutiveFails[p] > 0) pumpConsecutiveFails[p] = 0;
+          }
         }
+      }
+    } else {
+      if (pumpMonitoringActive[p]) {
+        pumpMonitoringActive[p] = false;
+        pumpConsecutiveFails[p] = 0;
+      }
     }
+  }
 }
 
 /// Обновляет состояние аварийного мониторинга
 void updateEmergencyMonitoring() {
-    extern SystemFlags flags;
-    extern int tank1Level, tank2Level;
-
-    // Сброс watchdog перед проверками
-    if (flags.watchdogEnabled) {
-        WDT_RESET();
-    }
-
-    // Периодическая проверка аварийных ситуаций
-    static unsigned long lastCheck = 0;
-    if (hasIntervalElapsed(lastCheck, 200)) {  // Каждые 200 мс (5 раз в секунду)
-        lastCheck = millis();
-        checkEmergencySituations();
-    }
-
-    // Диагностический вывод состояния мониторинга каждые 5 секунд (оставляем менее частым, чтобы не
-    // засорять лог)
-    static unsigned long lastDiag = 0;
-    if (hasIntervalElapsed(lastDiag, 5000)) {
-        lastDiag = millis();
-    }
-
-    // Проверяем пустые баки
-    if (flags.tank1Empty || flags.tank2Empty) {
-        // Это нормальная ситуация, не аварийная
-    }
+  extern SystemFlags flags;
+  extern int tank1Level, tank2Level;
+  
+  // Сброс watchdog перед проверками
+  if (flags.watchdogEnabled) {
+    WDT_RESET();
+  }
+  
+  // Периодическая проверка аварийных ситуаций
+  static unsigned long lastCheck = 0;
+  if (hasIntervalElapsed(lastCheck, 200)) { // Каждые 200 мс (5 раз в секунду)
+    lastCheck = millis();
+    checkEmergencySituations();
+  }
+  
+  // Диагностический вывод состояния мониторинга каждые 5 секунд (оставляем менее частым, чтобы не засорять лог)
+  static unsigned long lastDiag = 0;
+  if (hasIntervalElapsed(lastDiag, 5000)) {
+    lastDiag = millis();
+  }
+  
+  // Проверяем пустые баки
+  if (flags.tank1Empty || flags.tank2Empty) {
+    // Это нормальная ситуация, не аварийная
+  }
 }
 
 /// Проверяет переполнение бака
 bool checkOverflow() {
-    extern int tank1Level, tank2Level;
-    extern TankParams tank1, tank2;
-
-    if (tank1Level > tank1.maxLevel || tank2Level > tank2.maxLevel) {
-        return true;
-    }
-    return false;
+  extern int tank1Level, tank2Level;
+  extern TankParams tank1, tank2;
+  
+  if (tank1Level > tank1.maxLevel || tank2Level > tank2.maxLevel) {
+    return true;
+  }
+  return false;
 }
 
 // Removed: unused hardware-check helpers (checkRelayFault/checkOverheating/checkLowVoltage).
@@ -169,158 +130,164 @@ bool checkOverflow() {
 
 /// Обрабатывает аварийный режим
 void handleEmergency() {
-    extern SystemFlags flags;
-    extern char emergencyMessage[41];
-    // FSM state accessed via systemContext
-    extern void turnOffAllRelays();
+  extern SystemFlags flags;
+  extern char emergencyMessage[41];
+  // FSM state accessed via systemContext
+  extern void turnOffAllRelays();
+  
+  if (!flags.emergencyMode) return;
 
-    if (!flags.emergencyMode) return;
+  // Выключаем все реле в аварийном режиме
+  turnOffAllRelays();
+  changeState(STATE_IDLE);
+  flags.waterTreatmentInProgress = 0;
+  flags.backwashInProgress = 0;
+  flags.inMenu = 0;
+  flags.inFilterWashInfo = 0;
 
-    // Выключаем все реле в аварийном режиме
-    turnOffAllRelays();
-    changeState(STATE_IDLE);
-    flags.waterTreatmentInProgress = 0;
-    flags.backwashInProgress = 0;
-    flags.inMenu = 0;
-    flags.inFilterWashInfo = 0;
-
-    // Включаем подсветку и дисплей для видимости аварии (обновляем и аппаратное состояние)
-    activateBacklight();
+  // Включаем подсветку и дисплей для видимости аварии (обновляем и аппаратное состояние)
+  activateBacklight();
 }
 
 /// Входит в аварийный режим с сообщением
 void enterEmergencyMode(const char* message) {
-    extern SystemFlags flags;
-    extern char emergencyMessage[41];
-
-    flags.emergencyMode = true;
-    strncpy(emergencyMessage, message, 40);
-    emergencyMessage[40] = '\0';
-
-    saveEventLog(LOG_ERROR, EVENT_EMERGENCY, 0);  // EVENT_EMERGENCY
-    Serial.printf("[EMERGENCY] %s\n", message);
-
-    handleEmergency();
+  extern SystemFlags flags;
+  extern char emergencyMessage[41];
+  
+  flags.emergencyMode = true;
+  strncpy(emergencyMessage, message, 40);
+  emergencyMessage[40] = '\0';
+  
+  saveEventLog(LOG_ERROR, EVENT_EMERGENCY, 0); // EVENT_EMERGENCY
+  Serial.printf("[EMERGENCY] %s\n", message);
+  
+  handleEmergency();
 }
 
 // Совместимая с заголовком обёртка для триггера аварии
-void triggerEmergency(const char* message) { enterEmergencyMode(message); }
+void triggerEmergency(const char* message) {
+  enterEmergencyMode(message);
+}
 
 /// Выходит из аварийного режима
 void exitEmergencyMode() {
-    extern SystemFlags flags;
-
-    flags.emergencyMode = false;
-    turnOffAllRelays();
-    // Ensure the emergency screen will be reinitialized next time it appears
-    flags.emergencyScreenInitialized = 0;
-    // После аварийного экрана принудительно переинициализируем главный экран,
-    // чтобы стереть возможные артефакты от аварийных строк.
-    flags.displayInitialized = 0;
-    // Reset global blink state for predictable behavior
-    flags.blinkState = 1;
-    forceRedisplay();
+  extern SystemFlags flags;
+  
+  flags.emergencyMode = false;
+  turnOffAllRelays();
+  // Ensure the emergency screen will be reinitialized next time it appears
+  flags.emergencyScreenInitialized = 0;
+  // После аварийного экрана принудительно переинициализируем главный экран,
+  // чтобы стереть возможные артефакты от аварийных строк.
+  flags.displayInitialized = 0;
+  // Reset global blink state for predictable behavior
+  flags.blinkState = 1;
+  forceRedisplay();
 }
 
 /// Проверяет возможность выхода из аварии (при длительном нажатии кнопки)
 void checkEmergencyReset() {
-    extern SystemFlags flags;
-    static unsigned long pressStart = 0;
-    static bool pressing = false;
+  extern SystemFlags flags;
+  static unsigned long pressStart = 0;
+  static bool pressing = false;
+  
+  // Сброс watchdog перед долгой операцией
+  if (flags.watchdogEnabled) {
+    WDT_RESET();
+  }
 
-    // Сброс watchdog перед долгой операцией
-    if (flags.watchdogEnabled) {
-        WDT_RESET();
+  // --- АВТОМАТИЧЕСКИЙ СБРОС АВАРИИ ---
+  // Если условия аварии устранены (например, уровень воды в норме), сбрасываем emergencyMode
+  extern int tank1Level, tank2Level;
+  extern TankParams tank1, tank2;
+  // Пример: если уровень воды в баке 1 и 2 в допустимых пределах — сброс аварии
+  if (flags.emergencyMode) {
+    // Use inclusive bounds to consider exact min/max as OK
+    bool tank1Ok = (tank1Level >= tank1.minLevel && tank1Level <= tank1.maxLevel);
+    bool tank2Ok = (tank2Level >= tank2.minLevel && tank2Level <= tank2.maxLevel);
+    if (tank1Ok && tank2Ok) {
+      exitEmergencyMode();
+      Serial.println("[EMERGENCY] Auto-reset: levels normal");
     }
+  }
 
-    // --- АВТОМАТИЧЕСКИЙ СБРОС АВАРИИ ---
-    // Если условия аварии устранены (например, уровень воды в норме), сбрасываем emergencyMode
-    extern int tank1Level, tank2Level;
-    extern TankParams tank1, tank2;
-    // Пример: если уровень воды в баке 1 и 2 в допустимых пределах — сброс аварии
-    if (flags.emergencyMode) {
-        // Use inclusive bounds to consider exact min/max as OK
-        bool tank1Ok = (tank1Level >= tank1.minLevel && tank1Level <= tank1.maxLevel);
-        bool tank2Ok = (tank2Level >= tank2.minLevel && tank2Level <= tank2.maxLevel);
-        if (tank1Ok && tank2Ok) {
-            exitEmergencyMode();
-            Serial.println("[EMERGENCY] Auto-reset: levels normal");
-        }
-    }
-
-    // --- РУЧНОЙ СБРОС (долгое нажатие) ---
-    if (isEncoderButtonPressed()) {
-        // Избегаем ложных срабатываний сразу после поворота энкодера
-        extern volatile unsigned long lastEncoderInterrupt;
-        unsigned long now = millis();
-        if (now - lastEncoderInterrupt < 200) {
-            // ignore presses too soon after rotation
-            // don't start pressing timer
-        } else {
-            if (!pressing) {
-                pressing = true;
-                pressStart = now;
-            } else if (now - pressStart >= 3000) {
-                // Длительное нажатие 3 сек — сброс аварии
-                exitEmergencyMode();
-                pressing = false;
-                pressStart = 0;
-                Serial.println("[EMERGENCY] Reset by long press");
-            }
-        }
+  // --- РУЧНОЙ СБРОС (долгое нажатие) ---
+  if (isEncoderButtonPressed()) {
+    // Избегаем ложных срабатываний сразу после поворота энкодера
+    extern volatile unsigned long lastEncoderInterrupt;
+    unsigned long now = millis();
+    if (now - lastEncoderInterrupt < 200) {
+      // ignore presses too soon after rotation
+      // don't start pressing timer
     } else {
+      if (!pressing) {
+        pressing = true;
+        pressStart = now;
+      } else if (now - pressStart >= 3000) {
+        // Длительное нажатие 3 сек — сброс аварии
+        exitEmergencyMode();
         pressing = false;
         pressStart = 0;
+        Serial.println("[EMERGENCY] Reset by long press");
+      }
     }
+  } else {
+    pressing = false;
+    pressStart = 0;
+  }
 }
 
 // ============ МОНИТОРИНГ НАСОСОВ ============
 
 /// Запускает аварийный мониторинг насоса 1
 void startPumpEmergencyMonitoring() {
-    extern int tank1Level;
-    if (pumpMonitoringActive[0]) return;
-    pumpMonitoringActive[0] = true;
-    pumpStartLevel[0] = tank1Level;
-    pumpStartTime[0] = millis();
-    pumpConsecutiveFails[0] = 0;
+  extern int tank1Level;
+  if (pumpMonitoringActive[0]) return;
+  pumpMonitoringActive[0] = true;
+  pumpStartLevel[0] = tank1Level;
+  pumpStartTime[0] = millis();
+  pumpConsecutiveFails[0] = 0;
 }
 
 /// Останавливает аварийный мониторинг насоса 1
-void stopPumpEmergencyMonitoring() { pumpMonitoringActive[0] = false; }
+void stopPumpEmergencyMonitoring() {
+  pumpMonitoringActive[0] = false;
+}
 
 /// Запускает аварийный мониторинг насоса 2
 void startPump2EmergencyMonitoring() {
-    extern int tank2Level;
-    if (pumpMonitoringActive[1]) return;
-    pumpMonitoringActive[1] = true;
-    pumpStartLevel[1] = tank2Level;
-    pumpStartTime[1] = millis();
-    pumpConsecutiveFails[1] = 0;
+  extern int tank2Level;
+  if (pumpMonitoringActive[1]) return;
+  pumpMonitoringActive[1] = true;
+  pumpStartLevel[1] = tank2Level;
+  pumpStartTime[1] = millis();
+  pumpConsecutiveFails[1] = 0;
 }
 
 /// Останавливает аварийный мониторинг насоса 2
-void stopPump2EmergencyMonitoring() { pumpMonitoringActive[1] = false; }
+void stopPump2EmergencyMonitoring() {
+  pumpMonitoringActive[1] = false;
+}
 
 // ============ ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ============
 
 /// Возвращает текст аварийного сообщения
 const char* getEmergencyMessage() {
-    extern char emergencyMessage[41];
-    return emergencyMessage;
+  extern char emergencyMessage[41];
+  return emergencyMessage;
 }
 
 /// Устанавливает текст аварийного сообщения
 void setEmergencyMessage(const char* message) {
-    extern char emergencyMessage[41];
-    strncpy(emergencyMessage, message, 40);
-    emergencyMessage[40] = '\0';
+  extern char emergencyMessage[41];
+  strncpy(emergencyMessage, message, 40);
+  emergencyMessage[40] = '\0';
 }
 
 /// Проверяет, находимся ли мы в аварийном режиме
 bool isInEmergencyMode() {
-    extern SystemFlags flags;
-    return flags.emergencyMode;
+  extern SystemFlags flags;
+  return flags.emergencyMode;
 }
 
 // Removed: getLastErrorCode()/clearErrorCode() — not referenced.
@@ -329,57 +296,56 @@ bool isInEmergencyMode() {
 
 /// Логирует аварийное событие
 void logEmergencyEvent(uint16_t errorCode, uint32_t context) {
-    saveEventLog(LOG_ERROR, EVENT_EMERGENCY, (uint16_t)errorCode);
+  saveEventLog(LOG_ERROR, EVENT_EMERGENCY, (uint16_t)errorCode);
 }
 
 // Removed: printEmergencyStats()/exportEmergencyLogs() — use central event log export.
 
 /// Сбрасывает аварию (публичная функция, совместимая с заголовком)
 void resetEmergency() {
-    extern SafeLCD lcd;
-
-    exitEmergencyMode();
-    saveEventLog(LOG_INFO, EVENT_EMERGENCY, 1);  // param=1 -> вручную сброшено
-
-    // Очистить экран физически от аварийного сообщения
-    lcd.clear();
-
-    // Переинициализировать флаг отображения для перерисовки всех статических элементов
-    extern SystemFlags flags;
-    flags.displayInitialized = false;
-
-    // Принудительно перерисовать дисплей
-    forceRedisplay();
+  extern SafeLCD lcd;
+  
+  exitEmergencyMode();
+  saveEventLog(LOG_INFO, EVENT_EMERGENCY, 1); // param=1 -> вручную сброшено
+  
+  // Очистить экран физически от аварийного сообщения
+  lcd.clear();
+  
+  // Переинициализировать флаг отображения для перерисовки всех статических элементов
+  extern SystemFlags flags;
+  flags.displayInitialized = false;
+  
+  // Принудительно перерисовать дисплей
+  forceRedisplay();
 }
 
 // ============ ЗАЩИТА ОТ ЗАВИСАНИЯ ============
 
-/// Проверяет зависание системы (только безопасность, без перезагрузки — WDT занимается
-/// перезагрузками)
+/// Проверяет зависание системы (только безопасность, без перезагрузки — WDT занимается перезагрузками)
 void checkForHang() {
-    extern unsigned long loopStartTime, hangDetectionTime;
-    extern SystemFlags flags;
-
-    // Пропускаем проверку если находимся в меню (блокирующие циклы — это нормально)
-    if (flags.inMenu) return;
-
-    unsigned long currentTime = millis();
-    unsigned long loopDuration = currentTime - loopStartTime;
-
-    // Если loop() выполняется дольше MAX_LOOP_TIME (2с) — потенциальное зависание
-    if (loopDuration > MAX_LOOP_TIME) {
-        flags.systemHangDetected = 1;
-        Serial.printf("[HANG] Loop took %lu ms! Safety relay shutdown\n", loopDuration);
-
-        // Аварийное выключение всех реле для безопасности
-        turnOffAllRelays();
-        saveEventLog(LOG_ERROR, EVENT_WATCHDOG_RESET, (uint16_t)(loopDuration / 100));
-
-        // НЕ перезагружаем — WDT (аппаратный watchdog) сделает это если loop действительно завис.
-        // ESP.restart() здесь вызывал ложные перезагрузки после выхода из блокирующих меню.
-    } else {
-        flags.systemHangDetected = 0;
-    }
+  extern unsigned long loopStartTime, hangDetectionTime;
+  extern SystemFlags flags;
+  
+  // Пропускаем проверку если находимся в меню (блокирующие циклы — это нормально)
+  if (flags.inMenu) return;
+  
+  unsigned long currentTime = millis();
+  unsigned long loopDuration = currentTime - loopStartTime;
+  
+  // Если loop() выполняется дольше MAX_LOOP_TIME (2с) — потенциальное зависание
+  if (loopDuration > MAX_LOOP_TIME) {
+    flags.systemHangDetected = 1;
+    Serial.printf("[HANG] Loop took %lu ms! Safety relay shutdown\n", loopDuration);
+    
+    // Аварийное выключение всех реле для безопасности
+    turnOffAllRelays();
+    saveEventLog(LOG_ERROR, EVENT_WATCHDOG_RESET, (uint16_t)(loopDuration / 100));
+    
+    // НЕ перезагружаем — WDT (аппаратный watchdog) сделает это если loop действительно завис.
+    // ESP.restart() здесь вызывал ложные перезагрузки после выхода из блокирующих меню.
+  } else {
+    flags.systemHangDetected = 0;
+  }
 }
 
 // Removed: setHangTimeout()/sendHeartbeat() — unused in release.

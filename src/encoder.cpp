@@ -570,6 +570,7 @@ void onEncoderButton() {
   extern unsigned long lastActivityTime;
   extern SafeLCD lcd;
   extern int filterWashScrollOffset;
+  extern SystemContext systemContext;
   
   lastActivityTime = millis();
   
@@ -591,6 +592,14 @@ void onEncoderButton() {
   if (!flags.backlightOn) {
     lcd.backlight();
     flags.backlightOn = 1;
+  }
+  
+  // ========== РЕЖИМ BACKWASH С ОШИБКОЙ СУХОГО ХОДА ==========
+  // Нажатие кнопки очищает ошибку и возвращается к нормальному отображению backwash
+  if (systemContext.currentState == STATE_BACKWASH && flags.backwashDryRunError) {
+    flags.backwashDryRunError = 0;
+    flags.backwashScreenInitialized = 0;
+    return;
   }
   
   // ========== РЕЖИМ МЕНЮ ==========

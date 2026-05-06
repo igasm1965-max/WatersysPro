@@ -83,6 +83,7 @@ using SafeLCD = LiquidCrystal_I2C;
 #define EVENT_NTP_SYNC_SUCCESS 19 ///< Событие: Успешная синхронизация времени через NTP
 #define EVENT_NTP_SYNC_FAILED 20 ///< Событие: Ошибка синхронизации времени через NTP
 #define EVENT_TIMEZONE_CHANGED 21 ///< Событие: Часовой пояс изменен
+#define EVENT_BACKWASH_DRY_RUN 22 ///< Событие: Сухой ход при обратной промывке
 
 // ============ PREFERENCES KEYS ============
 #define PREF_KEY_LANG_EN "lang_en"  ///< bool: true=English output, false=Русский

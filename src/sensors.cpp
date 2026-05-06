@@ -32,7 +32,15 @@ int readUltrasonicSensor1() {
 
 /// Читает УЗ датчик 2 (raw via NewPing)
 int readUltrasonicSensor2() {
-    return (int)sonar2.ping_cm();  // 0 == no echo
+    int value = (int)sonar2.ping_cm();  // 0 == no echo
+    // Debug monitoring for sensor 2
+    static unsigned long lastDebugTime = 0;
+    if (millis() - lastDebugTime > 5000) {  // Print every 5 seconds
+        lastDebugTime = millis();
+        Serial.printf("[SENSOR2_DEBUG] raw=%d, TRIG=%d, ECHO=%d, MAX_DIST=%d\n", 
+                      value, HC_TRIG2, HC_ECHO2, TANK_MAX_SENSOR_DISTANCE);
+    }
+    return value;
 }
 
 // ============ КАЛИБРАЦИЯ ДАТЧИКОВ ============
@@ -93,6 +101,14 @@ void readUltrasonicSensors() {
     // Защита от ложных нулей отключена: применяем сырое значение сразу.
     tank1Level = raw1;
     tank2Level = raw2;
+
+    // Extended logging for sensor debugging
+    static unsigned long lastExtendedLog = 0;
+    if (millis() - lastExtendedLog > 10000) {  // Print every 10 seconds
+        lastExtendedLog = millis();
+        Serial.printf("[SENSOR_EXTENDED] Sensor1: raw=%d, level=%d | Sensor2: raw=%d, level=%d | GPIO2_TRIG=%d, GPIO2_ECHO=%d\n", 
+                      raw1, tank1Level, raw2, tank2Level, digitalRead(HC_TRIG2), digitalRead(HC_ECHO2));
+    }
 
     Serial.printf("[SENSOR] raw1=%d raw2=%d -> tank1=%d tank2=%d\n", tank1RawDistance,
                   tank2RawDistance, tank1Level, tank2Level);

@@ -69,7 +69,9 @@ void loadAllSettings() {
   extern byte nightModeEnd[2];
   extern struct TankParams tank1, tank2;
   
-  // Таймеры (в секундах)
+  Serial.println("[PREFS] Loading all settings from NVS...");
+  
+  // ============ ТАЙМЕРЫ (в секундах) ============
   setlingDuration = preferences.getULong("settling_dur", 10UL);
   aerationDuration = preferences.getULong("aeration_dur", 10UL);
   ozonationDuration = preferences.getULong("ozone_dur", 10UL);
@@ -77,23 +79,28 @@ void loadAllSettings() {
   extern unsigned long backlightTimeout;
   backlightTimeout = backlightDuration * 1000UL; // sync runtime timeout (s -> ms)
   filterWashDuration = preferences.getULong("filter_wash", 10UL);
+  
+  Serial.printf("[PREFS] Timers: settling=%lu, aeration=%lu, ozone=%lu, wash=%lu, backlight=%lu\n",
+                setlingDuration, aerationDuration, ozonationDuration, filterWashDuration, backlightDuration);
+  
+  // ============ ПЕРИОД ОЧИСТКИ ФИЛЬТРА ============
   // Prefer canonical key; migrate legacy key if present.
   if (preferences.isKey("filter_clean")) {
     filterCleaningInterval = preferences.getULong("filter_clean", 7 * 24UL * 3600UL);
   } else if (preferences.isKey("filter_period")) {
     filterCleaningInterval = preferences.getULong("filter_period", 7 * 24UL * 3600UL);
     preferences.putULong("filter_clean", filterCleaningInterval);
+    Serial.println("[PREFS] Migrated legacy filter_period key to filter_clean");
   } else {
     filterCleaningInterval = 7 * 24UL * 3600UL;
   }
+  Serial.printf("[PREFS] Filter cleaning interval: %lu seconds\n", filterCleaningInterval);
   
-  // Загружаем timestamp последней промывки (восстановление в restoreBackwashTimer после initRTC)
+  // ============ ПОСЛЕДНЯЯ ПРОМЫВКА ============
   lastBackwashTimestamp = preferences.getULong("last_backwash", 0);
-  
-  // Временно инициализируем filterOperationStartTime (будет пересчитано в restoreBackwashTimer)
   filterOperationStartTime = millis();
   
-  // Расписание
+  // ============ РАСПИСАНИЕ ============
   scheduleStart[0] = preferences.getUChar("sch_start_h", 8);
   scheduleStart[1] = preferences.getUChar("sch_start_m", 0);
   scheduleStart[2] = preferences.getUChar("sch_start_s", 0);
@@ -102,20 +109,32 @@ void loadAllSettings() {
   scheduleEnd[1] = preferences.getUChar("sch_end_m", 0);
   scheduleEnd[2] = preferences.getUChar("sch_end_s", 0);
   
-  // Ночной режим
+  Serial.printf("[PREFS] Schedule: %02u:%02u:%02u - %02u:%02u:%02u\n",
+                scheduleStart[0], scheduleStart[1], scheduleStart[2],
+                scheduleEnd[0], scheduleEnd[1], scheduleEnd[2]);
+  
+  // ============ НОЧНОЙ РЕЖИМ ============
   nightModeStart[0] = preferences.getUChar("night_start_h", 22);
   nightModeStart[1] = preferences.getUChar("night_start_m", 0);
   
   nightModeEnd[0] = preferences.getUChar("night_end_h", 6);
   nightModeEnd[1] = preferences.getUChar("night_end_m", 0);
   
-  // Параметры баков
+  Serial.printf("[PREFS] Night mode: %02u:%02u - %02u:%02u\n",
+                nightModeStart[0], nightModeStart[1],
+                nightModeEnd[0], nightModeEnd[1]);
+  
+  // ============ ПАРАМЕТРЫ БАКОВ ============
   tank1.minLevel = preferences.getUChar("tank1_min", 10);
   tank1.maxLevel = preferences.getUChar("tank1_max", 80);
   
   tank2.minLevel = preferences.getUChar("tank2_min", 10);
   tank2.maxLevel = preferences.getUChar("tank2_max", 80);
   
+  Serial.printf("[PREFS] Tank1: min=%u, max=%u\n", tank1.minLevel, tank1.maxLevel);
+  Serial.printf("[PREFS] Tank2: min=%u, max=%u\n", tank2.minLevel, tank2.maxLevel);
+  
+  Serial.println("[PREFS] All settings loaded successfully");
 }
 
 // ============ СОХРАНЕНИЕ НАСТРОЕК ============
@@ -189,6 +208,9 @@ void saveTimerSettings() {
   backlightTimeout = backlightDuration * 1000UL; // apply runtime timeout
   preferences.putULong("filter_wash", filterWashDuration);
   preferences.putULong("filter_clean", filterCleaningInterval);
+  
+  Serial.printf("[PREFS] Timers saved: settling=%lu, aeration=%lu, ozone=%lu, wash=%lu, clean_period=%lu\n",
+                setlingDuration, aerationDuration, ozonationDuration, filterWashDuration, filterCleaningInterval);
 }
 
 /// Сохраняет параметры расписания
@@ -210,6 +232,12 @@ void saveScheduleSettings() {
   
   preferences.putUChar("night_end_h", nightModeEnd[0]);
   preferences.putUChar("night_end_m", nightModeEnd[1]);
+  
+  Serial.printf("[PREFS] Schedule saved: %02u:%02u:%02u - %02u:%02u:%02u | Night: %02u:%02u - %02u:%02u\n",
+                scheduleStart[0], scheduleStart[1], scheduleStart[2],
+                scheduleEnd[0], scheduleEnd[1], scheduleEnd[2],
+                nightModeStart[0], nightModeStart[1],
+                nightModeEnd[0], nightModeEnd[1]);
 }
 
 // ============ СОХРАНЕНИЕ СОСТОЯНИЯ РАБОТЫ ============
@@ -287,6 +315,9 @@ void saveTankSettings() {
   
   preferences.putUChar("tank2_min", tank2.minLevel);
   preferences.putUChar("tank2_max", tank2.maxLevel);
+  
+  Serial.printf("[PREFS] Tank settings saved: T1[%u,%u] T2[%u,%u]\n",
+                tank1.minLevel, tank1.maxLevel, tank2.minLevel, tank2.maxLevel);
 }
 
 /// Сохраняет одиночное значение таймера
@@ -336,14 +367,21 @@ void saveSingleSetting(int settingCode, uint32_t value) {
 /// Сбрасывает все настройки на значения по умолчанию
 void resetAllSettings() {
   extern Preferences preferences;
+  extern void loadSafetySettings();  // From engineer_menu.cpp
   
+  Serial.println("[PREFS] *** RESETTING ALL SETTINGS TO DEFAULTS ***");
   preferences.clear();
+  
+  // Перезагружаем все параметры (они используют значения по умолчанию при отсутствии ключей)
   loadAllSettings();
+  loadSafetySettings();
+  
+  // Сохраняем значения по умолчанию в Preferences
   saveTimerSettings();
   saveScheduleSettings();
   saveTankSettings();
   
-  Serial.println("[INFO] All settings reset to defaults");
+  Serial.println("[PREFS] ✓ All settings reset to defaults and saved");
 }
 
 /// Сбрасывает конкретную настройку

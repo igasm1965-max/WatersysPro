@@ -338,14 +338,13 @@ void processAutomaticControl() {
             }
 
             // Приоритет 1: Промывка фильтра (если требуется)
-            if (flags.filterCleaningNeeded && !flags.tank2Empty &&
+            if (flags.filterCleaningNeeded && !flags.tank1Empty &&
                 !flags.waterTreatmentInProgress && !flags.backwashInProgress) {
-                if (tank2Level <= tank2.minLevel) {  // Уровень достаточен (бак 2 полон)
+                if (tank1Level <= tank1.minLevel) {  // Уровень достаточен (бак полон)
                     changeState(STATE_BACKWASH);
                     currentBackwashRemaining =
                         filterWashDuration;  // Инициализируем таймер промывки
                     flags.backwashInProgress = 1;
-                    startPump2EmergencyMonitoring();
                     saveEventLog(LOG_INFO, 15, 0);  // EVENT_FILTER_WASH_START
                     break;
                 }
@@ -399,6 +398,13 @@ void processAutomaticControl() {
                 changeState(STATE_AERATION);
                 currentAerationRemaining = aerationDuration;  // Инициализируем таймер аэрации
             }
+            // Таймаут безопасности (настраиваемый)
+            else if (currentTime - systemContext.stateStartTime >
+                     (unsigned long)safetySettings.timeoutOzonation * 60UL * 1000UL) {
+                changeState(STATE_IDLE);
+                flags.waterTreatmentInProgress = 0;
+                triggerEmergency("OZONATION TIMEOUT");
+            }
             break;
 
         case STATE_AERATION:
@@ -406,6 +412,13 @@ void processAutomaticControl() {
             if (currentAerationRemaining == 0) {
                 changeState(STATE_SETTLING);
                 currentSetlingRemaining = setlingDuration;  // Инициализируем таймер отстаивания
+            }
+            // Таймаут безопасности (настраиваемый)
+            else if (currentTime - systemContext.stateStartTime >
+                     (unsigned long)safetySettings.timeoutAeration * 60UL * 1000UL) {
+                changeState(STATE_IDLE);
+                flags.waterTreatmentInProgress = 0;
+                triggerEmergency("AERATION TIMEOUT");
             }
             break;
 
@@ -415,13 +428,22 @@ void processAutomaticControl() {
                 flags.waterTreatmentInProgress = 0;
 
                 // Проверка необходимости промывки фильтра
-                if (flags.filterCleaningNeeded && !flags.tank2Empty && !flags.backwashInProgress) {
-                    if (tank2Level <= tank2.minLevel) {  // Уровень достаточен (бак 2 полон)
-                        changeState(STATE_BACKWASH);
-                        currentBackwashRemaining =
-                            filterWashDuration;  // Инициализируем таймер промывки
-                        flags.backwashInProgress = 1;
-                        startPump2EmergencyMonitoring();
+                if (flags.filterCleaningNeeded && !flags.tank1Empty && !flags.backwashInProgress) {
+                    if (tank1Level <= tank1.minLevel) {  // Уровень достаточен (бак полон)
+                        // Проверяем уровень бака 2 перед промывкой
+                        if (tank2Level > tank2.minLevel) {
+                            // Бак 2 не полный - наполняем его перед промывкой
+                            changeState(STATE_FILTRATION);
+                            filterOperationStartTime = systemContext.stateStartTime;
+                            flags.firstFiltrationCycle = 0;
+                            startPump2EmergencyMonitoring();
+                        } else {
+                            // Бак 2 уже полный - сразу запускаем промывку
+                            changeState(STATE_BACKWASH);
+                            currentBackwashRemaining = filterWashDuration;
+                            flags.backwashInProgress = 1;
+                            saveEventLog(LOG_INFO, 15, 0);  // EVENT_FILTER_WASH_START
+                        }
                     }
                 }
                 // Иначе переход к фильтрации (если нужна)
@@ -433,20 +455,29 @@ void processAutomaticControl() {
                     changeState(STATE_IDLE);
                 }
             }
+            // Таймаут безопасности (настраиваемый)
+            else if (currentTime - systemContext.stateStartTime >
+                     (unsigned long)safetySettings.timeoutSettling * 60UL * 1000UL) {
+                changeState(STATE_IDLE);
+                flags.waterTreatmentInProgress = 0;
+                triggerEmergency("SETTLING TIMEOUT");
+            }
             break;
 
         case STATE_FILTRATION: {
             // Фильтрация завершена: бак 1 опустел или бак 2 заполнен
             if (tank1Level >= tank1.maxLevel || tank2Level <= tank2.minLevel) {
                 stopPump2EmergencyMonitoring();
-
-                // Проверка необходимости промывки после фильтрации (если бак 2 заполнен)
-                if (flags.filterCleaningNeeded && !flags.tank2Empty &&
+                
+                // Если требуется промывка и бак 2 полный - переходим в BACKWASH
+                // ПРИМЕЧАНИЕ: НЕ проверяем уровень бака 1, так как он естественно опустошается во время фильтрации
+                if (flags.filterCleaningNeeded && !flags.backwashInProgress && 
                     tank2Level <= tank2.minLevel) {
+                    // Бак 2 полный и нужна промывка - запускаем её
                     changeState(STATE_BACKWASH);
                     currentBackwashRemaining = filterWashDuration;
                     flags.backwashInProgress = 1;
-                    startPump2EmergencyMonitoring();
+                    saveEventLog(LOG_INFO, 15, 0);  // EVENT_FILTER_WASH_START
                 } else {
                     changeState(STATE_IDLE);
                 }
@@ -461,13 +492,24 @@ void processAutomaticControl() {
         } break;
 
         case STATE_BACKWASH:
-            // Промывка завершена: по таймеру или бак 2 опустел (вода для промывки берется из бака
-            // 2)
-            if ((currentBackwashRemaining == 0) || flags.tank2Empty) {
+            // Проверка на сухой ход - если бак 2 опустел ДО завершения промывки (опасно для фильтра)
+            if (tank2Level <= tank2.minLevel && !flags.tank2Empty && currentBackwashRemaining > 10) {
+                stopPump2EmergencyMonitoring();
+                
+                flags.filterCleaningNeeded = 0;
+                flags.backwashInProgress = 0;
+                flags.backwashDryRunError = 1;
+                
+                saveEventLog(LOG_WARNING, EVENT_BACKWASH_DRY_RUN, 0);
+                // Остаемся на экране backwash для показа ошибки
+            }
+            // Промывка завершена: по таймеру или бак 2 опустел
+            else if ((currentBackwashRemaining == 0) || tank2Level >= tank2.maxLevel) {
                 stopPump2EmergencyMonitoring();
 
                 flags.filterCleaningNeeded = 0;
                 flags.backwashInProgress = 0;
+                flags.backwashDryRunError = 0;
                 filterOperationStartTime = millis();
                 flags.firstFiltrationCycle = 1;
 
@@ -486,6 +528,14 @@ void processAutomaticControl() {
                 } else {
                     changeState(STATE_IDLE);
                 }
+            }
+            // Таймаут безопасности (настраиваемый)
+            else if (currentTime - systemContext.stateStartTime >
+                     (unsigned long)safetySettings.timeoutBackwash * 60UL * 1000UL) {
+                stopPump2EmergencyMonitoring();
+                changeState(STATE_IDLE);
+                flags.backwashInProgress = 0;
+                triggerEmergency("BACKWASH TIMEOUT");
             }
             break;
     }

@@ -1107,6 +1107,7 @@ const char* getEventText(uint16_t eventCode) {
                                   return "Runtime state restored";
     case EVENT_WIFI_CONNECTED:     return "Wi-Fi connected";
     case EVENT_WIFI_AP_STARTED:    return "Wi-Fi AP started";
+    case EVENT_BACKWASH_DRY_RUN:   return "Backwash dry run detected";
     default:                      return "Unknown event";
   }
 }
