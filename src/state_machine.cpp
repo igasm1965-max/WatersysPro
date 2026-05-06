@@ -493,7 +493,9 @@ void processAutomaticControl() {
 
         case STATE_BACKWASH:
             // Проверка на сухой ход - если бак 2 опустел ДО завершения промывки (опасно для фильтра)
-            if (tank2Level <= tank2.minLevel && !flags.tank2Empty && currentBackwashRemaining > 10) {
+            // ИСПРАВЛЕНО: было tank2Level <= tank2.minLevel (проверяло полный бак),
+            // теперь tank2Level >= tank2.maxLevel (правильно проверяет пустой бак)
+            if (tank2Level >= tank2.maxLevel && !flags.tank2Empty && currentBackwashRemaining > 10) {
                 stopPump2EmergencyMonitoring();
                 
                 flags.filterCleaningNeeded = 0;
