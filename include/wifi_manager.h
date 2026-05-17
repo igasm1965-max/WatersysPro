@@ -22,4 +22,8 @@ String wifi_getIP();
 bool wifi_needsNTPSync();
 void wifi_clearNTPSyncFlag();
 
+// Wi-Fi monitoring and diagnostics
+String wifi_getStats();
+String wifi_getDetailedInfo();
+
 #endif // WIFI_MANAGER_H

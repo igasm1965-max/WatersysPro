@@ -30,6 +30,9 @@ static const int WIFI_MAX_ATTEMPTS = 5;
 
 static unsigned long lastProcessTime = 0;
 static bool needsNTPSync = false;
+static unsigned long lastAPCheckTime = 0;
+static const unsigned long AP_CHECK_INTERVAL_MS = 30000; // Проверять AP каждые 30 секунд
+static unsigned int apRestartCount = 0;
 
 static String makeApName() {
   uint64_t mac = ESP.getEfuseMac();
@@ -51,9 +54,33 @@ static void startAP() {
     Serial.printf("[WiFi] AP IP: %s\n", WiFi.softAPIP().toString().c_str());
     saveEventLog(LOG_INFO, EVENT_WIFI_AP_STARTED, 0);
     wifiState = WIFI_IDLE;
+    apRestartCount++;
+    lastAPCheckTime = millis();
   } else {
     Serial.println("[WiFi] softAP failed");
     wifiState = WIFI_FAILED;
+  }
+}
+
+// Проверяет состояние точки доступа и перезапускает при необходимости
+static void checkAPHealth() {
+  unsigned long now = millis();
+  if (now - lastAPCheckTime < AP_CHECK_INTERVAL_MS) {
+    return;
+  }
+  lastAPCheckTime = now;
+  
+  // Проверяем, активна ли точка доступа
+  if (WiFi.getMode() & WIFI_MODE_AP) {
+    // AP должен быть активен, проверяем количество клиентов (опционально)
+    int clients = WiFi.softAPgetStationNum();
+    Serial.printf("[WiFi] AP health check: active, clients=%d, restarts=%u\n", clients, apRestartCount);
+  } else {
+    // AP не активен, но должен быть (если нет STA соединения)
+    if (WiFi.status() != WL_CONNECTED) {
+      Serial.println("[WiFi] AP is not active but should be - restarting...");
+      startAP();
+    }
   }
 }
 
@@ -142,6 +169,10 @@ static void registerStaEventHandlers() {
     // info.wifi_sta_disconnected.reason is only valid for disconnect events
     uint8_t r = info.wifi_sta_disconnected.reason;
     Serial.printf("[WiFi] STA disconnected (reason %d=%s)\n", r, reasonToString(r));
+    // Дополнительная диагностика
+    Serial.printf("[WiFi] RSSI before disconnect: %d\n", WiFi.RSSI());
+    Serial.printf("[WiFi] AP SSID: %s\n", WiFi.SSID().c_str());
+    Serial.printf("[WiFi] BSSID: %s\n", WiFi.BSSIDstr().c_str());
   }, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
 }
 
@@ -166,6 +197,9 @@ void initWifiManager() {
 void loopWifiManager() {
   // called frequently from main loop
   unsigned long now = millis();
+  
+  // Проверяем здоровье точки доступа
+  checkAPHealth();
   if (attemptInProgress) {
     if (WiFi.status() == WL_CONNECTED) {
       wifiState = WIFI_CONNECTED;
@@ -243,4 +277,44 @@ bool wifi_needsNTPSync() {
 
 void wifi_clearNTPSyncFlag() {
   needsNTPSync = false;
+}
+
+// Возвращает статистику Wi-Fi для мониторинга
+String wifi_getStats() {
+  String stats = "";
+  stats += "State: ";
+  switch(wifiState) {
+    case WIFI_IDLE: stats += "IDLE"; break;
+    case WIFI_CONNECTING: stats += "CONNECTING"; break;
+    case WIFI_CONNECTED: stats += "CONNECTED"; break;
+    case WIFI_FAILED: stats += "FAILED"; break;
+  }
+  stats += ", Attempts: " + String(attemptCount);
+  stats += ", AP restarts: " + String(apRestartCount);
+  stats += ", RSSI: " + String(WiFi.RSSI());
+  stats += ", Clients: " + String(WiFi.softAPgetStationNum());
+  return stats;
+}
+
+// Возвращает детальную информацию о Wi-Fi соединении
+String wifi_getDetailedInfo() {
+  String info = "";
+  info += "Mode: ";
+  wifi_mode_t mode = WiFi.getMode();
+  if (mode & WIFI_MODE_AP) info += "AP ";
+  if (mode & WIFI_MODE_STA) info += "STA ";
+  
+  if (WiFi.status() == WL_CONNECTED) {
+    info += "\nSTA IP: " + WiFi.localIP().toString();
+    info += "\nGateway: " + WiFi.gatewayIP().toString();
+    info += "\nSSID: " + WiFi.SSID();
+    info += "\nBSSID: " + WiFi.BSSIDstr();
+    info += "\nChannel: " + String(WiFi.channel());
+  }
+  
+  info += "\nAP IP: " + WiFi.softAPIP().toString();
+  info += "\nAP Clients: " + String(WiFi.softAPgetStationNum());
+  info += "\nAP SSID: " + makeApName();
+  
+  return info;
 }

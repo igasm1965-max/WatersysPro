@@ -398,8 +398,29 @@ void setup() {
     Wire.begin(I2C_SDA, I2C_SCL);
     initI2C();
 
-    // Файловая система (SPIFFS) - optional
-    // removed SPIFFS-specific code
+    // Файловая система (LittleFS) - инициализируем для веб-интерфейса
+    bool littleFSMounted = false;
+    for (int attempt = 0; attempt < 3 && !littleFSMounted; attempt++) {
+        if (LittleFS.begin(true)) {
+            littleFSMounted = true;
+            Serial.println("[INFO] LittleFS mounted successfully");
+            Serial.printf("[INFO] LittleFS total: %u, used: %u\n", LittleFS.totalBytes(), LittleFS.usedBytes());
+        } else {
+            Serial.printf("[WARN] LittleFS mount attempt %d failed\n", attempt + 1);
+            delay(100);
+        }
+    }
+    if (!littleFSMounted) {
+        Serial.println("[ERROR] LittleFS mount failed after 3 attempts!");
+    } else {
+        // Проверка наличия необходимых файлов веб-интерфейса
+        const char* requiredFiles[] = {"/index.html", "/logfilter.html"};
+        for (const char* file : requiredFiles) {
+            if (!LittleFS.exists(file)) {
+                Serial.printf("[WARN] Required file %s not found in LittleFS\n", file);
+            }
+        }
+    }
 
     // SD card (SPI) - optional; mounts if present and prints status to Serial
     initSD();

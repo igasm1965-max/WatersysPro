@@ -26,7 +26,7 @@ static String safeGetPref(const char *key, const String &def = "") {
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include <esp_system.h>
-// removed SPIFFS-specific code
+#include <LittleFS.h>  // LittleFS filesystem
 #include <SD.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
@@ -42,19 +42,30 @@ static AsyncWebSocket ws("/ws");
 // Filesystem helpers --------------------------------------------------------
 // ---------------------------------------------------------------------------
 
-// Try to send a static resource from SD card first, then SPIFFS.  Returns
+// Try to send a static resource from SD card first, then LittleFS.  Returns
 // true if a file was found and queued, false otherwise.
 static bool sendStaticResource(AsyncWebServerRequest* request,
                                const char* path,
                                const char* contentType) {
+  // Debug output always enabled to track file serving
+  bool sdExists = sdPresent && SD.exists(path);
+  bool littleFSExists = LittleFS.exists(path);
+  Serial.printf("[Web] Trying to serve %s (sdPresent=%d, sdExists=%d, littleFSExists=%d)\n",
+                path, sdPresent, sdExists, littleFSExists);
+  
   if (sdPresent && SD.exists(path)) {
-#ifdef DEBUG_SERIAL
     Serial.printf("[Web] serve %s from SD\n", path);
-#endif
     request->send(SD, path, contentType);
     return true;
   }
-// removed SPIFFS-specific code
+  // Try LittleFS if SD doesn't have the file
+  if (LittleFS.exists(path)) {
+    Serial.printf("[Web] serve %s from LittleFS\n", path);
+    request->send(LittleFS, path, contentType);
+    return true;
+  }
+  Serial.printf("[Web] %s not found in SD or LittleFS (sdPresent=%d, LittleFS mounted=%d)\n",
+                path, sdPresent, LittleFS.totalBytes() > 0);
   return false;
 }
 
@@ -535,27 +546,33 @@ static const char RESCUE_PAGE[] PROGMEM =
   "cursor:pointer}button:hover{background:#0e7490}.note{color:#9ca3af;font-size:13px}"
   "</style></head><body>"
   "<h2>WSystem &#8212; Setup</h2>"
-  "<p>&#x26A0; Файл <code>index.html</code> не найден на SD-карте.</p>"
+  "<p>&#x26A0; Файл <code>index.html</code> не найден ни на SD-карте, ни во внутренней памяти (LittleFS).</p>"
+  "<p>Возможные причины:</p>"
+  "<ul>"
+  "<li>SD-карта отсутствует или неисправна</li>"
+  "<li>Файловая система LittleFS не смонтирована</li>"
+  "<li>Файлы интерфейса не были загружены при сборке</li>"
+  "</ul>"
   "<p>Загрузите файл ниже (URL: <code>POST /api/sd_upload?token=ТВОЙ_ТОКЕН</code>):</p>"
   "<form method=POST action='/api/sd_upload' enctype='multipart/form-data'>"
   "<input type=password name=token id=t placeholder='Admin token'>"
   "<input type=file name=file accept='.html'>"
   "<button type=submit>Загрузить на SD</button></form>"
   "<p class=note>После загрузки index.html перезагрузите страницу.<br>"
-  "SD: %s | IP: %s</p></body></html>";
+  "SD: %s | LittleFS: %s | IP: %s</p></body></html>";
 
 // root page handler (serves index.html from SD/SPIFFS)
 static void handleRoot(AsyncWebServerRequest* request) {
   IPAddress clientIP = request->client()->remoteIP();
-#ifdef DEBUG_SERIAL
   Serial.printf("[Web] GET / from %s\n", clientIP.toString().c_str());
-#endif
   if (!sendStaticResource(request, "/index.html", "text/html")) {
     // SD card missing index.html – show embedded rescue/upload page
     extern bool sdPresent;
-    char page[sizeof(RESCUE_PAGE) + 32];
+    bool littleFSMounted = LittleFS.totalBytes() > 0;
+    char page[sizeof(RESCUE_PAGE) + 64];
     snprintf(page, sizeof(page), RESCUE_PAGE,
              sdPresent ? "OK" : "NOT FOUND",
+             littleFSMounted ? "MOUNTED" : "NOT MOUNTED",
              wifi_getIP().c_str());
     request->send(200, "text/html", page);
   }

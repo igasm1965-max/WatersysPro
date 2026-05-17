@@ -17,9 +17,7 @@ using SafeLCD = LiquidCrystal_I2C;
 #include "esp_task_wdt.h"
 #include "rom/rtc.h"
 #include <esp32-hal-timer.h>
-// removed SPIFFS-specific code
-
-// removed SPIFFS-specific code
+#include <LittleFS.h>  // LittleFS filesystem for web UI
 
 // ============ РЕЖИМ РАЗРАБОТКИ ============
 #define BARE_BOARD_MODE false  ///< true = голая плата (без модулей), false = с модулями
@@ -174,7 +172,7 @@ enum eEncoderState {
 #define DEFAULT_TIMEOUT_BACKWASH 30      ///< Таймаут промывки (мин)
 
 // ============ КОНСТАНТЫ WATCHDOG ДЛЯ ESP32 ============
-#define WDT_TIMEOUT_SECONDS 30            ///< 30с — запас для TLS handshake и menu loops
+#define WDT_TIMEOUT_SECONDS 60            ///< 60с — увеличен для стабильности Wi-Fi и AP
 #define WATCHDOG_ENABLED true  ///< Watchdog включён для продакшена
 /// Сброс watchdog таймера
 #define WDT_RESET() { if (WATCHDOG_ENABLED) esp_task_wdt_reset(); }

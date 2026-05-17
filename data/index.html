@@ -1,0 +1,1916 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WSystem</title>
+  <style>
+    :root {
+      --bg: #020617;
+      --bg-elevated: #020617;
+      --bg-card: #020617;
+      --bg-card-soft: #020617;
+      --border-subtle: rgba(148, 163, 184, 0.35);
+      --border-strong: rgba(148, 163, 184, 0.7);
+      --accent: #22d3ee;
+      --accent-soft: rgba(34, 211, 238, 0.12);
+      --accent-strong: #06b6d4;
+      --accent-muted: #0f172a;
+      --success: #22c55e;
+      --success-soft: rgba(34, 197, 94, 0.12);
+      --danger: #f97373;
+      --danger-soft: rgba(248, 113, 113, 0.12);
+      --warning: #fdba74;
+      --warning-soft: rgba(253, 186, 116, 0.12);
+      --text-main: #e5e7eb;
+      --text-soft: #9ca3af;
+      --text-muted: #6b7280;
+      --input-bg: rgba(15, 23, 42, 0.9);
+      --input-border: rgba(148, 163, 184, 0.6);
+      --shadow-soft: 0 22px 45px rgba(15, 23, 42, 0.9);
+      --radius-lg: 16px;
+      --radius-md: 12px;
+      --radius-pill: 999px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 24px 16px 32px;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, #0f172a 0, #020617 50%, #000 100%);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+    }
+
+    .app-shell {
+      width: 100%;
+      max-width: 1040px;
+      background:
+        radial-gradient(circle at top, rgba(56, 189, 248, 0.16), transparent 55%),
+        radial-gradient(circle at bottom right, rgba(34, 197, 94, 0.14), transparent 50%),
+        var(--bg-elevated);
+      border-radius: 24px;
+      padding: 20px 22px 24px;
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      box-shadow: var(--shadow-soft);
+      backdrop-filter: blur(18px) saturate(1.4);
+    }
+
+    @media (min-width: 960px) {
+      .app-shell {
+        padding: 26px 28px 30px;
+      }
+    }
+
+    header.app-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .app-title-block {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .app-title {
+      font-size: 1.6rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .app-title-badge {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      padding: 3px 9px;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.55);
+      background: rgba(15, 23, 42, 0.85);
+      color: var(--text-soft);
+    }
+
+    .app-subtitle {
+      font-size: 0.9rem;
+      color: var(--text-soft);
+    }
+
+    .pill-meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: flex-start;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .page-view {
+      display: block;
+    }
+
+    .settings-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .settings-title {
+      font-size: 1rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-main);
+    }
+
+    .pill-meta {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      border-radius: var(--radius-pill);
+      padding: 4px 10px;
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      background: rgba(15, 23, 42, 0.9);
+      color: var(--text-muted);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .pill-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: radial-gradient(circle at 30% 30%, #a7f3d0, #22c55e);
+      box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.4);
+    }
+
+    .layout-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 14px;
+    }
+
+    @media (max-width: 900px) {
+      .layout-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .layout-grid-lcd-system {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+      gap: 14px;
+    }
+
+    @media (max-width: 900px) {
+      .layout-grid-lcd-system {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .layout-grid-pair {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 14px;
+    }
+
+    @media (max-width: 900px) {
+      .layout-grid-pair {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .stack {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .card {
+      border-radius: var(--radius-lg);
+      background:
+        radial-gradient(circle at top left, rgba(148, 163, 184, 0.12), transparent 60%),
+        radial-gradient(circle at bottom right, rgba(15, 23, 42, 0.9), transparent 65%),
+        var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      padding: 12px 14px 13px;
+      box-shadow: 0 16px 35px rgba(15, 23, 42, 0.85);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      border-radius: inherit;
+      background: linear-gradient(135deg, rgba(34, 211, 238, 0.22), transparent 45%, rgba(34, 197, 94, 0.18));
+      mix-blend-mode: soft-light;
+      opacity: 0.6;
+    }
+
+    .card-inner {
+      position: relative;
+      z-index: 1;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .card-title-block {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .card-title {
+      font-size: 0.95rem;
+      text-transform: uppercase;
+      letter-spacing: 0.13em;
+      color: #e5e7eb;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .card-title span.dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, #bae6fd, #0ea5e9);
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+    }
+
+    .card-subtitle {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    .card-badge {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      padding: 4px 9px;
+      border-radius: var(--radius-pill);
+      border: 1px solid rgba(56, 189, 248, 0.5);
+      background: rgba(8, 47, 73, 0.9);
+      color: #e0f2fe;
+      white-space: nowrap;
+    }
+
+    .card-body {
+      font-size: 0.85rem;
+      color: var(--text-main);
+    }
+
+    .status-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+      gap: 10px;
+      align-items: stretch;
+    }
+
+    @media (max-width: 720px) {
+      .status-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    #info {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 0.82rem;
+      padding: 9px 10px;
+      border-radius: var(--radius-md);
+      background: rgba(15, 23, 42, 0.96);
+      border: 1px solid rgba(148, 163, 184, 0.6);
+      color: #e5e7eb;
+      max-height: 170px;
+      overflow-y: auto;
+      overflow-anchor: none;
+    }
+
+    #controls {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 8px;
+      margin-top: 6px;
+      overflow-anchor: none;
+    }
+
+    /* Relay control buttons: green when ON, red when OFF */
+    .relay-btn {
+      width: 100%;
+      justify-content: center;
+      font-weight: 600;
+    }
+
+    .relay-btn.relay-disabled,
+    .relay-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      filter: grayscale(0.35);
+    }
+
+    .mode-switch {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 6px;
+      margin-bottom: 6px;
+    }
+
+    .mode-switch .mode-btn-active {
+      box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.8), 0 0 12px rgba(34, 211, 238, 0.35);
+    }
+
+    #modeLockHint {
+      color: #fecaca;
+      min-height: 1.2em;
+    }
+
+    .chart-card {
+      padding: 9px 10px;
+      border-radius: var(--radius-md);
+      background: radial-gradient(circle at top, rgba(30, 64, 175, 0.28), transparent 55%),
+                  rgba(15, 23, 42, 0.98);
+      border: 1px solid rgba(129, 140, 248, 0.8);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    /* Визуализация главного экрана (эмуляция LCD 20x4) */
+    .lcd-card {
+      margin-top: 10px;
+      padding: 8px 10px;
+      border-radius: var(--radius-md);
+      background: radial-gradient(circle at top, rgba(34, 197, 94, 0.18), transparent 55%),
+                  rgba(15, 23, 42, 0.98);
+      border: 1px solid rgba(34, 197, 94, 0.7);
+    }
+
+    .lcd-header {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--text-soft);
+      margin-bottom: 4px;
+    }
+
+    .lcd-screen {
+      margin: 0;
+      padding: 10px 12px;
+      border-radius: 6px;
+      background: #020617;
+      border: 1px solid rgba(148, 163, 184, 0.7);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      /* Увеличенный масштаб «экрана устройства» примерно в 2 раза по высоте */
+      font-size: 1.4rem;
+      line-height: 1.8;
+      white-space: pre;
+      color: #a7f3d0;
+    }
+ 
+    .chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.8rem;
+      color: var(--text-soft);
+    }
+
+    .chart-legend {
+      display: inline-flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+      font-size: 0.78rem;
+    }
+
+    .legend-swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+    }
+
+    .legend-swatch.t1 { background: #38bdf8; }
+    .legend-swatch.t2 { background: #f472b6; }
+
+    .status-badges-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .status-pill {
+      font-size: 0.78rem;
+      padding: 3px 9px;
+      border-radius: var(--radius-pill);
+      border: 1px solid rgba(148, 163, 184, 0.6);
+      background: rgba(15, 23, 42, 0.92);
+      color: var(--text-soft);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+    }
+
+    .status-dot.sd-ok {
+      background: radial-gradient(circle at 30% 30%, #bbf7d0, #22c55e);
+      box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.4);
+    }
+
+    .status-dot.sd-unknown {
+      background: radial-gradient(circle at 30% 30%, #e5e7eb, #9ca3af);
+      box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.3);
+    }
+
+    .status-dot.sd-missing {
+      background: radial-gradient(circle at 30% 30%, #fed7aa, #f97316);
+      box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.4);
+    }
+
+    canvas#levelChart {
+      width: 100%;
+      max-width: 260px;
+      height: 140px;
+      border-radius: 10px;
+      background: radial-gradient(circle at bottom, rgba(15, 118, 110, 0.22), transparent 60%),
+                  #020617;
+      border: 1px solid rgba(148, 163, 184, 0.6);
+    }
+
+    .field-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 2fr);
+      gap: 6px 10px;
+      align-items: center;
+      margin-bottom: 6px;
+      font-size: 0.84rem;
+    }
+
+    @media (max-width: 640px) {
+      .field-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .field-label {
+      color: var(--text-soft);
+      padding-right: 4px;
+      font-size: 0.8rem;
+    }
+
+    .field-label strong {
+      color: var(--text-main);
+      font-weight: 500;
+    }
+
+    input[type="text"],
+    input[type="password"],
+    input[type="number"],
+    input[type="search"],
+    input:not([type]) {
+      width: 100%;
+      padding: 6px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--input-border);
+      background: var(--input-bg);
+      color: var(--text-main);
+      font-size: 0.83rem;
+      outline: none;
+      transition: border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+    }
+
+    input::placeholder {
+      color: rgba(148, 163, 184, 0.7);
+    }
+
+    input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.7);
+      background: rgba(15, 23, 42, 1);
+    }
+
+    input[type="checkbox"] {
+      width: 15px;
+      height: 15px;
+      border-radius: 4px;
+      border: 1px solid rgba(148, 163, 184, 0.9);
+      background: rgba(15, 23, 42, 0.9);
+      accent-color: var(--accent);
+    }
+
+    .btn-row,
+    .btn-row-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    button {
+      font-family: inherit;
+      font-size: 0.8rem;
+      font-weight: 500;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      padding: 6px 12px;
+      cursor: pointer;
+      background: rgba(15, 23, 42, 0.9);
+      color: var(--text-main);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      outline: none;
+      user-select: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+    }
+
+    button:hover {
+      opacity: 0.8;
+    }
+
+    button:active {
+      opacity: 0.7;
+    }
+
+    button:focus {
+      outline: none;
+    }
+
+    .section-footer-note {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .relay-state-label {
+      font-size: 0.75rem;
+      opacity: 0.9;
+    }
+
+    .relay-on {
+      background: #16a34a;
+      border-color: rgba(22, 163, 74, 0.9);
+      color: #ecfdf5;
+    }
+
+    .relay-on:hover {
+      background: #22c55e;
+    }
+
+    .relay-off {
+      background: #b91c1c;
+      border-color: rgba(239, 68, 68, 0.95);
+      color: #fef2f2;
+    }
+
+    .relay-off:hover {
+      background: #dc2626;
+    }
+
+    .btn-primary {
+      background: radial-gradient(circle at 25% 0, #67e8f9, #22d3ee);
+      color: #0f172a;
+      border-color: rgba(34, 211, 238, 0.1);
+    }
+
+    .btn-primary:hover {
+      background: radial-gradient(circle at 25% 0, #a5f3fc, #06b6d4);
+    }
+
+    .btn-soft {
+      background: var(--accent-soft);
+      border-color: rgba(34, 211, 238, 0.6);
+      color: #e0f2fe;
+    }
+
+    .btn-soft:hover {
+      background: rgba(56, 189, 248, 0.33);
+    }
+
+    .btn-success {
+      background: var(--success-soft);
+      border-color: rgba(34, 197, 94, 0.75);
+      color: #bbf7d0;
+    }
+
+    .btn-success:hover {
+      background: rgba(22, 163, 74, 0.55);
+    }
+
+    .btn-warning {
+      background: var(--warning-soft);
+      border-color: rgba(249, 115, 22, 0.7);
+      color: #fed7aa;
+    }
+
+    .btn-danger {
+      background: var(--danger-soft);
+      border-color: rgba(239, 68, 68, 0.85);
+      color: #fecaca;
+    }
+
+    .btn-outline {
+      background: rgba(15, 23, 42, 0.9);
+      color: var(--text-main);
+      border-color: rgba(148, 163, 184, 0.7);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      border-color: rgba(148, 163, 184, 0.4);
+      color: var(--text-soft);
+    }
+
+    .btn-sm {
+      padding: 4px 10px;
+      font-size: 0.78rem;
+    }
+
+    .hint-text {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 3px;
+    }
+
+    .danger-inline-hint {
+      color: #ff2020;
+      font-weight: 700;
+      font-size: 0.78rem;
+      line-height: 1.2;
+      text-shadow: 0 0 6px rgba(255, 0, 0, 0.35);
+    }
+
+    .section-footer-note {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    #msg {
+      margin-top: 10px;
+      font-size: 0.8rem;
+      color: #a7f3d0;
+      padding: 6px 10px;
+      border-radius: var(--radius-pill);
+      background: rgba(15, 118, 110, 0.25);
+      border: 1px solid rgba(34, 197, 94, 0.4);
+      min-height: 1.2em;
+      overflow-anchor: none;
+    }
+ 
+    .emergency-banner {
+      margin-top: 8px;
+      padding: 6px 10px;
+      border-radius: var(--radius-md);
+      background: rgba(220, 38, 38, 0.18);
+      border: 1px solid rgba(248, 113, 113, 0.9);
+      color: #fecaca;
+      font-size: 0.8rem;
+      display: none;
+    }
+ 
+    .emergency-banner.active {
+      display: block;
+    }
+
+    #mqttMsg {
+      font-size: 0.78rem;
+      color: #bae6fd;
+    }
+
+    #logMsg {
+      margin-top: 6px;
+      font-size: 0.8rem;
+      color: #a7f3d0;
+      padding: 6px 8px;
+      border-radius: 10px;
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px dashed rgba(148, 163, 184, 0.7);
+      max-height: 140px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    /* Окна логов и списка SD-файлов: фиксированная высота с прокруткой */
+    #logView,
+    #sdList {
+      max-height: 300px;
+      overflow-y: auto;
+      background: rgba(15, 23, 42, 0.98);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 8px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 0.8rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin-top: 8px;
+    }
+
+    a {
+      color: #38bdf8;
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .legacy-link-row {
+      margin-top: 10px;
+      font-size: 0.8rem;
+      color: var(--text-soft);
+    }
+
+    noscript .noscript-warning {
+      margin-top: 8px;
+      color: #fed7aa;
+      font-size: 0.82rem;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 6, 23, 0.78);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      padding: 16px;
+    }
+
+    .modal-card {
+      width: 100%;
+      max-width: 420px;
+      border-radius: var(--radius-lg);
+      border: 1px solid rgba(148, 163, 184, 0.55);
+      background: radial-gradient(circle at top, rgba(56, 189, 248, 0.14), transparent 55%), rgba(2, 6, 23, 0.98);
+      box-shadow: 0 22px 45px rgba(0, 0, 0, 0.55);
+      padding: 14px;
+    }
+
+    .modal-title {
+      font-size: 0.95rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 6px;
+    }
+
+    .modal-subtitle {
+      font-size: 0.82rem;
+      color: var(--text-soft);
+      margin-bottom: 10px;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    #settingsTokenError {
+      min-height: 1.1em;
+      color: #ff6b6b;
+      font-size: 0.78rem;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div id="settingsTokenModal" class="modal-overlay" onclick="handleSettingsModalBackdrop(event)">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="settingsTokenTitle">
+      <div id="settingsTokenTitle" class="modal-title">Доступ к Settings</div>
+      <div class="modal-subtitle">Введите мастер токен для открытия страницы настроек.</div>
+      <input id="settingsTokenInput" type="password" placeholder="Master token" autocomplete="current-password">
+      <div id="settingsTokenError"></div>
+      <div class="modal-actions">
+        <button class="btn-ghost btn-sm" onclick="closeSettingsTokenModal()">Отмена</button>
+        <button id="settingsTokenSubmitBtn" class="btn-primary btn-sm" onclick="submitSettingsToken()">Войти</button>
+      </div>
+    </div>
+  </div>
+
+  <main class="app-shell">
+    <header class="app-header">
+      <div class="app-title-block">
+        <div class="app-title">
+          ESP32 Water System
+          <span class="app-title-badge">Control Panel</span>
+        </div>
+        <div class="app-subtitle">Мониторинг уровней, реле, Wi‑Fi, MQTT и логов системы</div>
+      </div>
+      <div class="header-actions">
+        <div class="pill-meta-row">
+          <div class="pill-meta">
+            <span class="pill-dot"></span>
+            LIVE STATUS
+          </div>
+          <div class="pill-meta" id="clockPill">--</div>
+        </div>
+        <button id="openSettingsBtn" class="btn-outline btn-sm" onclick="openSettingsPage()">Setting</button>
+      </div>
+    </header>
+
+    <div id="mainPage" class="page-view">
+    <!-- LCD и Система на одной строке -->
+    <div class="layout-grid-lcd-system">
+      <section class="card">
+        <div class="card-inner">
+          <div class="card-header">
+            <div class="card-title-block">
+              <div class="card-title"><span class="dot"></span> Главный экран</div>
+              <div class="card-subtitle">LCD установки</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="lcd-card">
+              <div class="lcd-header">LCD дисплей</div>
+              <pre id="lcdScreen" class="lcd-screen">Загрузка...</pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-inner">
+          <div class="card-header">
+            <div class="card-title-block">
+              <div class="card-title"><span class="dot"></span> Система</div>
+              <div class="card-subtitle">IP, MAC, аптайм, MQTT и реле</div>
+            </div>
+            <div class="card-badge">Status</div>
+          </div>
+          <div class="card-body">
+            <div class="status-grid">
+              <div>
+                <div id="info"><span id="infoIP"></span><br><span id="infoMAC"></span><br><span id="infoUptime"></span><br><b><span id="infoMqtt"></span></b><br><b><span id="infoWifi"></span></b></div>
+                <div class="mode-switch">
+                  <button id="modeManualBtn" class="btn-soft btn-sm" onclick="setMode('manual')">Ручной</button>
+                  <button id="modeAutoBtn" class="btn-soft btn-sm" onclick="setMode('auto')">Автомат</button>
+                </div>
+                <div id="modeStatus" class="hint-text">Режим: неизвестен</div>
+                <div id="modeLockHint" class="hint-text"></div>
+                <div id="controls"></div>
+              </div>
+              <div class="chart-card">
+                <div class="chart-header">
+                  <div>Уровень баков</div>
+                  <div class="chart-legend">
+                    <span class="legend-item"><span class="legend-swatch t1"></span> Tank 1</span>
+                    <span class="legend-item"><span class="legend-swatch t2"></span> Tank 2</span>
+                  </div>
+                </div>
+                <canvas id="levelChart" width="300" height="150"></canvas>
+                <div class="status-badges-row">
+                  <span class="status-pill" id="sdIndicator">
+                    <span class="status-dot sd-unknown"></span>
+                    SD card: unknown
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div id="emergencyBanner" class="emergency-banner"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    </div>
+
+    <div id="settingsPage" class="page-view" style="display:none;">
+      <div class="settings-header">
+        <div class="settings-title">Settings</div>
+        <button class="btn-soft btn-sm" onclick="closeSettingsPage()">Back</button>
+      </div>
+
+    <!-- Смена мастер токена и Wi-Fi на одной строке -->
+    <div class="layout-grid-pair">
+      <section class="card">
+        <div class="card-inner">
+          <div class="card-header">
+            <div class="card-title-block">
+              <div class="card-title"><span class="dot"></span> Смена мастер токена</div>
+              <div class="card-subtitle">Изменение администраторского токена</div>
+            </div>
+            <div class="card-badge">Security</div>
+          </div>
+          <div class="card-body">
+            <div class="field-grid">
+              <div class="field-label">Current</div>
+              <div><input id="admin_current" type="password" placeholder="текущий токен"></div>
+
+              <div class="field-label">New (≤20)</div>
+              <div><input id="admin_new" type="text" placeholder="новый токен"></div>
+            </div>
+            <div class="btn-row">
+              <button class="btn-soft btn-sm" onclick="saveAdminToken()">Set admin token</button>
+            </div>
+            <div class="hint-text">Только латинские буквы и цифры, длина 1–20 символов.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-inner">
+          <div class="card-header">
+            <div class="card-title-block">
+              <div class="card-title"><span class="dot"></span> Wi‑Fi</div>
+              <div class="card-subtitle">Подключение устройства и токены</div>
+            </div>
+            <span id="wifiIndicator" class="status-pill"><span class="status-dot sd-unknown"></span>unknown</span>
+          </div>
+          <div class="card-body">
+            <div class="field-grid">
+              <div class="field-label"><strong>SSID</strong></div>
+              <div><input id="ssid" type="text" placeholder="Wi‑Fi network name"></div>
+
+              <div class="field-label"><strong>Password</strong></div>
+              <div><input id="pass" type="password" placeholder="password"></div>
+
+              <div class="field-label"><strong>Timezone (UTC)</strong></div>
+              <div><input id="timezone" type="number" min="-12" max="12" placeholder="0" style="max-width: 80px"></div>
+            </div>
+
+            <div class="btn-row">
+              <button class="btn-primary" onclick="saveWifi()">Save Wi‑Fi</button>
+              <button class="btn-soft btn-sm" onclick="saveTimezone()">Save Timezone</button>
+            </div>
+
+            <div class="hint-text">Если устройство работает в режиме точки доступа и не подключено к роутеру, сохранение новых Wi‑Fi данных доступно без токена.</div>
+
+            <div class="section-footer-note">После изменения настроек устройство может перезапустить соединение.</div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- MQTT и Логи/SD на одной строке -->
+    <div class="layout-grid-pair">
+      <section class="card">
+        <div class="card-inner">
+          <div class="card-header">
+            <div class="card-title-block">
+              <div class="card-title"><span class="dot"></span> MQTT</div>
+              <div class="card-subtitle">Отправка телеметрии в брокер</div>
+            </div>
+            <span id="mqttIndicator" class="status-pill"><span class="status-dot sd-unknown"></span>unknown</span>
+          </div>
+          <div class="card-body">
+            <div class="field-grid">
+              <div class="field-label"><strong>Broker</strong></div>
+              <div><input id="mqtt_broker" type="text" placeholder="broker.local"></div>
+
+              <div class="field-label"><strong>Port</strong></div>
+              <div><input id="mqtt_port" type="number" style="max-width: 120px" placeholder="1883"></div>
+
+              <div class="field-label"><strong>TLS Port</strong></div>
+              <div><input id="mqtt_tls_port" type="number" style="max-width: 120px" placeholder="8883"></div>
+
+              <div class="field-label"><strong>User</strong></div>
+              <div><input id="mqtt_user" type="text" placeholder="username"></div>
+
+              <div class="field-label"><strong>Password</strong></div>
+              <div><input id="mqtt_pass" type="password" placeholder="password"></div>
+
+              <div class="field-label"><strong>Client ID</strong></div>
+              <div><input id="mqtt_client_id" type="text" placeholder="auto-generated"></div>
+
+              <div class="field-label"><strong>Topic base</strong></div>
+              <div><input id="mqtt_topic_base" type="text" placeholder="watersystem"></div>
+
+              <div class="field-label"><strong>Interval (s)</strong></div>
+              <div><input id="mqtt_interval" type="number" style="max-width: 120px" placeholder="10"></div>
+
+              <div class="field-label"><strong>TLS Enable</strong></div>
+              <div><input id="mqtt_secure" type="checkbox"></div>
+
+              <div class="field-label"><strong>TLS Insecure (diag)</strong></div>
+              <div style="display:flex; align-items:center; gap:10px; flex-wrap:nowrap;">
+                <input id="mqtt_insecure" type="checkbox">
+                <span class="danger-inline-hint" style="white-space: nowrap;">Использовать только для диагностики !!!</span>
+              </div>
+
+              <div class="field-label"><strong>Will message</strong></div>
+              <div><input id="mqtt_will" type="checkbox"></div>
+
+              <div class="field-label"><strong>Enabled</strong></div>
+              <div><input id="mqtt_enabled" type="checkbox"></div>
+            </div>
+
+            <div class="btn-row">
+              <button class="btn-primary" onclick="saveMqtt()">Save MQTT</button>
+              <span id="mqttMsg"></span>
+            </div>
+
+            <div class="section-footer-note">После сохранения устройство может переподключиться к брокеру.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-inner">
+          <div class="card-header">
+            <div class="card-title-block">
+              <div class="card-title"><span class="dot"></span> Логи / SD</div>
+              <div class="card-subtitle">Работа с логами и картой памяти</div>
+            </div>
+            <div class="card-badge">Diagnostics</div>
+          </div>
+          <div class="card-body">
+            <div class="btn-row-wrap">
+              <button class="btn-outline btn-sm" onclick="downloadLogs()">Download logs</button>
+              <button class="btn-warning btn-sm" onclick="viewLogs()">View logs</button>
+              <button class="btn-soft btn-sm" onclick="exportLogs()">Export to SD</button>
+              <button class="btn-soft btn-sm" onclick="listSdFiles()">List SD files</button>
+              <button class="btn-danger btn-sm" onclick="clearLogs()">Clear logs</button>
+            </div>
+            <pre id="logMsg"></pre>
+            <pre id="logView" style="display:none;"></pre>
+            <pre id="sdList" style="display:none;"></pre>
+          </div>
+        </div>
+      </section>
+    </div>
+    </div>
+
+    <div id="msg"></div>
+
+    <div class="legacy-link-row">
+      <a href="/legacy">Legacy UI (no JavaScript)</a>
+    </div>
+
+    <noscript>
+      <div class="noscript-warning">JavaScript is disabled or not supported by your browser. Use the <a href="/legacy">Legacy UI</a>.</div>
+    </noscript>
+  </main>
+
+  <script>
+  // Enhanced status update: prefer WebSocket (push) and pause polling when page hidden to reduce load
+  var pollingEnabled = true;
+  var currentControlMode = 'auto';
+  var settingsAdminToken = '';
+  var settingsSessionId = '';
+
+  function setUiMessage(text, timeoutMs) {
+    const msg = document.getElementById('msg');
+    if (!msg) return;
+    msg.innerText = text;
+    setTimeout(function(){ msg.innerText = ''; }, timeoutMs || 3000);
+  }
+
+  async function verifyAdminToken(token) {
+    try {
+      const verifyResp = await fetch('/api/settings_auth', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ token: token })
+      });
+      if (!verifyResp.ok) return false;
+      const verifyJson = await verifyResp.json();
+      if (!verifyJson.ok || !verifyJson.session) return false;
+      settingsSessionId = String(verifyJson.session);
+      return true;
+    } catch (e) {
+      console.warn('verifyAdminToken error', e);
+      return false;
+    }
+  }
+
+  function openSettingsPage() {
+    const modal = document.getElementById('settingsTokenModal');
+    const input = document.getElementById('settingsTokenInput');
+    const err = document.getElementById('settingsTokenError');
+    if (err) err.textContent = '';
+    if (input) {
+      input.value = '';
+      setTimeout(function(){ input.focus(); }, 0);
+    }
+    if (modal) modal.style.display = 'flex';
+  }
+
+  function closeSettingsTokenModal() {
+    const modal = document.getElementById('settingsTokenModal');
+    const err = document.getElementById('settingsTokenError');
+    if (err) err.textContent = '';
+    if (modal) modal.style.display = 'none';
+  }
+
+  function handleSettingsModalBackdrop(event) {
+    if (event.target && event.target.id === 'settingsTokenModal') {
+      closeSettingsTokenModal();
+    }
+  }
+
+  async function submitSettingsToken() {
+    const input = document.getElementById('settingsTokenInput');
+    const err = document.getElementById('settingsTokenError');
+    const btn = document.getElementById('settingsTokenSubmitBtn');
+    const enteredToken = input ? (input.value || '').trim() : '';
+
+    if (!enteredToken) {
+      if (err) err.textContent = 'Введите мастер токен';
+      return;
+    }
+
+    if (btn) btn.disabled = true;
+    if (err) err.textContent = 'Проверка токена...';
+    const ok = await verifyAdminToken(enteredToken);
+    if (btn) btn.disabled = false;
+
+    if (!ok) {
+      if (err) err.textContent = 'Неверный мастер токен';
+      return;
+    }
+
+    settingsAdminToken = enteredToken;
+    closeSettingsTokenModal();
+    const main = document.getElementById('mainPage');
+    const settings = document.getElementById('settingsPage');
+    if (main) main.style.display = 'none';
+    if (settings) settings.style.display = 'block';
+    loadMqtt();
+    loadTimezone();
+  }
+
+  function closeSettingsPage() {
+    const main = document.getElementById('mainPage');
+    const settings = document.getElementById('settingsPage');
+    settingsAdminToken = '';
+    settingsSessionId = '';
+    if (settings) settings.style.display = 'none';
+    if (main) main.style.display = 'block';
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    const tokenInput = document.getElementById('settingsTokenInput');
+    if (tokenInput) {
+      tokenInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          submitSettingsToken();
+        }
+      });
+    }
+  });
+
+  function applyControlMode(mode) {
+    currentControlMode = (mode === 'manual') ? 'manual' : 'auto';
+    const manualBtn = document.getElementById('modeManualBtn');
+    const autoBtn = document.getElementById('modeAutoBtn');
+    const modeStatus = document.getElementById('modeStatus');
+    const modeHint = document.getElementById('modeLockHint');
+
+    if (manualBtn) {
+      manualBtn.classList.toggle('mode-btn-active', currentControlMode === 'manual');
+    }
+    if (autoBtn) {
+      autoBtn.classList.toggle('mode-btn-active', currentControlMode === 'auto');
+    }
+    if (modeStatus) {
+      modeStatus.textContent = 'Режим: ' + (currentControlMode === 'manual' ? 'Ручной' : 'Автоматический');
+    }
+    if (modeHint) {
+      modeHint.textContent = currentControlMode === 'manual' ? '' : 'Ручное управление реле заблокировано в автоматическом режиме';
+    }
+  }
+
+  function setMode(mode) {
+    const targetMode = (mode === 'manual') ? 'manual' : 'auto';
+
+    if (wsClient && wsClient.readyState === WebSocket.OPEN) {
+      wsClient.send(JSON.stringify({type:'control', op:'set_mode', mode:targetMode}));
+      return;
+    }
+
+    fetch('/control?op=set_mode&mode=' + encodeURIComponent(targetMode))
+      .then(function(r){
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        if (pollingEnabled) setTimeout(fetchStatus, 80);
+      })
+      .catch(function(e){
+        console.warn('setMode error', e);
+        setUiMessage('Ошибка переключения режима');
+      });
+  }
+
+  function getControlToken() {
+    return '';
+  }
+  function escapeHtml(s) {
+    return s == null ? '' : String(s);
+  }
+  function renderStatus(j) {
+    try {
+      const modeRaw = (j && j.control_mode) ? String(j.control_mode) : ((j && j.flags && j.flags.manualMode) ? 'manual' : 'auto');
+      const mode = modeRaw.toLowerCase() === 'manual' ? 'manual' : 'auto';
+      applyControlMode(mode);
+
+      // Update info fields in-place (no innerHTML rebuild)
+      var infoIP = document.getElementById('infoIP');
+      var infoMAC = document.getElementById('infoMAC');
+      var infoUptime = document.getElementById('infoUptime');
+      var infoMqtt = document.getElementById('infoMqtt');
+      var infoWifi = document.getElementById('infoWifi');
+      if (infoIP) infoIP.textContent = 'IP:' + (j.ip || '');
+      if (infoMAC) infoMAC.textContent = 'MAC:' + (j.mac || '');
+      if (infoUptime) infoUptime.textContent = 'Uptime:' + (j.uptime || 0) + 's';
+      // MQTT status
+      if (j.mqtt) {
+        var ms = 'MQTT: ' + (j.mqtt.enabled ? 'enabled' : 'disabled') + ' - ' + (j.mqtt.connected ? 'connected' : 'offline');
+        if (j.mqtt.broker) ms += ' @ ' + (j.mqtt.broker);
+        if (infoMqtt) infoMqtt.textContent = ms;
+        
+        // Update MQTT indicator
+        const mqttIndicatorEl = document.getElementById('mqttIndicator');
+        if (mqttIndicatorEl) {
+          if (j.mqtt.connected) {
+            mqttIndicatorEl.innerHTML = '<span class="status-dot sd-ok"></span>connected';
+          } else if (j.mqtt.enabled) {
+            mqttIndicatorEl.innerHTML = '<span class="status-dot sd-missing"></span>offline';
+          } else {
+            mqttIndicatorEl.innerHTML = '<span class="status-dot sd-unknown"></span>disabled';
+          }
+        }
+      }
+
+      if (j.wifi) {
+        var ws = 'disconnected';
+        if (j.wifi.connected) ws = 'STA connected';
+        else if (j.wifi.ap_active) ws = 'AP mode';
+        if (infoWifi) infoWifi.textContent = 'Wi-Fi: ' + ws;
+      }
+      
+      // Update Wi-Fi indicator
+      const wifiIndicatorEl = document.getElementById('wifiIndicator');
+      if (wifiIndicatorEl) {
+        const wifiConnected = !!(j.wifi && j.wifi.connected);
+        const apActive = !!(j.wifi && j.wifi.ap_active);
+        if (wifiConnected) {
+          wifiIndicatorEl.innerHTML = '<span class="status-dot sd-ok"></span>connected';
+        } else if (apActive) {
+          wifiIndicatorEl.innerHTML = '<span class="status-dot sd-unknown"></span>AP mode';
+        } else {
+          wifiIndicatorEl.innerHTML = '<span class="status-dot sd-missing"></span>disconnected';
+        }
+      }
+
+      // Relay controls: update existing buttons in-place to avoid scroll jump
+      const controlsEl = document.getElementById('controls');
+      if (j.relays) {
+        const interactive = mode === 'manual';
+        const relayNames = Object.keys(j.relays).filter(function(k){ return Object.prototype.hasOwnProperty.call(j.relays, k); });
+        // Build set of expected button ids
+        const expectedIds = relayNames.map(function(n){ return 'relay-btn-' + n; });
+        // Remove buttons that no longer exist
+        const existing = controlsEl.querySelectorAll('.relay-btn[data-relay]');
+        existing.forEach(function(btn){
+          if (expectedIds.indexOf(btn.id) === -1) btn.remove();
+        });
+        // Remove emergency button if no longer needed
+        const oldEmBtn = controlsEl.querySelector('.btn-danger');
+        if (oldEmBtn && !(j.emergency && j.emergency.active)) oldEmBtn.remove();
+
+        relayNames.forEach(function(name){
+          const isOn = !!j.relays[name];
+          const btnId = 'relay-btn-' + name;
+          let btn = document.getElementById(btnId);
+          if (!btn) {
+            btn = document.createElement('button');
+            btn.id = btnId;
+            btn.setAttribute('data-relay', name);
+            btn.className = 'relay-btn';
+            btn.onclick = function(e){ e.preventDefault(); control(name, 'toggle'); };
+            btn.innerHTML = escapeHtml(name) + ' <span class="relay-state-label"></span>';
+            controlsEl.appendChild(btn);
+          }
+          btn.className = 'relay-btn ' + (isOn ? 'relay-on' : 'relay-off') + (interactive ? '' : ' relay-disabled');
+          btn.disabled = !interactive;
+          btn.querySelector('.relay-state-label').textContent = isOn ? 'ВКЛ' : 'ВЫКЛ';
+        });
+      }
+      // Add reset emergency button if there's an active emergency
+      if (j.emergency && j.emergency.active) {
+        if (!controlsEl.querySelector('.btn-danger')) {
+          const emBtn = document.createElement('button');
+          emBtn.className = 'btn-danger';
+          emBtn.onclick = function(e){ e.preventDefault(); resetEmergency(); };
+          emBtn.textContent = 'Сброс аварии';
+          controlsEl.appendChild(emBtn);
+        }
+      }
+      // Emergency indicator
+      const em = j.emergency;
+      const emEl = document.getElementById('emergencyBanner');
+      if (emEl) {
+        if (em && em.active) {
+          const text = em.message && String(em.message).trim() !== '' ? em.message : 'Аварийный режим';
+          emEl.textContent = 'Авария: ' + text;
+          emEl.classList.add('active');
+        } else {
+          emEl.textContent = '';
+          emEl.classList.remove('active');
+        }
+      }
+      // SD card indicator
+      const sdEl = document.getElementById('sdIndicator');
+      if (sdEl) sdEl.innerText = 'SD card: ' + (j.sd ? 'present' : 'absent');
+      // draw level chart (sensors mounted at top: larger value = emptier tank)
+      if (typeof j.tank1 !== 'undefined' || typeof j.tank2 !== 'undefined') {
+        updateChart(j.tank1, j.tank2);
+      }
+      // emulate main LCD screen
+      renderMainScreen(j);
+    } catch (e) {
+      console.warn('renderStatus error', e);
+    }
+  }
+
+  // simple bar chart for tank levels
+  // Датчики стоят сверху: чем больше расстояние до воды, тем бак ПУСТЕЕ.
+  // Масштаб: 0–100 см (0–1 м) по вертикали.
+  function updateChart(raw1, raw2) {
+    const c = document.getElementById('levelChart');
+    if (!c) return;
+    const ctx = c.getContext('2d');
+    const w = c.width, h = c.height;
+    ctx.clearRect(0,0,w,h);
+
+    const maxDepthCm = 100; // 1 метр
+    const clamp = v => {
+      if (typeof v !== 'number') v = parseFloat(v);
+      if (isNaN(v)) v = maxDepthCm;
+      return Math.max(0, Math.min(maxDepthCm, v));
+    };
+
+    // raw value = расстояние от датчика (сверху) до поверхности воды, см
+    const d1 = clamp(raw1);
+    const d2 = clamp(raw2);
+
+    // высота столба воды от дна (см)
+    const h1cm = maxDepthCm - d1;
+    const h2cm = maxDepthCm - d2;
+
+    const fill1 = h1cm / maxDepthCm; // 0..1
+    const fill2 = h2cm / maxDepthCm; // 0..1
+
+    const barWidth = 80;
+    const usableHeight = h - 24; // небольшой отступ сверху/снизу
+    const baseY = h - 4;        // нижняя ось
+
+    // Tank1
+    ctx.fillStyle = '#0288d1';
+    ctx.fillRect(50, baseY - fill1 * usableHeight, barWidth, fill1 * usableHeight);
+    // Tank2
+    ctx.fillStyle = '#c2185b';
+    ctx.fillRect(170, baseY - fill2 * usableHeight, barWidth, fill2 * usableHeight);
+
+    // Оси и подписи по высоте в метрах
+    ctx.fillStyle = '#9ca3af';
+    ctx.font = '11px sans-serif';
+    ctx.fillText('0 м (дно)', 5, baseY);
+    ctx.fillText('1 м (пусто)', 5, 12);
+
+    ctx.fillStyle = '#e5e7eb';
+    ctx.font = '12px sans-serif';
+    ctx.fillText('Tank1: ' + (h1cm/100).toFixed(2) + ' м', 50, 12);
+    ctx.fillText('Tank2: ' + (h2cm/100).toFixed(2) + ' м', 170, 12);
+  }
+
+  // Эмуляция главного экрана LCD (4 строки по 20 символов)
+  function renderMainScreen(j) {
+    var lcd = document.getElementById('lcdScreen');
+    if (!lcd) return;
+
+    var state = (j.state || '').toUpperCase();
+    var timers = j.timers || {};
+    var flags = j.flags || {};
+    var rel = j.relays || {};
+
+    var maxDepthCm = 100; // 1 метр, как в графике уровней
+
+    function toInt(v) {
+      v = (typeof v === 'number') ? v : parseInt(v, 10);
+      if (!isFinite(v) || isNaN(v)) return 0;
+      return Math.max(0, v);
+    }
+
+    function fmt2(n) {
+      n = toInt(n);
+      return (n < 10 ? '0' : '') + n;
+    }
+
+    function fmt3(n) {
+      n = toInt(n);
+      var s = String(n);
+      if (s.length < 3) s = ' '.repeat(3 - s.length) + s;
+      return s;
+    }
+
+    function fmtHMS(sec) {
+      sec = toInt(sec);
+      var h = Math.floor(sec / 3600);
+      var m = Math.floor((sec % 3600) / 60);
+      var s = sec % 60;
+      return fmt2(h) + ':' + fmt2(m) + ':' + fmt2(s); // 8 символов
+    }
+
+    function fmtMMSS(sec) {
+      sec = toInt(sec);
+      var m = Math.floor(sec / 60);
+      var s = sec % 60;
+      var core = fmt2(m) + ':' + fmt2(s); // 5 символов
+      return core + '  '; // до 7 символов как " STOP   "
+    }
+
+    // Перевод расстояния от датчика (см, сверху) в высоту столба воды (см, от дна)
+    function distanceToWaterHeight(distCm) {
+      var d = toInt(distCm);
+      var h = maxDepthCm - d;
+      if (h < 0) h = 0;
+      if (h > maxDepthCm) h = maxDepthCm;
+      return h;
+    }
+
+    // Строка 0: статический заголовок
+    var row0 = 'Aeration  Ozon   Lv1';
+
+    // Строка 1: таймер аэрации, таймер озонации, уровень бака 1
+    var row1Left;
+    if (state === 'AERATION') {
+      row1Left = fmtHMS(timers.aeration || 0);
+    } else {
+      row1Left = '  STOP  ';
+    }
+
+    var row1Mid;
+    if (state === 'OZONATION') {
+      row1Mid = fmtMMSS(timers.ozonation || 0);
+    } else {
+      row1Mid = ' STOP   ';
+    }
+
+    // Уровень бака 1: выводим то же значение, что и на реальном LCD (tank1Level в см)
+    var t1 = (typeof j.tank1 !== 'undefined') ? toInt(j.tank1) : 0;
+    var t1Str;
+    if (flags.tank1Empty && !flags.blinkState) {
+      t1Str = '   ';
+    } else {
+      t1Str = fmt3(t1);
+    }
+    // Формируем левую часть строки (таймеры) и добиваем до позиции 17, чтобы уровни обоих баков
+    // начинались с одной и той же колонки, как на реальном LCD (setCursor(17, N)).
+    var core1 = row1Left + ' ' + row1Mid;
+    while (core1.length < 17) core1 += ' ';
+    var row1 = (core1 + t1Str).slice(0, 20);
+
+    // Строка 2: текст по фильтру и Lv2
+    var row2;
+    if (flags.filterCleaningNeeded && !flags.backwashInProgress && flags.blinkState) {
+      row2 = 'Setling          Lv2';
+    } else {
+      row2 = 'Setling  PNAOFC  Lv2';
+    }
+
+    // Строка 3: таймер отстаивания, состояния реле (6 бит), уровень бака 2
+    var row3Left;
+    if (state === 'SETTLING') {
+      row3Left = fmtHMS(timers.settling || 0);
+    } else {
+      row3Left = '  STOP  ';
+    }
+
+    var order = ['pump1', 'pump2', 'aeration', 'ozone', 'filter', 'backwash'];
+    var bits = '';
+    for (var i = 0; i < order.length; i++) {
+      bits += rel[order[i]] ? '1' : '0';
+    }
+
+    // Уровень бака 2: выводим то же значение, что и на реальном LCD (tank2Level в см)
+    var t2 = (typeof j.tank2 !== 'undefined') ? toInt(j.tank2) : 0;
+    var t2Str;
+    if (flags.tank2Empty && !flags.blinkState) {
+      t2Str = '   ';
+    } else {
+      t2Str = fmt3(t2);
+    }
+    // Та же схема выравнивания по колонке 17 для второй строки уровней
+    var core3 = row3Left + ' ' + bits;
+    while (core3.length < 17) core3 += ' ';
+    var row3 = (core3 + t2Str).slice(0, 20);
+
+    lcd.textContent = row0 + '\n' + row1 + '\n' + row2 + '\n' + row3;
+  }
+ 
+  // WebSocket receiver (preferred, more efficient than polling)
+  var wsClient = null;
+  if ('WebSocket' in window) {
+    try {
+      wsClient = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
+      wsClient.onmessage = function(evt) {
+        try { var j = JSON.parse(evt.data);
+          if (j.meta) {
+            const msg = document.getElementById('msg');
+            msg.innerText = 'Clients:' + j.wsClients + ' Heap:' + j.freeHeap;
+            setTimeout(()=>{ msg.innerText = ''; }, 3000);
+          } else if (j.responseTo) {
+            const msg = document.getElementById('msg');
+            msg.innerText = (j.message ? j.message : JSON.stringify(j));
+            setTimeout(()=>{ msg.innerText = ''; }, 3000);
+          } else {
+            renderStatus(j);
+          }
+        } catch(e) { console.warn('ws parse', e); }
+      };
+      // When WS opens — sync UI. When it closes/errors — fall back to polling and clear wsClient.
+      wsClient.onopen = function(){ console.log('WS connected'); fetchStatus(); };
+      wsClient.onclose = function(){ console.log('WS disconnected'); wsClient = null; fetchStatus(); };
+      wsClient.onerror = function(err){ console.warn('WS error', err); wsClient = null; fetchStatus(); };
+    } catch(e) {
+      wsClient = null;
+    }
+  }
+
+  // Polling fallback (chained, single outstanding request only)
+  async function fetchStatus(){
+    if (!pollingEnabled) { setTimeout(fetchStatus, 2000); return; }
+    try {
+      const r = await fetch('/status');
+      const j = await r.json();
+      renderStatus(j);
+    } catch (e) {
+      console.warn('fetchStatus error', e);
+    }
+    setTimeout(fetchStatus, 2000);
+  }
+
+  // Prefer WebSocket for controls when available
+  // control() implemented later in the script to avoid duplicate definitions.
+
+  // Pause polling when tab not visible (saves CPU and network)
+  document.addEventListener('visibilitychange', function() {
+    pollingEnabled = !document.hidden;
+    if (pollingEnabled) fetchStatus();
+  });
+
+  function control(name,op){
+    if (currentControlMode !== 'manual') {
+      setUiMessage('В автоматическом режиме ручные команды запрещены');
+      return;
+    }
+
+    // If WebSocket is available, send via WS (optimistic update will be handled on WS message). Otherwise use HTTP and fetch status quickly.
+    if (wsClient && wsClient.readyState === WebSocket.OPEN) {
+      wsClient.send(JSON.stringify({type:'control', name:name, op:op}));
+    } else {
+      var token = getControlToken();
+      var query = '/control?name=' + encodeURIComponent(name) + '&op=' + encodeURIComponent(op);
+      if (token) {
+        query += '&token=' + encodeURIComponent(token);
+      }
+      fetch(query)
+        .then(function(r){
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          if (pollingEnabled) setTimeout(fetchStatus,50);
+        })
+        .catch(function(e){
+          console.warn(e);
+          setUiMessage('Команда отклонена: проверьте режим и токен');
+        });
+    }
+  }
+
+  function saveWifi(){
+    if (!settingsSessionId) {
+      setUiMessage('Сначала откройте Settings и введите мастер токен');
+      return;
+    }
+    const payload = { ssid: document.getElementById('ssid').value,
+                      pass: document.getElementById('pass').value };
+    fetch('/api/wifi', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Settings-Session': settingsSessionId},
+      body: JSON.stringify(payload)
+    })
+      .then(r=>r.json())
+      .then(j=>{
+        const msg = document.getElementById('msg');
+        msg.innerText = JSON.stringify(j);
+        setTimeout(()=>{ msg.innerText = ''; }, 3000);
+      }).catch(e=>{ console.warn('saveWifi error', e); });
+  }
+
+  // MQTT functions
+  async function loadMqtt(){
+    try {
+      const r = await fetch('/api/mqtt');
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json();
+      document.getElementById('mqtt_broker').value = j.broker || '';
+      document.getElementById('mqtt_port').value = j.port || '';
+      document.getElementById('mqtt_user').value = j.user || '';
+      document.getElementById('mqtt_client_id').value = j.client_id || '';
+      document.getElementById('mqtt_topic_base').value = j.topic_base || '';
+      document.getElementById('mqtt_interval').value = j.interval || '';
+      document.getElementById('mqtt_secure').checked = !!j.secure;
+      document.getElementById('mqtt_tls_port').value = j.tls_port || '';
+      document.getElementById('mqtt_insecure').checked = !!j.insecure;
+      document.getElementById('mqtt_will').checked = !!j.will;
+      document.getElementById('mqtt_enabled').checked = !!j.enabled;
+    } catch(e) { console.warn('loadMqtt error', e); }
+  }
+
+  function saveMqtt(){
+    if (!settingsSessionId) {
+      setUiMessage('Сначала откройте Settings и введите мастер токен');
+      return;
+    }
+    const payload = {
+      enabled: document.getElementById('mqtt_enabled').checked,
+      broker: document.getElementById('mqtt_broker').value,
+      port: parseInt(document.getElementById('mqtt_port').value) || 1883,
+      user: document.getElementById('mqtt_user').value,
+      pass: document.getElementById('mqtt_pass').value,
+      client_id: document.getElementById('mqtt_client_id').value,
+      topic_base: document.getElementById('mqtt_topic_base').value,
+      interval: parseInt(document.getElementById('mqtt_interval').value) || 10,
+      secure: document.getElementById('mqtt_secure').checked,
+      tls_port: parseInt(document.getElementById('mqtt_tls_port').value) || 8883,
+      insecure: document.getElementById('mqtt_insecure').checked,
+      will: document.getElementById('mqtt_will').checked
+    // no admin token field anymore
+    };
+    fetch('/api/mqtt', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Settings-Session': settingsSessionId},
+      body: JSON.stringify(payload)
+    })
+      .then(r=>r.json())
+      .then(j=>{
+        const msg = document.getElementById('mqttMsg'); msg.innerText = JSON.stringify(j); setTimeout(()=>{ msg.innerText=''; }, 3000);
+        // Clear password input after save for safety
+        document.getElementById('mqtt_pass').value = '';
+      }).catch(e=>{ console.warn('saveMqtt error', e); });
+  }
+
+  async function saveAdminToken(){
+    const m = document.getElementById('msg');
+    const current = (document.getElementById('admin_current').value || '').trim();
+    const newToken = (document.getElementById('admin_new').value || '').trim();
+    // длина проверяется на сервере, здесь лишь алфавитно-цифровые символы
+    const re = /^[A-Za-z0-9]+$/;
+    if (!re.test(newToken)) { if (m) { m.innerText = 'Новый токен должен содержать только буквы и цифры'; setTimeout(()=>{ m.innerText=''; }, 3000); } return; }
+    const payload = { token_admin: current, new_token: newToken };
+    try{
+      const r = await fetch('/api/admin_token',{method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+      const text = await r.text();
+      let j = {};
+      try {
+        j = text ? JSON.parse(text) : {};
+      } catch(parseErr) {
+        if (m) m.innerText = 'Admin token API parse error: HTTP ' + r.status + ' ' + text;
+        console.warn('saveAdminToken parse error', parseErr, text);
+        setTimeout(()=>{ if (m) m.innerText=''; }, 5000);
+        return;
+      }
+      if (j.ok) {
+        if (m) m.innerText = 'Admin token updated';
+        settingsAdminToken = newToken;
+      } else {
+        if (m) m.innerText = 'Error: ' + (j.error || text || JSON.stringify(j));
+      }
+      setTimeout(()=>{ if (m) m.innerText=''; }, 5000);
+      document.getElementById('admin_current').value = '';
+      document.getElementById('admin_new').value = '';
+    }catch(e){
+      console.warn('saveAdminToken error', e);
+      const m = document.getElementById('msg');
+      if (m) {
+        m.innerText = 'Admin token request failed: ' + e;
+        setTimeout(()=>{ m.innerText=''; }, 5000);
+      }
+    }
+  }
+
+  // Load MQTT settings on page load
+  // If WebSocket is not available/open, start polling fallback so UI stays in sync.
+  // Settings data is loaded only after successful admin token check in openSettingsPage().
+  if (!(wsClient && wsClient.readyState === WebSocket.OPEN)) { fetchStatus(); }
+
+  // Download readable logs and trigger file save
+  async function downloadLogs(){
+    try {
+      const r = await fetch('/logs.txt');
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const txt = await r.text();
+      const blob = new Blob([txt], {type:'text/plain'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const name = 'events-' + new Date().toISOString().slice(0,10) + '.txt';
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.warn('downloadLogs error', e);
+      const lm = document.getElementById('logMsg'); lm.innerText = 'Download failed'; setTimeout(()=>{ lm.innerText=''; }, 3000);
+    }
+  }
+
+  // View logs (toggle window with auto-refresh)
+  let logViewOpen = false;
+  let logViewInterval = null;
+  async function refreshLogView(){
+    try {
+      const r = await fetch('/logs.txt');
+      if (r.ok) {
+        const text = await r.text();
+        document.getElementById('logView').innerText = text;
+      }
+    } catch(e) { console.warn('refreshLogView error', e); }
+  }
+  async function viewLogs(){
+    const pre = document.getElementById('logView');
+    if (!logViewOpen) {
+      try {
+        const r = await fetch('/logs.txt');
+        if (r.ok) {
+          pre.innerText = await r.text();
+          pre.style.display = 'block';
+          logViewOpen = true;
+          logViewInterval = setInterval(refreshLogView, 5000);
+        }
+      } catch(e) { console.warn('viewLogs error', e); }
+    } else {
+      pre.style.display = 'none';
+      logViewOpen = false;
+      if (logViewInterval) { clearInterval(logViewInterval); logViewInterval = null; }
+    }
+  }
+
+  // Clear logs (requires admin token)
+  async function exportLogs(){
+    try {
+      const r = await fetch('/api/export_logs');
+      const j = await r.json();
+      const msg = document.getElementById('logMsg');
+      msg.innerText = j.ok ? 'Exported to SD' : 'Export failed';
+      setTimeout(()=>{ msg.innerText=''; },3000);
+      if (pollingEnabled) setTimeout(fetchStatus,50);
+    } catch(e){ console.warn('exportLogs', e); }
+  }
+
+  let sdListOpen = false;
+  async function listSdFiles(){
+    const pre = document.getElementById('sdList');
+    if (!sdListOpen) {
+      try {
+        const r = await fetch('/api/sd_files');
+        const j = await r.json();
+        pre.innerText = j.files.join('\n');
+        pre.style.display = 'block';
+        sdListOpen = true;
+      } catch(e){ console.warn('listSdFiles error', e); }
+    } else {
+      pre.style.display = 'none';
+      sdListOpen = false;
+    }
+  }
+
+  async function clearLogs(){
+    if (!settingsSessionId) {
+      setUiMessage('Сначала откройте Settings и введите мастер токен');
+      return;
+    }
+    if (!confirm('Clear all logs? This cannot be undone.')) return;
+    try {
+      const resp = await fetch('/api/logs', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json', 'X-Settings-Session': settingsSessionId},
+        body: JSON.stringify({action: 'clear'})
+      });
+      const j = await resp.json();
+      const lm = document.getElementById('logMsg'); lm.innerText = JSON.stringify(j); setTimeout(()=>{ lm.innerText=''; }, 3000);
+    } catch(e) { console.warn('clearLogs error', e); }
+  }
+
+  // Start polling only if WebSocket not available
+  if (!wsClient) fetchStatus();
+
+  // Clock: update date & time every second
+  function updateClock(){
+    var now = new Date();
+    var dd = ('0'+now.getDate()).slice(-2);
+    var mm = ('0'+(now.getMonth()+1)).slice(-2);
+    var yyyy = now.getFullYear();
+    var hh = ('0'+now.getHours()).slice(-2);
+    var mi = ('0'+now.getMinutes()).slice(-2);
+    var ss = ('0'+now.getSeconds()).slice(-2);
+    var el = document.getElementById('clockPill');
+    if(el) el.textContent = dd+'.'+mm+'.'+yyyy+' '+hh+':'+mi+':'+ss;
+  }
+  updateClock();
+  setInterval(updateClock, 1000);
+  
+  async function loadTimezone(){
+    try {
+      const r = await fetch('/api/timezone');
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json();
+      document.getElementById('timezone').value = j.timezone || 0;
+    } catch(e){ console.warn('loadTimezone error', e); }
+  }
+
+  function saveTimezone(){
+    if (!settingsSessionId) {
+      setUiMessage('Сначала откройте Settings и введите мастер токен');
+      return;
+    }
+    const tz = parseInt(document.getElementById('timezone').value) || 0;
+    if (tz < -12 || tz > 12) { 
+      const msg = document.getElementById('msg');
+      msg.innerText = 'Timezone must be between -12 and +12'; 
+      setTimeout(()=>{ msg.innerText=''; }, 3000);
+      return; 
+    }
+    const payload = { timezone: tz };
+    fetch('/api/timezone', {
+      method:'POST',
+      headers:{'Content-Type':'application/json', 'X-Settings-Session': settingsSessionId},
+      body: JSON.stringify(payload)
+    })
+      .then(r=>r.json())
+      .then(j=>{
+        const msg = document.getElementById('msg');
+        if (j.ok) {
+          msg.innerText = 'Timezone updated (UTC' + (tz >= 0 ? '+' : '') + tz + ')';
+        } else {
+          msg.innerText = 'Error: ' + (j.error || JSON.stringify(j));
+        }
+        setTimeout(()=>{ msg.innerText=''; }, 3000);
+      })
+      .catch(e=>{ console.warn('saveTimezone error', e); });
+  }
+
+  // Reset emergency mode
+  function resetEmergency(){
+    if (wsClient && wsClient.readyState === WebSocket.OPEN) {
+      wsClient.send(JSON.stringify({type:'control', op:'reset_emergency'}));
+    } else {
+      fetch('/control?op=reset_emergency').then(()=>{ if (pollingEnabled) setTimeout(fetchStatus,100); }).catch(e=>console.warn(e));
+    }
+  }
+
+  </script>
+</body>
+</html>
