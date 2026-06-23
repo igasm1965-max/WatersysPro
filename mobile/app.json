@@ -22,7 +22,11 @@
       "permissions": [
         "INTERNET",
         "ACCESS_NETWORK_STATE",
-        "CHANGE_NETWORK_STATE"
+        "CHANGE_NETWORK_STATE",
+        "POST_NOTIFICATIONS",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "WAKE_LOCK"
       ]
     },
     "plugins": [
