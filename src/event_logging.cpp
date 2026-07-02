@@ -726,19 +726,30 @@ void saveWDTStats() {
 // ============ ЗАГРУЗКА СОБЫТИЙ ============
 
 /// Загружает события из SPIFFS в ОЗУ буфер
-/// Helper to parse a text line into an EventLog struct
+/// Helper to parse a text line into an EventLog struct.
+/// Handles two formats:
+///   DD.MM.YYYY HH:MM - type:XX param:XX lvl:X ...   (without seconds, from prune/deleteOld)
+///   DD.MM.YYYY HH:MM:SS - type:XX param:XX lvl:X ... (with seconds, from saveEventLog)
 static bool parseLogLine(const String &line, EventLog &out) {
-    int d,m,y,h,mi,type,param,lvl;
-    int scanned = sscanf(line.c_str(), "%d.%d.%d %d:%d - type:%d param:%d lvl:%d",
+    int d,m,y,h,mi,s,type,param,lvl;
+    // Try with seconds first
+    int scanned = sscanf(line.c_str(), "%d.%d.%d %d:%d:%d - type:%d param:%d lvl:%d",
+                         &d,&m,&y,&h,&mi,&s,&type,&param,&lvl);
+    if (scanned == 9) {
+        // Format with seconds — parsed successfully
+    } else {
+        // Try without seconds
+        scanned = sscanf(line.c_str(), "%d.%d.%d %d:%d - type:%d param:%d lvl:%d",
                          &d,&m,&y,&h,&mi,&type,&param,&lvl);
-    if (scanned != 8) return false;
-    out.day = d;
-    out.month = m;
-    out.year = y;
-    out.hour = h;
-    out.minute = mi;
+        if (scanned != 8) return false;
+    }
+    out.day = (uint8_t)d;
+    out.month = (uint8_t)m;
+    out.year = (uint16_t)y;
+    out.hour = (uint8_t)h;
+    out.minute = (uint8_t)mi;
     out.eventType = (uint8_t)type;
-    out.eventParam = (uint8_t)param;
+    out.eventParam = (uint16_t)param;
     out.level = (LogLevel)lvl;
     return true;
 }
@@ -1002,11 +1013,20 @@ void pruneEventLogs(uint32_t maxAgeSeconds) {
 }
 
 /// Экспортирует весь журнал в читаемый текст (строки разделены \n)
+/// Учитывает циклическую природу буфера eventLogs[200].
 String exportEventsAsText() {
   extern EventLog eventLogs[200];
+  extern uint8_t eventLogIndex; // next write position
+  int total = getEventLogCount();
   String out = "";
-  for (int i = 0; i < 200; ++i) {
-    EventLog &e = eventLogs[i];
+
+  // If buffer never wrapped, entries are packed at [0..total-1].
+  // If it wrapped, the oldest entry is at eventLogIndex.
+  int start = (total < 200) ? 0 : eventLogIndex;
+
+  for (int n = 0; n < total; ++n) {
+    int idx = (start + n) % 200;
+    EventLog &e = eventLogs[idx];
     if (e.eventType == 0) continue;
     char desc[80];
     getEventTypeLong(e.level, e.eventType, e.eventParam, desc, sizeof(desc));

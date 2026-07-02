@@ -24,9 +24,9 @@ static unsigned long lastAttemptEndMs = 0;
 static int attemptCount = 0;
 static bool attemptInProgress = false;
 static unsigned long currentBackoffMs = 2000;
-static const unsigned long MAX_WIFI_BACKOFF_MS = 60000;
-static const unsigned long WIFI_ATTEMPT_TIMEOUT_MS = 10000;
-static const int WIFI_MAX_ATTEMPTS = 5;
+static const unsigned long MAX_WIFI_BACKOFF_MS = 120000;
+static const unsigned long WIFI_ATTEMPT_TIMEOUT_MS = 15000;
+static const int WIFI_MAX_ATTEMPTS = 10;
 
 static unsigned long lastProcessTime = 0;
 static bool needsNTPSync = false;
@@ -173,6 +173,27 @@ static void registerStaEventHandlers() {
     Serial.printf("[WiFi] RSSI before disconnect: %d\n", WiFi.RSSI());
     Serial.printf("[WiFi] AP SSID: %s\n", WiFi.SSID().c_str());
     Serial.printf("[WiFi] BSSID: %s\n", WiFi.BSSIDstr().c_str());
+    
+    // Адаптивный backoff в зависимости от причины отключения
+    if (r == 201 || r == 2 || r == 15) {
+      // Аутентификация/рукопожатие - серьезная проблема, увеличиваем backoff
+      unsigned long newBackoff = currentBackoffMs * 3;
+      currentBackoffMs = (newBackoff < 300000UL) ? newBackoff : 300000UL; // до 5 минут
+      Serial.printf("[WiFi] Authentication issue, increased backoff to %lu ms\n", currentBackoffMs);
+    } else if (r == 200 || r == 202) {
+      // Временная проблема (beacon timeout, assoc fail) - умеренный backoff
+      unsigned long newBackoff = currentBackoffMs * 2;
+      currentBackoffMs = (newBackoff < 120000UL) ? newBackoff : 120000UL; // до 2 минут
+      Serial.printf("[WiFi] Temporary issue, increased backoff to %lu ms\n", currentBackoffMs);
+    } else {
+      // Другие причины - стандартный backoff
+      unsigned long newBackoff = currentBackoffMs * 2;
+      currentBackoffMs = (newBackoff < MAX_WIFI_BACKOFF_MS) ? newBackoff : MAX_WIFI_BACKOFF_MS;
+    }
+    
+    // Сбрасываем флаг attemptInProgress чтобы loopWifiManager мог запланировать новую попытку
+    attemptInProgress = false;
+    lastAttemptEndMs = millis();
   }, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
 }
 
@@ -194,12 +215,68 @@ void initWifiManager() {
   }
 }
 
+// Оптимизация режима Wi-Fi: отключаем AP если STA подключен и нет клиентов
+static void optimizeWiFiMode() {
+  static unsigned long lastOptimizeCheck = 0;
+  unsigned long now = millis();
+  
+  // Проверяем не чаще чем раз в 60 секунд
+  if (now - lastOptimizeCheck < 60000) {
+    return;
+  }
+  lastOptimizeCheck = now;
+  
+  // Если STA подключен и нет клиентов AP, переключаемся в режим STA только
+  if (WiFi.status() == WL_CONNECTED && WiFi.softAPgetStationNum() == 0) {
+    if (WiFi.getMode() == WIFI_AP_STA) {
+      WiFi.mode(WIFI_STA);
+      Serial.println("[WiFi] AP disabled, STA only mode for better stability");
+      saveEventLog(LOG_INFO, EVENT_SETTINGS_CHANGE, 0);
+    }
+  }
+}
+
+// Мониторинг качества сигнала Wi-Fi
+static void monitorWiFiSignal() {
+  static unsigned long lastRSSICheck = 0;
+  static int lastReportedRSSI = 0;
+  unsigned long now = millis();
+  
+  // Проверяем не чаще чем раз в 30 секунд
+  if (now - lastRSSICheck < 30000) {
+    return;
+  }
+  lastRSSICheck = now;
+  
+  if (WiFi.status() == WL_CONNECTED) {
+    int rssi = WiFi.RSSI();
+    
+    // Логируем только если RSSI изменился значительно (более 5 dBm) или слишком слабый
+    if (abs(rssi - lastReportedRSSI) > 5 || rssi < -75) {
+      lastReportedRSSI = rssi;
+      
+      if (rssi < -75) {
+        Serial.printf("[WiFi] Warning: Weak signal (%d dBm)\n", rssi);
+        // Сохраняем событие в лог для последующего анализа
+        saveEventLog(LOG_WARNING, EVENT_WIFI_WEAK_SIGNAL, rssi);
+      }
+    }
+  }
+}
+
 void loopWifiManager() {
   // called frequently from main loop
   unsigned long now = millis();
   
   // Проверяем здоровье точки доступа
   checkAPHealth();
+  
+  // Оптимизация режима Wi-Fi (отключение AP при необходимости)
+  optimizeWiFiMode();
+  
+  // Мониторинг качества сигнала
+  monitorWiFiSignal();
+  
   if (attemptInProgress) {
     if (WiFi.status() == WL_CONNECTED) {
       wifiState = WIFI_CONNECTED;

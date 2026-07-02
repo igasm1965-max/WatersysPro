@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import DashboardScreen from './src/screens/DashboardScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
+import LogsScreen from './src/screens/LogsScreen';
 import PinScreen, { PIN_KEY } from './src/screens/PinScreen';
 import { AppContext } from './src/context/AppContext';
 
@@ -42,12 +43,14 @@ export default function App() {
             let iconName: any = 'home-outline';
             if (route.name === 'Главная') iconName = focused ? 'home' : 'home-outline';
             if (route.name === 'Настройки') iconName = focused ? 'settings' : 'settings-outline';
+            if (route.name === 'Логи') iconName = focused ? 'document-text' : 'document-text-outline';
             return <Ionicons name={iconName} size={size} color={color} />;
           },
           tabBarActiveTintColor: '#2196F3',
           tabBarInactiveTintColor: 'gray'
         })}>
           <Tab.Screen name="Главная" component={DashboardScreen} />
+          <Tab.Screen name="Логи" component={LogsScreen} />
           <Tab.Screen name="Настройки" component={SettingsScreen} />
         </Tab.Navigator>
       </NavigationContainer>

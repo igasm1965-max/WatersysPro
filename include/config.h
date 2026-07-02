@@ -81,7 +81,8 @@ using SafeLCD = LiquidCrystal_I2C;
 #define EVENT_NTP_SYNC_SUCCESS 19 ///< Событие: Успешная синхронизация времени через NTP
 #define EVENT_NTP_SYNC_FAILED 20 ///< Событие: Ошибка синхронизации времени через NTP
 #define EVENT_TIMEZONE_CHANGED 21 ///< Событие: Часовой пояс изменен
-#define EVENT_BACKWASH_DRY_RUN 22 ///< Событие: Сухой ход при обратной промывке
+#define EVENT_BACKWASH_DRY_RUN 22 ///< Событие: Сухой ход при обратной промывки
+#define EVENT_WIFI_WEAK_SIGNAL 23 ///< Событие: Слабый сигнал Wi-Fi (RSSI < -75 dBm)
 
 // ============ PREFERENCES KEYS ============
 #define PREF_KEY_LANG_EN "lang_en"  ///< bool: true=English output, false=Русский
@@ -288,7 +289,9 @@ enum eEncoderState {
 #define LOG_FILTER_ERRORS         (1UL << 8)  ///< Any LOG_ERROR-level events
 
 #define PREF_KEY_LOG_FILTER "log_filter"
-#define PREF_KEY_LOG_FILTER_DEFAULT (LOG_FILTER_EMERGENCY | LOG_FILTER_WATCHDOG | LOG_FILTER_SENSOR | LOG_FILTER_ERRORS)
+// Log everything by default so that logs are always available via MQTT and direct access.
+// Users can restrict via the log filter UI (web or engineer menu) if they want to reduce SD writes.
+#define PREF_KEY_LOG_FILTER_DEFAULT (LOG_FILTER_WIFI | LOG_FILTER_MANUAL | LOG_FILTER_EMERGENCY | LOG_FILTER_WATCHDOG | LOG_FILTER_SENSOR | LOG_FILTER_SETTINGS | LOG_FILTER_WEB | LOG_FILTER_STATECHANGE | LOG_FILTER_ERRORS)
 
 // ============ КОНСТАНТЫ РЕЛЕ ============
 #define RELAY_PUMP1 0       ///< Реле насоса 1

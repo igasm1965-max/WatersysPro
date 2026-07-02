@@ -47,6 +47,20 @@ void initializePreferences() {
   if (!preferences.isKey(PREF_KEY_MQTT_TOPIC_BASE)) {
     preferences.putString(PREF_KEY_MQTT_TOPIC_BASE, DEFAULT_MQTT_TOPIC_BASE);
   }
+
+  // --- Log filter migration ---
+  // The old default (284 = EMERGENCY|WATCHDOG|SENSOR|ERRORS) was too restrictive
+  // and prevented most events from being written to SD and published via MQTT.
+  // The new default logs everything. Overwrite the stored value unconditionally
+  // so that existing devices get the new behaviour after firmware update.
+  {
+    uint32_t oldMask = preferences.getULong(PREF_KEY_LOG_FILTER, 0);
+    uint32_t newDefault = (uint32_t)PREF_KEY_LOG_FILTER_DEFAULT;
+    if (oldMask != newDefault) {
+      preferences.putULong(PREF_KEY_LOG_FILTER, newDefault);
+      Serial.printf("[PREFS] Log filter migrated: 0x%04lX -> 0x%04lX\n", (unsigned long)oldMask, (unsigned long)newDefault);
+    }
+  }
 }
 
 

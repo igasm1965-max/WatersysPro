@@ -8,6 +8,7 @@ void initVQTT();
 void loopVQTT();
 void vqtt_publishTelemetry();
 void vqtt_publishState();
+void vqtt_publishLogs();
 
 // Status helpers
 bool vqtt_isConnected();
@@ -22,6 +23,7 @@ static inline void initVQTT() {}
 static inline void loopVQTT() {}
 static inline void vqtt_publishTelemetry() {}
 static inline void vqtt_publishState() {}
+static inline void vqtt_publishLogs() {}
 static inline bool vqtt_isConnected() { return false; }
 static inline String vqtt_getBroker() { return String(); }
 static inline String vqtt_getTopicBase() { return String(); }

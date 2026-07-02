@@ -36,6 +36,8 @@ static bool mqttConnected = false;
 static bool wifiWasConnected = false;  // Track WiFi connection changes
 static unsigned long lastTelemetryMs = 0;
 static unsigned long pubIntervalMs = 10000;
+static unsigned long lastLogsPublishMs = 0;
+static unsigned long logsPublishIntervalMs = 60000; // publish logs every 60s
 static String mqttTopicBase = DEFAULT_MQTT_TOPIC_BASE;
 static String mqttClientId;
 static unsigned long lastConnectAttempt = 0;
@@ -382,6 +384,21 @@ static void connectToBroker() {
     // Publish initial telemetry
     vqtt_publishTelemetry();
     vqtt_publishState();
+
+    // Force an immediate publish of logs so they appear on the broker ASAP
+    // after (re)connect.  This also serves as a diagnostic — if you see
+    // watersystem/logs on the broker, the log pipeline works.
+    Serial.println("[VQTT] Forcing immediate log publish after connect...");
+    vqtt_publishLogs();
+
+    // Publish a small diagnostic "ping" message to verify the publish channel.
+    // If you see watersystem/diag on the broker, basic MQTT publish works.
+    {
+      String diagTopic = mqttTopicBase + "/diag";
+      String diagPayload = "connected;uptime=" + String(millis() / 1000);
+      bool diagOk = activeMqtt->publish(diagTopic.c_str(), diagPayload.c_str());
+      Serial.printf("[VQTT] Published diag to %s: %s\n", diagTopic.c_str(), diagOk ? "OK" : "FAILED");
+    }
   } else {
     Serial.printf("[VQTT] Connection FAILED (state=%d)\n", activeMqtt->state());
     if (useTLS) {
@@ -438,9 +455,9 @@ void initVQTT() {
   // Initialize default MQTT client (will switch to TLS if needed)
   mqttClient.setServer("", 0);
   mqttClient.setCallback(onMqttMessage);
-  mqttClient.setBufferSize(512);
+  mqttClient.setBufferSize(2048);
   mqttClient.setKeepAlive(120);          // 120s keepalive (default 15s too aggressive)
-  mqttClientSecure.setBufferSize(512);
+  mqttClientSecure.setBufferSize(2048);
   mqttClientSecure.setKeepAlive(120);
   activeMqtt = &mqttClient;
   
@@ -503,6 +520,12 @@ void loopVQTT() {
   if (millis() - lastTelemetryMs >= pubIntervalMs) {
     lastTelemetryMs = millis();
     vqtt_publishTelemetry();
+  }
+
+  // Periodic logs publish (every 60s)
+  if (millis() - lastLogsPublishMs >= logsPublishIntervalMs) {
+    lastLogsPublishMs = millis();
+    vqtt_publishLogs();
   }
 }
 
@@ -588,8 +611,41 @@ void vqtt_publishTelemetry() {
   String topic = mqttTopicBase + "/telemetry";
   
   bool ok = activeMqtt->publish(topic.c_str(), out.c_str());
-  Serial.printf("[VQTT] Published telemetry to %s (%d bytes): %s\n", 
+  Serial.printf("[VQTT] Published telemetry to %s (%d bytes): %s\n",
                 topic.c_str(), out.length(), ok ? "OK" : "FAILED");
+}
+
+void vqtt_publishLogs() {
+  if (!activeMqtt || !activeMqtt->connected()) {
+    Serial.println("[VQTT] Not connected, skipping logs publish");
+    return;
+  }
+
+  // Get the last 20 log entries as text
+  String logsText = exportEventsAsText();
+
+  // Always publish something so the backend DB always has a record.
+  // Even "(no events)" is useful — it tells the user the device is alive
+  // but hasn't recorded any events yet (e.g. right after boot).
+  if (logsText.length() == 0) {
+    logsText = "(no events)\n";
+  }
+
+  // Truncate to max 2000 bytes to fit in MQTT message
+  if (logsText.length() > 2000) {
+    // Keep the most recent entries (end of string)
+    logsText = logsText.substring(logsText.length() - 2000);
+    // Find first newline to avoid cutting a line
+    int firstNl = logsText.indexOf('\n');
+    if (firstNl > 0 && firstNl < 100) {
+      logsText = logsText.substring(firstNl + 1);
+    }
+  }
+
+  String topic = mqttTopicBase + "/logs";
+  bool ok = activeMqtt->publish(topic.c_str(), logsText.c_str());
+  Serial.printf("[VQTT] Published logs to %s (%d bytes): %s\n",
+                topic.c_str(), logsText.length(), ok ? "OK" : "FAILED");
 }
 
 void vqtt_publishState() {

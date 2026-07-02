@@ -37,8 +37,8 @@ int readUltrasonicSensor2() {
     static unsigned long lastDebugTime = 0;
     if (millis() - lastDebugTime > 5000) {  // Print every 5 seconds
         lastDebugTime = millis();
-        Serial.printf("[SENSOR2_DEBUG] raw=%d, TRIG=%d, ECHO=%d, MAX_DIST=%d\n", 
-                      value, HC_TRIG2, HC_ECHO2, TANK_MAX_SENSOR_DISTANCE);
+        // Serial.printf("[SENSOR2_DEBUG] raw=%d, TRIG=%d, ECHO=%d, MAX_DIST=%d\n",
+        //               value, HC_TRIG2, HC_ECHO2, TANK_MAX_SENSOR_DISTANCE);
     }
     return value;
 }
@@ -106,8 +106,8 @@ void readUltrasonicSensors() {
     static unsigned long lastExtendedLog = 0;
     if (millis() - lastExtendedLog > 10000) {  // Print every 10 seconds
         lastExtendedLog = millis();
-        Serial.printf("[SENSOR_EXTENDED] Sensor1: raw=%d, level=%d | Sensor2: raw=%d, level=%d | GPIO2_TRIG=%d, GPIO2_ECHO=%d\n", 
-                      raw1, tank1Level, raw2, tank2Level, digitalRead(HC_TRIG2), digitalRead(HC_ECHO2));
+        // Serial.printf("[SENSOR_EXTENDED] Sensor1: raw=%d, level=%d | Sensor2: raw=%d, level=%d | GPIO2_TRIG=%d, GPIO2_ECHO=%d\n",
+        //               raw1, tank1Level, raw2, tank2Level, digitalRead(HC_TRIG2), digitalRead(HC_ECHO2));
     }
 
     Serial.printf("[SENSOR] raw1=%d raw2=%d -> tank1=%d tank2=%d\n", tank1RawDistance,
