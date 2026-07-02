@@ -1,10 +1,11 @@
 /*
   Minimal backend PoC:
   - subscribes to MQTT (device/+/telemetry, device/+/alert)
-  - saves telemetry/alerts to Postgres
+  - saves telemetry/alerts to Postgres (or in-memory fallback)
   - emits realtime updates via Socket.IO
   - REST endpoints for status/history/command
   - push notifications via Expo (optional)
+  - proxies log requests to ESP32 devices
 */
 
 require('dotenv').config();
@@ -17,6 +18,7 @@ const bodyParser = require('body-parser');
 const rateLimit = require('express-rate-limit');
 const socketIo = require('socket.io');
 const mqtt = require('mqtt');
+const { httpGet } = require('./httpClient');
 let Expo;
 let expo = null;
 try {
@@ -26,7 +28,17 @@ try {
   console.warn('expo-server-sdk not installed — push notifications disabled');
   expo = null;
 }
-const { pool, initDb } = require('./db');
+const {
+  getPool,
+  isDbAvailable,
+  initDb,
+  memInsertTelemetry,
+  memGetLatestTelemetry,
+  memGetDevices,
+  memInsertDeviceLog,
+  memGetLatestDeviceLog,
+  memInsertAlert,
+} = require('./db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
@@ -136,8 +148,15 @@ function requireRemoteToken(req, res, next) {
 }
 
 async function loadPushTokens() {
-  const r = await pool.query('SELECT token FROM push_tokens');
-  r.rows.forEach(r => pushTokensCache.add(r.token));
+  if (!isDbAvailable()) return;
+  const p = getPool();
+  if (!p) return;
+  try {
+    const r = await p.query('SELECT token FROM push_tokens');
+    r.rows.forEach(r => pushTokensCache.add(r.token));
+  } catch (err) {
+    console.warn('[DB] Could not load push tokens:', err.message);
+  }
 }
 
 async function sendPushNotification(title, body, data = {}) {
@@ -160,12 +179,14 @@ async function sendPushNotification(title, body, data = {}) {
 }
 
 // --- MQTT client ---
+// MQTT broker connection
+// Use the URL directly — mqtt.js handles credentials in URL natively
 const client = mqtt.connect(MQTT_BROKER, {
   clientId: MQTT_CLIENT_ID,
-  keepalive: 120,           // 120s (default 60s too aggressive for mobile networks)
-  reconnectPeriod: 5000,    // 5s initial reconnect
-  connectTimeout: 10000,    // 10s connect timeout
-  clean: false,             // Persistent session — broker keeps subscriptions on disconnect
+  keepalive: 120,
+  reconnectPeriod: 5000,
+  connectTimeout: 10000,
+  clean: false,
 });
 client.on('connect', () => {
   console.log('MQTT connected to', MQTT_BROKER);
@@ -173,6 +194,20 @@ client.on('connect', () => {
   client.subscribe('device/+/telemetry');
   client.subscribe('device/+/alert');
   client.subscribe(`${MQTT_TOPIC_BASE}/#`);
+  // Subscribe to logs topic explicitly (already covered by # but explicit for clarity)
+  client.subscribe(`${MQTT_TOPIC_BASE}/logs`);
+});
+client.on('error', (err) => {
+  console.error('MQTT connection error:', err.message || err);
+});
+client.on('close', () => {
+  console.log('MQTT connection closed');
+});
+client.on('offline', () => {
+  console.log('MQTT went offline');
+});
+client.on('reconnect', () => {
+  console.log('MQTT reconnecting...');
 });
 
 client.on('message', async (topic, payload) => {
@@ -199,7 +234,16 @@ client.on('message', async (topic, payload) => {
     if (kind === 'telemetry') {
       latestRemote.telemetry = obj;
       latestRemote.deviceId = deviceId;
-      await pool.query('INSERT INTO telemetry(device_id, payload) VALUES($1,$2)', [deviceId, obj]);
+      if (isDbAvailable()) {
+        try {
+          await getPool().query('INSERT INTO telemetry(device_id, payload) VALUES($1,$2)', [deviceId, obj]);
+        } catch (dbErr) {
+          console.error('[MQTT] DB insert telemetry error:', dbErr.message);
+          memInsertTelemetry(deviceId, obj);
+        }
+      } else {
+        memInsertTelemetry(deviceId, obj);
+      }
       io.emit('status_update', { deviceId, payload: obj });
 
       const em = obj && obj.emergency ? obj.emergency : null;
@@ -210,12 +254,47 @@ client.on('message', async (topic, payload) => {
         await sendPushNotification(`Авария: ${deviceId}`, emMessage, { deviceId, type: 'emergency' });
       }
       emergencyActiveByDevice.set(deviceId, emActive);
+    } else if (kind === 'logs') {
+      // Device logs published via MQTT (text payload)
+      const logsText = txt;
+      // Store in DB (or in-memory) for remote access
+      if (isDbAvailable()) {
+        try {
+          await getPool().query(
+            'INSERT INTO device_logs(device_id, content) VALUES($1, $2)',
+            [deviceId, logsText]
+          );
+          // Keep only the latest 5 log entries per device (cleanup old ones)
+          await getPool().query(
+            `DELETE FROM device_logs WHERE device_id=$1 AND id NOT IN (
+              SELECT id FROM device_logs WHERE device_id=$1 ORDER BY ts DESC LIMIT 5
+            )`,
+            [deviceId]
+          );
+        } catch (dbErr) {
+          console.error('[MQTT] Failed to store device logs in DB:', dbErr.message);
+          memInsertDeviceLog(deviceId, logsText);
+        }
+      } else {
+        memInsertDeviceLog(deviceId, logsText);
+      }
+      io.emit('device_logs', { deviceId, logs: logsText });
     } else if (kind === 'state') {
       latestRemote.state = obj;
       latestRemote.deviceId = deviceId;
       io.emit('device_state', { deviceId, payload: obj });
     } else if (kind === 'alert') {
-      await pool.query('INSERT INTO alerts(device_id, type, severity, message) VALUES($1,$2,$3,$4)', [deviceId, obj.type || 'alert', obj.severity || 'warning', obj.message || JSON.stringify(obj)]);
+      if (isDbAvailable()) {
+        try {
+          await getPool().query('INSERT INTO alerts(device_id, type, severity, message) VALUES($1,$2,$3,$4)',
+            [deviceId, obj.type || 'alert', obj.severity || 'warning', obj.message || JSON.stringify(obj)]);
+        } catch (dbErr) {
+          console.error('[MQTT] DB insert alert error:', dbErr.message);
+          memInsertAlert(deviceId, obj.type || 'alert', obj.severity || 'warning', obj.message || JSON.stringify(obj));
+        }
+      } else {
+        memInsertAlert(deviceId, obj.type || 'alert', obj.severity || 'warning', obj.message || JSON.stringify(obj));
+      }
       io.emit('alert', { deviceId, ...obj });
       // send push (optional)
       await sendPushNotification(`Alert on ${deviceId}: ${obj.type || 'alert'}`, obj.message || 'See device', { deviceId });
@@ -291,11 +370,13 @@ app.post('/api/remote/command', requireRemoteToken, (req, res) => {
   }
   metricsCounters.commands++;
 
-  // Audit log
-  pool.query(
-    'INSERT INTO audit_log(source, action, target, value, ip) VALUES($1,$2,$3,$4,$5)',
-    ['remote_api', 'command', target, value, req.ip]
-  ).catch(err => console.error('Audit log error', err));
+  // Audit log (best-effort)
+  if (isDbAvailable()) {
+    getPool().query(
+      'INSERT INTO audit_log(source, action, target, value, ip) VALUES($1,$2,$3,$4,$5)',
+      ['remote_api', 'command', target, value, req.ip]
+    ).catch(err => console.error('Audit log error', err));
+  }
 
   res.json({ ok: true, topic, payload: value });
 });
@@ -374,22 +455,63 @@ app.get('/api/firmware/latest', async (req, res) => {
 });
 
 app.get('/api/devices', async (req, res) => {
-  const r = await pool.query("SELECT DISTINCT device_id FROM telemetry ORDER BY device_id");
-  res.json(r.rows.map(r => r.device_id));
+  if (isDbAvailable()) {
+    try {
+      const r = await getPool().query("SELECT DISTINCT device_id FROM telemetry ORDER BY device_id");
+      return res.json(r.rows.map(r => r.device_id));
+    } catch (err) {
+      console.error('[DB] Error fetching devices:', err.message);
+      // Fall through to in-memory
+    }
+  }
+  // In-memory fallback
+  const devices = memGetDevices();
+  res.json(devices);
 });
 
 app.get('/api/status/:deviceId', async (req, res) => {
   const deviceId = req.params.deviceId;
-  const r = await pool.query('SELECT payload, ts FROM telemetry WHERE device_id=$1 ORDER BY ts DESC LIMIT 1', [deviceId]);
-  if (r.rows.length === 0) return res.status(404).json({ error: 'no data' });
-  res.json({ deviceId, ts: r.rows[0].ts, payload: r.rows[0].payload });
+  let telemetry = null;
+
+  if (isDbAvailable()) {
+    try {
+      const r = await getPool().query('SELECT payload, ts FROM telemetry WHERE device_id=$1 ORDER BY ts DESC LIMIT 1', [deviceId]);
+      if (r.rows.length > 0) {
+        telemetry = { ts: r.rows[0].ts, payload: r.rows[0].payload };
+      }
+    } catch (err) {
+      console.error('[DB] Error fetching status:', err.message);
+    }
+  }
+
+  if (!telemetry) {
+    const mem = memGetLatestTelemetry(deviceId);
+    if (mem) {
+      telemetry = { ts: mem.ts, payload: mem.payload };
+    }
+  }
+
+  if (!telemetry) return res.status(404).json({ error: 'no data' });
+  res.json({ deviceId, ts: telemetry.ts, payload: telemetry.payload });
 });
 
 app.get('/api/history/:deviceId', async (req, res) => {
   const deviceId = req.params.deviceId;
   const days = Number(req.query.days || 7);
-  const r = await pool.query('SELECT ts, payload FROM telemetry WHERE device_id=$1 AND ts >= now() - ($2::int || \" days\")::interval ORDER BY ts ASC', [deviceId, days]);
-  res.json(r.rows.map(row => ({ ts: row.ts, ...row.payload })));
+  if (isDbAvailable()) {
+    try {
+      const r = await getPool().query('SELECT ts, payload FROM telemetry WHERE device_id=$1 AND ts >= now() - ($2::int || " days")::interval ORDER BY ts ASC', [deviceId, days]);
+      return res.json(r.rows.map(row => ({ ts: row.ts, ...row.payload })));
+    } catch (err) {
+      console.error('[DB] Error fetching history:', err.message);
+    }
+  }
+  // In-memory fallback — return what we have
+  const cutoff = Date.now() - days * 86400000;
+  const entries = memGetDevices().includes(deviceId)
+    ? [memGetLatestTelemetry(deviceId)].filter(Boolean).filter(e => new Date(e.ts).getTime() >= cutoff)
+    : [];
+  res.json(entries.map(e => ({ ts: e.ts, ...e.payload })));
 });
 
 // Aggregated history (daily averages for a metric)
@@ -397,11 +519,14 @@ app.get('/api/history-aggregate/:deviceId', async (req, res) => {
   const deviceId = req.params.deviceId;
   const days = Number(req.query.days || 7);
   const metric = req.query.metric || 'pressure';
-  try {
-    const q = `SELECT date_trunc('day', ts) AS day, avg( (payload ->> $3)::numeric ) AS avg_val FROM telemetry WHERE device_id=$1 AND ts >= now() - ($2::int || '' days'')::interval GROUP BY day ORDER BY day`;
-    const r = await pool.query(q, [deviceId, days, metric]);
-    res.json(r.rows.map(row => ({ day: row.day, avg: row.avg_val })));
-  } catch (err) { console.error(err); res.status(500).json({ error: 'db error' }); }
+  if (isDbAvailable()) {
+    try {
+      const q = `SELECT date_trunc('day', ts) AS day, avg( (payload ->> $3)::numeric ) AS avg_val FROM telemetry WHERE device_id=$1 AND ts >= now() - ($2::int || '' days'')::interval GROUP BY day ORDER BY day`;
+      const r = await getPool().query(q, [deviceId, days, metric]);
+      return res.json(r.rows.map(row => ({ day: row.day, avg: row.avg_val })));
+    } catch (err) { console.error(err); }
+  }
+  res.json([]);
 });
 
 // Protected: send command to device (requires JWT)
@@ -409,35 +534,154 @@ app.post('/api/command/:deviceId', authenticate, async (req, res) => {
   const deviceId = req.params.deviceId;
   const cmd = req.body;
   client.publish(`device/${deviceId}/command`, JSON.stringify(cmd));
-  // Audit log
-  pool.query(
-    'INSERT INTO audit_log(source, action, target, value, user_info, ip) VALUES($1,$2,$3,$4,$5,$6)',
-    ['jwt_api', 'command', deviceId, JSON.stringify(cmd), req.user.email, req.ip]
-  ).catch(err => console.error('Audit log error', err));
+  // Audit log (best-effort)
+  if (isDbAvailable()) {
+    getPool().query(
+      'INSERT INTO audit_log(source, action, target, value, user_info, ip) VALUES($1,$2,$3,$4,$5,$6)',
+      ['jwt_api', 'command', deviceId, JSON.stringify(cmd), req.user.email, req.ip]
+    ).catch(err => console.error('Audit log error', err));
+  }
   res.json({ ok: true });
+});
+
+// --- Device logs from MQTT (stored in DB or in-memory) ---
+// GET /api/device-logs-db/:deviceId — returns logs published by the device via MQTT
+// Always accessible (no direct connection to ESP32 needed)
+app.get('/api/device-logs-db/:deviceId', async (req, res) => {
+  const deviceId = req.params.deviceId;
+  let content = null;
+  let ts = null;
+
+  if (isDbAvailable()) {
+    try {
+      const r = await getPool().query(
+        'SELECT content, ts FROM device_logs WHERE device_id=$1 ORDER BY ts DESC LIMIT 1',
+        [deviceId]
+      );
+      if (r.rows.length > 0) {
+        content = r.rows[0].content;
+        ts = r.rows[0].ts;
+      }
+    } catch (err) {
+      console.error('[DB] Error fetching device logs:', err.message);
+    }
+  }
+
+  if (!content) {
+    const mem = memGetLatestDeviceLog(deviceId);
+    if (mem) {
+      content = mem.content;
+      ts = mem.ts;
+    }
+  }
+
+  if (!content) {
+    return res.status(404).json({
+      error: 'no logs',
+      deviceId,
+      detail: 'Device has not published logs via MQTT yet. Logs are sent every 60 seconds when the device is online.',
+    });
+  }
+
+  res.json({ deviceId, content, ts });
+});
+
+// --- Device log proxy ---
+// Proxies log requests from the mobile app to the ESP32 device.
+// The device IP is taken from the latest telemetry payload (field "ip").
+// GET /api/device-logs/:deviceId?type=events  — returns /logs.txt (event log from RAM)
+// GET /api/device-logs/:deviceId?type=sd       — returns /events.log from SD card
+app.get('/api/device-logs/:deviceId', async (req, res) => {
+  const deviceId = req.params.deviceId;
+  const logType = req.query.type || 'events'; // 'events' or 'sd'
+
+  // Look up the device IP from the latest telemetry payload
+  try {
+    let payload = null;
+
+    if (isDbAvailable()) {
+      try {
+        const r = await getPool().query(
+          "SELECT payload FROM telemetry WHERE device_id=$1 ORDER BY ts DESC LIMIT 1",
+          [deviceId]
+        );
+        if (r.rows.length > 0) {
+          payload = r.rows[0].payload;
+        }
+      } catch (err) {
+        console.error('[DB] Error fetching telemetry for proxy:', err.message);
+      }
+    }
+
+    if (!payload) {
+      const mem = memGetLatestTelemetry(deviceId);
+      if (mem) {
+        payload = mem.payload;
+      }
+    }
+
+    if (!payload) {
+      return res.status(404).json({ error: 'device not found', detail: 'no telemetry data for this device' });
+    }
+
+    const deviceIp = payload && (payload.ip || payload.device_ip);
+    if (!deviceIp) {
+      return res.status(404).json({
+        error: 'device IP not available',
+        detail: 'The device has not reported its IP address in telemetry yet. Ensure the device is online and sending data.',
+      });
+    }
+
+    // Build the ESP32 URL
+    let espUrl;
+    if (logType === 'sd') {
+      // Fetch the SD card log file
+      espUrl = `http://${deviceIp}/api/sd_file?name=/events.log`;
+    } else {
+      // Fetch the in-memory event log (default)
+      espUrl = `http://${deviceIp}/logs.txt`;
+    }
+
+    console.log(`[Proxy] Fetching logs from ${espUrl}`);
+    const logData = await httpGet(espUrl, 10000);
+    res.json({ deviceId, logType, content: logData });
+  } catch (err) {
+    console.error(`[Proxy] Error fetching logs for ${deviceId}:`, err.message);
+    if (err.message && err.message.includes('ECONNREFUSED')) {
+      return res.status(502).json({ error: 'device unreachable', detail: `Cannot connect to device at the reported IP. The device may be offline or on a different network.` });
+    }
+    if (err.message && err.message.includes('timeout')) {
+      return res.status(504).json({ error: 'device timeout', detail: 'The device did not respond in time. It may be busy or unreachable.' });
+    }
+    res.status(502).json({ error: 'proxy error', detail: err.message });
+  }
 });
 
 // Public: register Expo push token
 app.post('/api/push/register', async (req, res) => {
   const { token } = req.body;
   if (!token) return res.status(400).json({ error: 'token required' });
-  try {
-    await pool.query('INSERT INTO push_tokens(token) VALUES($1) ON CONFLICT (token) DO NOTHING', [token]);
-    pushTokensCache.add(token);
-    res.json({ ok: true });
-  } catch (err) {
-    console.error('push register', err);
-    res.status(500).json({ error: 'db error' });
+  pushTokensCache.add(token);
+  if (isDbAvailable()) {
+    try {
+      await getPool().query('INSERT INTO push_tokens(token) VALUES($1) ON CONFLICT (token) DO NOTHING', [token]);
+    } catch (err) {
+      console.error('push register db error', err);
+    }
   }
+  res.json({ ok: true });
 });
 
 // --- AUTH: register/login + middleware ---
 app.post('/api/auth/register', async (req, res) => {
+  if (!isDbAvailable()) {
+    return res.status(503).json({ error: 'Database unavailable — registration disabled' });
+  }
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'email+password required' });
   const hash = await bcrypt.hash(password, 10);
   try {
-    const insert = await pool.query(
+    const insert = await getPool().query(
       'INSERT INTO users(email, password_hash) VALUES($1,$2) RETURNING id, role',
       [email, hash]
     );
@@ -451,19 +695,22 @@ app.post('/api/auth/register', async (req, res) => {
 });
 
 app.post('/api/auth/login', async (req, res) => {
+  if (!isDbAvailable()) {
+    return res.status(503).json({ error: 'Database unavailable — login disabled' });
+  }
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'email+password required' });
   try {
-    const r = await pool.query('SELECT id, password_hash, role FROM users WHERE email=$1', [email]);
+    const r = await getPool().query('SELECT id, password_hash, role FROM users WHERE email=$1', [email]);
     if (r.rows.length === 0) return res.status(401).json({ error: 'invalid credentials' });
     const u = r.rows[0];
     const ok = await bcrypt.compare(password, u.password_hash);
     if (!ok) {
-      pool.query('INSERT INTO audit_log(source, action, target, ip) VALUES($1,$2,$3,$4)',
+      getPool().query('INSERT INTO audit_log(source, action, target, ip) VALUES($1,$2,$3,$4)',
         ['auth', 'login_failed', email, req.ip]).catch(() => {});
       return res.status(401).json({ error: 'invalid credentials' });
     }
-    pool.query('INSERT INTO audit_log(source, action, target, user_info, ip) VALUES($1,$2,$3,$4,$5)',
+    getPool().query('INSERT INTO audit_log(source, action, target, user_info, ip) VALUES($1,$2,$3,$4,$5)',
       ['auth', 'login_success', email, String(u.id), req.ip]).catch(() => {});
     const token = jwt.sign({ userId: u.id, email, role: u.role }, JWT_SECRET, { expiresIn: '8h' });
     res.json({ token });
@@ -495,17 +742,19 @@ io.on('connection', (socket) => {
 (async () => {
   try {
     await initDb();
-    await loadPushTokens();
     dbReady = true;
+    await loadPushTokens();
+    console.log('[DB] PostgreSQL connected and initialized');
   } catch (err) {
     dbReady = false;
-    console.error('Startup warning: DB unavailable, running in degraded mode', err && err.code ? err.code : err);
+    console.error('Startup warning: DB unavailable, running in degraded mode with in-memory storage', err && err.code ? err.code : err.message || err);
   }
 
   server.listen(PORT, () => {
     console.log(`Backend listening on http://localhost:${PORT}`);
     if (!dbReady) {
       console.log('Docs are available at /docs/, DB-dependent API may fail until PostgreSQL is up.');
+      console.log('In-memory storage active — MQTT logs and telemetry will work without PostgreSQL.');
     }
   });
 })();
