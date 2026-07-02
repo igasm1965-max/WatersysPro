@@ -181,13 +181,17 @@ async function sendPushNotification(title, body, data = {}) {
 // --- MQTT client ---
 // MQTT broker connection
 // Use the URL directly — mqtt.js handles credentials in URL natively
-const client = mqtt.connect(MQTT_BROKER, {
+const mqttOpts = {
   clientId: MQTT_CLIENT_ID,
   keepalive: 120,
   reconnectPeriod: 5000,
   connectTimeout: 10000,
   clean: false,
-});
+};
+// Add MQTT credentials if provided
+if (process.env.MQTT_USER) mqttOpts.username = process.env.MQTT_USER;
+if (process.env.MQTT_PASS) mqttOpts.password = process.env.MQTT_PASS;
+const client = mqtt.connect(MQTT_BROKER, mqttOpts);
 client.on('connect', () => {
   console.log('MQTT connected to', MQTT_BROKER);
   console.log('Remote topic base:', MQTT_TOPIC_BASE);
@@ -221,8 +225,13 @@ client.on('message', async (topic, payload) => {
     updateRemoteSeen(topic);
 
     let obj = null;
-    if (kind !== 'status') {
-      obj = JSON.parse(txt);
+    if (kind === 'telemetry') {
+      try {
+        obj = JSON.parse(txt);
+      } catch (parseErr) {
+        console.warn(`[MQTT] Non-JSON telemetry from ${deviceId}:`, parseErr.message);
+        return;
+      }
     }
 
     if (topic === `${MQTT_TOPIC_BASE}/status` || kind === 'status') {
