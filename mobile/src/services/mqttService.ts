@@ -32,6 +32,7 @@ async function loadMqttSettings(): Promise<void> {
 
 const TOPIC_TELEMETRY = 'watersystem/telemetry';
 const TOPIC_STATUS    = 'watersystem/status';
+const TOPIC_LOGS      = 'watersystem/logs';
 const TOPIC_CMD_BASE  = 'watersystem/cmd';
 
 // Integer state → name (matches SystemState enum in firmware)
@@ -65,12 +66,14 @@ export function normalizeTelemetry(raw: any): any {
 
 type TelemetryCallback  = (data: any) => void;
 type ConnectionCallback = (connected: boolean) => void;
+type LogsCallback       = (logs: string) => void;
 
 class MqttService {
   private client: MqttWsClient | null = null;
   private _connected = false;
   private telemetryListeners: TelemetryCallback[]  = [];
   private connListeners:      ConnectionCallback[]  = [];
+  private logsListeners:      LogsCallback[]        = [];
 
   /** Connect to MQTT broker via WSS. Resolves when CONNACK received. */
   connect(): Promise<void> {
@@ -97,7 +100,7 @@ class MqttService {
         this._connected = connected;
         this._notifyConn(connected);
         if (connected) {
-          this.client!.subscribe([TOPIC_TELEMETRY, TOPIC_STATUS]);
+          this.client!.subscribe([TOPIC_TELEMETRY, TOPIC_STATUS, TOPIC_LOGS]);
           resolve();
         }
       });
@@ -109,6 +112,8 @@ class MqttService {
             const data = normalizeTelemetry(raw);
             this.telemetryListeners.forEach(cb => cb(data));
           } catch (_) {}
+        } else if (topic === TOPIC_LOGS) {
+          this.logsListeners.forEach(cb => cb(payload));
         }
       });
 
@@ -121,6 +126,12 @@ class MqttService {
   onTelemetry(cb: TelemetryCallback): () => void {
     this.telemetryListeners.push(cb);
     return () => { this.telemetryListeners = this.telemetryListeners.filter(l => l !== cb); };
+  }
+
+  /** Subscribe to log updates from MQTT. Returns unsubscribe fn. */
+  onLogs(cb: LogsCallback): () => void {
+    this.logsListeners.push(cb);
+    return () => { this.logsListeners = this.logsListeners.filter(l => l !== cb); };
   }
 
   /** Subscribe to connection state changes. Returns unsubscribe fn. */

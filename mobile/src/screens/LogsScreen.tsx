@@ -1,17 +1,65 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { View, ScrollView, Text, StyleSheet } from 'react-native';
 import { Card, Title, Button, ActivityIndicator, SegmentedButtons, Paragraph, Chip } from 'react-native-paper';
 import api from '../services/api';
+import MqttService from '../services/mqttService';
 
-type LogSource = 'direct_events' | 'direct_sd' | 'mqtt_db';
+type LogSource = 'direct_events' | 'direct_sd' | 'mqtt_db' | 'mqtt_direct';
 
 export default function LogsScreen() {
   const [logs, setLogs] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [logSource, setLogSource] = useState<LogSource>('mqtt_db');
+  const [logSource, setLogSource] = useState<LogSource>('mqtt_direct');
   const [deviceIp, setDeviceIp] = useState<string | null>(null);
-  const [connectionMode, setConnectionMode] = useState<'direct' | 'proxy' | 'mqtt' | null>(null);
+  const [connectionMode, setConnectionMode] = useState<'direct' | 'proxy' | 'mqtt' | 'mqtt_direct' | null>(null);
+  const [mqttConnected, setMqttConnected] = useState(false);
+  const logsRef = useRef<string | null>(null);
+
+  // Keep logsRef in sync with logs state for the MQTT callback
+  logsRef.current = logs;
+
+  // MQTT direct mode: connect and subscribe to logs
+  useEffect(() => {
+    if (logSource !== 'mqtt_direct') return;
+
+    setLoading(true);
+    setError(null);
+    setConnectionMode('mqtt_direct');
+
+    let unsubLogs: (() => void) | null = null;
+    let unsubConn: (() => void) | null = null;
+
+    unsubConn = MqttService.onConnectionChange((connected) => {
+      setMqttConnected(connected);
+      if (connected) {
+        setLoading(false);
+      }
+    });
+
+    unsubLogs = MqttService.onLogs((logsText) => {
+      setLogs(logsText);
+      setError(null);
+    });
+
+    MqttService.connect().catch((err) => {
+      console.warn('[LogsScreen] MQTT connect error', err);
+      setLoading(false);
+      setError(
+        'Не удалось подключиться к MQTT брокеру.\n\n' +
+        'Проверьте:\n' +
+        '• Настройки MQTT в Settings (шестерёнка)\n' +
+        '• Брокер m1.wqtt.ru должен быть доступен\n' +
+        '• Телефон должен иметь доступ в интернет'
+      );
+    });
+
+    return () => {
+      if (unsubLogs) unsubLogs();
+      if (unsubConn) unsubConn();
+      // Don't disconnect MQTT here — DashboardScreen may be using it
+    };
+  }, [logSource]);
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
@@ -150,7 +198,8 @@ export default function LogsScreen() {
           <Title>Логи устройства</Title>
           <Paragraph style={styles.paragraph}>
             Выберите источник логов:
-            {'\n'}• <Text style={{fontWeight:'bold'}}>Через сервер (MQTT)</Text> — работает из любой сети, логи обновляются раз в минуту
+            {'\n'}• <Text style={{fontWeight:'bold'}}>MQTT (напрямую)</Text> — работает из любой сети, логи приходят раз в минуту в реальном времени (рекомендуется)
+            {'\n'}• <Text style={{fontWeight:'bold'}}>Через сервер (MQTT)</Text> — работает из любой сети, логи из БД сервера
             {'\n'}• <Text style={{fontWeight:'bold'}}>Напрямую (RAM)</Text> — только в одной WiFi-сети с устройством, актуальные логи из ОЗУ
             {'\n'}• <Text style={{fontWeight:'bold'}}>Напрямую (SD)</Text> — только в одной WiFi-сети, лог-файл с SD-карты
           </Paragraph>
@@ -163,15 +212,26 @@ export default function LogsScreen() {
 
           {connectionMode && (
             <Chip
-              icon={connectionMode === 'direct' ? 'flash' : connectionMode === 'mqtt' ? 'cloud' : 'server'}
+              icon={connectionMode === 'direct' ? 'flash' : connectionMode === 'mqtt_direct' ? 'cloud' : connectionMode === 'mqtt' ? 'database' : 'server'}
               style={[
                 styles.chip,
                 connectionMode === 'direct' ? styles.chipDirect :
+                connectionMode === 'mqtt_direct' ? styles.chipMqttDirect :
                 connectionMode === 'mqtt' ? styles.chipMqtt : styles.chipProxy
               ]}
             >
               {connectionMode === 'direct' ? 'Прямое подключение' :
-               connectionMode === 'mqtt' ? 'Через сервер (MQTT)' : 'Через сервер (прокси)'}
+               connectionMode === 'mqtt_direct' ? 'MQTT напрямую' :
+               connectionMode === 'mqtt' ? 'Через сервер (БД)' : 'Через сервер (прокси)'}
+            </Chip>
+          )}
+
+          {connectionMode === 'mqtt_direct' && (
+            <Chip
+              icon={mqttConnected ? 'check-circle' : 'alert'}
+              style={[styles.chip, mqttConnected ? styles.chipConnected : styles.chipDisconnected]}
+            >
+              {mqttConnected ? 'MQTT подключён' : 'MQTT не подключён'}
             </Chip>
           )}
 
@@ -179,23 +239,34 @@ export default function LogsScreen() {
             value={logSource}
             onValueChange={(val) => setLogSource(val as LogSource)}
             buttons={[
-              { value: 'mqtt_db', label: 'MQTT' },
+              { value: 'mqtt_direct', label: 'MQTT' },
+              { value: 'mqtt_db', label: 'БД' },
               { value: 'direct_events', label: 'RAM' },
               { value: 'direct_sd', label: 'SD' },
             ]}
             style={styles.segment}
           />
 
-          <Button
-            mode="contained"
-            onPress={fetchLogs}
-            loading={loading}
-            disabled={loading}
-            style={styles.button}
-            icon="file-document"
-          >
-            {loading ? 'Загрузка...' : 'Загрузить логи'}
-          </Button>
+          {logSource !== 'mqtt_direct' && (
+            <Button
+              mode="contained"
+              onPress={fetchLogs}
+              loading={loading}
+              disabled={loading}
+              style={styles.button}
+              icon="file-document"
+            >
+              {loading ? 'Загрузка...' : 'Загрузить логи'}
+            </Button>
+          )}
+
+          {logSource === 'mqtt_direct' && (
+            <Paragraph style={styles.mqttHint}>
+              {mqttConnected
+                ? 'Ожидание логов от устройства... Устройство публикует логи раз в 60 секунд.'
+                : 'Подключение к MQTT брокеру...'}
+            </Paragraph>
+          )}
         </Card.Content>
       </Card>
 
@@ -207,10 +278,19 @@ export default function LogsScreen() {
         </Card>
       )}
 
-      {loading && (
+      {loading && logSource !== 'mqtt_direct' && (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" />
           <Text style={styles.loadingText}>Получение логов...</Text>
+        </View>
+      )}
+
+      {loading && logSource === 'mqtt_direct' && !logs && (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" />
+          <Text style={styles.loadingText}>
+            {mqttConnected ? 'Ожидание логов...' : 'Подключение к MQTT...'}
+          </Text>
         </View>
       )}
 
@@ -223,6 +303,11 @@ export default function LogsScreen() {
                 {logs.split('\n').length} строк
               </Text>
             </View>
+            {logSource === 'mqtt_direct' && (
+              <Paragraph style={styles.autoUpdateHint}>
+                Логи обновляются автоматически раз в минуту
+              </Paragraph>
+            )}
             <ScrollView
               horizontal
               style={styles.logScrollH}
@@ -269,6 +354,15 @@ const styles = StyleSheet.create({
   chipMqtt: {
     backgroundColor: '#e3f2fd',
   },
+  chipMqttDirect: {
+    backgroundColor: '#e8eaf6',
+  },
+  chipConnected: {
+    backgroundColor: '#e8f5e9',
+  },
+  chipDisconnected: {
+    backgroundColor: '#ffebee',
+  },
   segment: {
     marginBottom: 16,
   },
@@ -314,5 +408,17 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#d4d4d4',
     lineHeight: 16,
+  },
+  mqttHint: {
+    marginTop: 8,
+    color: '#888',
+    fontStyle: 'italic',
+    textAlign: 'center',
+  },
+  autoUpdateHint: {
+    marginBottom: 8,
+    color: '#888',
+    fontStyle: 'italic',
+    fontSize: 12,
   },
 });
