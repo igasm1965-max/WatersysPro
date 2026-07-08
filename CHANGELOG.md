@@ -1,5 +1,61 @@
 # Changelog
 
+## [1.3.6] - 2026-07-08
+
+### Changed (Mobile App)
+- **Logs screen redesign**: simplified to a single working mode
+  - Removed non-working modes: RAM (direct connection), SD (direct connection), manual IP input for WebView
+  - Removed SegmentedButtons for log source selection
+  - Removed in-app WebView (react-native-webview no longer needed)
+  - Removed all connection mode Chip indicators
+  - Removed `fetchLogs()` function and related direct HTTP requests to device
+- **New log fetching logic**:
+  - On screen entry, automatically subscribes to MQTT topic `watersystem/logs` — receives last ~30 events
+  - Subscribes to MQTT topic `watersystem/logs/event` — new events are appended in real-time
+  - Logs update automatically, no "Load" button needed
+- **"Open Web Interface" button**:
+  - Device IP is taken from global context (set on Dashboard screen from telemetry)
+  - Opens device web interface in browser via `Linking.openURL()`
+  - Button is disabled until IP is received
+- **Global context**: added `deviceIp` and `setDeviceIp` fields to `AppContext`
+  - `DashboardScreen` saves device IP to context when receiving telemetry
+  - `LogsScreen` reads IP from context
+
+## [1.3.5] - 2026-07-08
+
+### Fixed (Firmware)
+- **Direct log loading from device**: fixed HTTP 500 error on `/logs.txt` and `/api/sd_file` endpoints
+  - Added `streamEventsAsText()` — streams events directly to `AsyncResponseStream` without intermediate String allocation
+  - Rewrote `/api/sd_file` handler with chunked reading (128-byte blocks) instead of `request->send(SD, path)`
+  - Added automatic Content-Type detection for SD files
+  - Eliminated double memory allocation that caused ESP32 crash under heap fragmentation
+
+## [1.3.2] - 2026-07-07
+
+### Changed (Firmware)
+- **Simplified "System Logging" menu**: flat structure instead of nested, removed ~300 lines of dead code
+  - Menu now has 3 items: `View Logs`, `Clear Logs`, `Back`
+  - Removed useless features: Event Statistics (ASCII bars), Event Graph (`#` chart), Filter by Type (broken filter UI)
+  - Removed duplicate cleanup functions: Clear Old Events, Prune Event Logs
+  - Removed "Format SD Card" item (unrelated to logging)
+  - Removed dead `buildStatsMenu()` function from display.cpp
+  - Removed global filter variables (`filterType`, `selectedEventType`, `filterStartDate`, `filterEndDate`)
+  - Full change log: see `plans/simplify_system_logging_menu.md`
+
+## [1.3.1] - 2026-07-06
+
+### Fixed (Mobile App)
+- **Log loading**: fixed "Network Error" when loading logs via MQTT channel
+  - Backend endpoint `/api/device-logs-db/:deviceId` now returns JSON instead of text/plain
+  - Mobile `api.ts` correctly parses JSON response and handles 404
+  - `LogsScreen.tsx` improved error handling and deviceId diagnostics
+  - Fixed deviceId mismatch between ESP32, backend and mobile app
+
+### Fixed (Documentation)
+- Updated version numbers across all docs: 1.1.0 → 1.3.0
+- Added links to new documents (plans/, monitoring/, scripts/)
+- Updated DOCUMENTATION_INDEX.md, PROJECT_STATUS.md, README.md, README_RU.md, VERSIONING.md
+
 ## [1.3.0] - 2026-04-11
 
 ### Added (Backend)

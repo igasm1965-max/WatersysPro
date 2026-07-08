@@ -1,3 +1,14 @@
+/**
+ * @file App.tsx
+ * @brief Корневой компонент приложения (v1.3.6)
+ *
+ * Изменения в версии 1.3.6:
+ * - Добавлено состояние deviceIp для передачи IP устройства между экранами
+ * - IP передаётся через AppContext: DashboardScreen устанавливает, LogsScreen читает
+ *
+ * @see plans/logs_screen_redesign_plan.md
+ */
+
 import React, { useCallback, useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -15,6 +26,8 @@ const Tab = createBottomTabNavigator();
 export default function App() {
   // null = loading, 'create' = no pin yet, 'unlock' = pin exists, 'open' = authenticated
   const [pinState, setPinState] = useState<'loading' | 'create' | 'unlock' | 'open'>('loading');
+  // IP устройства (ESP32) — устанавливается DashboardScreen из MQTT телеметрии
+  const [deviceIp, setDeviceIp] = useState<string | null>(null);
 
   useEffect(() => {
     AsyncStorage.getItem(PIN_KEY).then(stored => {
@@ -36,7 +49,7 @@ export default function App() {
   }
 
   return (
-    <AppContext.Provider value={{ lockApp }}>
+    <AppContext.Provider value={{ lockApp, deviceIp, setDeviceIp }}>
       <NavigationContainer>
         <Tab.Navigator screenOptions={({ route }) => ({
           tabBarIcon: ({ focused, color, size }) => {

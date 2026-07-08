@@ -1,9 +1,47 @@
+/**
+ * @file DashboardScreen.tsx
+ * @brief Главный экран с телеметрией устройства (v1.3.6)
+ *
+ * Изменения в версии 1.3.6:
+ * - Добавлено сохранение IP устройства в глобальный контекст (AppContext)
+ * - IP используется на LogsScreen для кнопки "Открыть веб-интерфейс"
+ *
+ * @see plans/logs_screen_redesign_plan.md
+ */
+
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, ScrollView, RefreshControl, Text, Alert } from 'react-native';
 import { Card, Title, Paragraph, Button, ActivityIndicator, Chip } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import MqttService from '../services/mqttService';
 import { useFocusEffect } from '@react-navigation/native';
+import { useAppContext } from '../context/AppContext';
+
+function useCurrentDateTime() {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return now;
+}
+
+function formatDate(d: Date): string {
+  const days = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+  const months = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+  const dayName = days[d.getDay()];
+  const day = d.getDate();
+  const month = months[d.getMonth()];
+  const year = d.getFullYear();
+  return `${dayName}, ${day} ${month} ${year}`;
+}
+
+function formatTime(d: Date): string {
+  const h = d.getHours().toString().padStart(2, '0');
+  const m = d.getMinutes().toString().padStart(2, '0');
+  const s = d.getSeconds().toString().padStart(2, '0');
+  return `${h}:${m}:${s}`;
+}
 
 export default function DashboardScreen() {
   const [status, setStatus] = useState<any | null>(null);
@@ -11,6 +49,8 @@ export default function DashboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [mqttConnected, setMqttConnected] = useState(false);
   const prevEmergencyRef = useRef<boolean>(false);
+  const dateTime = useCurrentDateTime();
+  const { setDeviceIp } = useAppContext();
 
   const relayTargets = ['pump1', 'pump2', 'aeration', 'ozone', 'filter', 'backwash'];
 
@@ -72,6 +112,13 @@ export default function DashboardScreen() {
     unsubConn = MqttService.onConnectionChange(setMqttConnected);
     unsubTelemetry = MqttService.onTelemetry((data) => {
       setStatus(data);
+      // v1.3.6: Сохраняем IP устройства в глобальный контекст для LogsScreen
+      // IP используется для кнопки "Открыть веб-интерфейс" на экране логов
+      // Поле ip приходит в MQTT телеметрии от ESP32
+      const ip = data?.ip || data?.device_ip || null;
+      if (ip) {
+        setDeviceIp(ip);
+      }
     });
 
     const timeout = setTimeout(() => {
@@ -155,6 +202,17 @@ export default function DashboardScreen() {
           {mqttConnected ? 'MQTT: подключено (wqtt.ru)' : 'MQTT: нет связи...'}
         </Text>
       </View>
+
+      {/* Date and time display */}
+      <View style={{alignItems:'center', paddingVertical:8, paddingHorizontal:16}}>
+        <Text style={{fontSize:28, fontWeight:'300', fontFamily:'monospace', color:'#1e293b', letterSpacing:2}}>
+          {formatTime(dateTime)}
+        </Text>
+        <Text style={{fontSize:14, color:'#64748b', marginTop:2}}>
+          {formatDate(dateTime)}
+        </Text>
+      </View>
+
       <Card style={{margin:16}}>
         <Card.Content>
           <Title>Текущее состояние</Title>
