@@ -27,6 +27,10 @@ export default function LogsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [mqttConnected, setMqttConnected] = useState(false);
   const logsRef = useRef<string | null>(null);
+  // Флаг: получен ли первый полный лог. После получения игнорируем
+  // последующие полные логи (раз в 60с), т.к. новые события уже приходят
+  // по одному через watersystem/logs/event
+  const initialLogReceived = useRef(false);
   // IP устройства из глобального контекста (устанавливается на DashboardScreen)
   const { deviceIp } = useAppContext();
 
@@ -40,10 +44,16 @@ export default function LogsScreen() {
    * 1. Подписываемся на watersystem/logs — получаем полный лог (последние ~30 событий)
    * 2. Подписываемся на watersystem/logs/event — новые события в реальном времени
    * 3. Каждое новое событие добавляется в конец списка
+   *
+   * Важно: полный лог публикуется устройством раз в 60 секунд. После получения
+   * первого полного лога (initialLogReceived) последующие игнорируются, чтобы
+   * они не затирали события, добавленные по одному через onSingleEvent.
    */
   useEffect(() => {
     setLoading(true);
     setError(null);
+    // Сбрасываем флаг при монтировании (перезаходе на экран)
+    initialLogReceived.current = false;
 
     let unsubLogs: (() => void) | null = null;
     let unsubConn: (() => void) | null = null;
@@ -59,9 +69,17 @@ export default function LogsScreen() {
 
     // Получаем полный лог (последние ~30 событий) из топика watersystem/logs
     // Публикуется устройством раз в 60 секунд, а также при подключении к MQTT
+    // ВАЖНО: используем только первый полный лог как начальное состояние.
+    // Последующие полные логи (раз в минуту) игнорируем, чтобы не затирать
+    // события, уже добавленные по одному через watersystem/logs/event.
     unsubLogs = MqttService.onLogs((logsText) => {
-      setLogs(logsText);
-      setError(null);
+      if (!initialLogReceived.current) {
+        initialLogReceived.current = true;
+        setLogs(logsText);
+        setError(null);
+      }
+      // После получения первого полного лога — игнорируем последующие,
+      // т.к. новые события уже приходят по одному через onSingleEvent
     });
 
     // Подписываемся на новые события в реальном времени (watersystem/logs/event)
