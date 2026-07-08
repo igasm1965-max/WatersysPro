@@ -43,6 +43,13 @@ static String mqttClientId;
 static unsigned long lastConnectAttempt = 0;
 static unsigned long reconnectIntervalMs = 5000;
 
+// Reconnect attempt limiting to prevent infinite loops when internet is down
+static int mqttReconnectCount = 0;
+static bool mqttConnecting = false;        // Re-entry guard for connectToBroker()
+static unsigned long mqttGiveupUntilMs = 0; // Timestamp until which we give up
+static const int MQTT_MAX_RECONNECT_ATTEMPTS = 5;
+static const unsigned long MQTT_GIVEUP_INTERVAL_MS = 300000; // 5 min pause after exhausting attempts
+
 // Helper function
 static String safeGetPref(const char *key, const String &def = "") {
     if (preferences.isKey(key)) {
@@ -149,6 +156,14 @@ static void onMqttMessage(char* topic, byte* payload, unsigned int length) {
     return;
   }
 
+  // getlogs — принудительная публикация полного лога по запросу
+  // Используется мобильным приложением при входе на экран логов
+  if (cmd == "getlogs") {
+    Serial.println("[VQTT] Forced log publish via getlogs command");
+    vqtt_publishLogs();
+    return;
+  }
+
   // Relay commands require manual mode
   if (!flags.manualMode) {
     Serial.println("[VQTT] Command rejected: not in manual mode");
@@ -240,12 +255,26 @@ static String makeDeviceId() {
 
 // MQTT Connection routine
 static void connectToBroker() {
+  // Re-entry guard: prevent concurrent connect attempts
+  if (mqttConnecting) {
+    Serial.println("[VQTT] Connect already in progress, skipping");
+    return;
+  }
+
   if (!preferences.getBool(PREF_KEY_MQTT_ENABLED, DEFAULT_MQTT_ENABLED)) {
     Serial.println("[VQTT] MQTT disabled");
     return;
   }
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("[VQTT] WiFi not connected");
+    return;
+  }
+
+  // Check if we are in a give-up period after exhausting reconnect attempts
+  unsigned long now = millis();
+  if (mqttGiveupUntilMs > 0 && now < mqttGiveupUntilMs) {
+    Serial.printf("[VQTT] In give-up period until +%lums, skipping\n",
+                  mqttGiveupUntilMs - now);
     return;
   }
 
@@ -263,13 +292,22 @@ static void connectToBroker() {
   Serial.printf("[VQTT] Configuring MQTT: broker=%s, port=%u, TLS=%s, clientId=%s\n",
                 broker.c_str(), (unsigned int)port, useTLS ? "ON" : "OFF", mqttClientId.c_str());
 
+  // Set connecting flag to prevent re-entry during blocking operations
+  mqttConnecting = true;
+
   // DNS resolution
   IPAddress brokerIP;
-  if (!WiFi.hostByName(broker.c_str(), brokerIP)) {
-    Serial.printf("[VQTT] ERROR: DNS failed for %s\n", broker.c_str());
-    return;
+  {
+    unsigned long dnsStart = millis();
+    bool dnsOk = WiFi.hostByName(broker.c_str(), brokerIP);
+    unsigned long dnsElapsed = millis() - dnsStart;
+    if (!dnsOk) {
+      Serial.printf("[VQTT] ERROR: DNS failed for %s (%lums)\n", broker.c_str(), dnsElapsed);
+      mqttConnecting = false;
+      return;
+    }
+    Serial.printf("[VQTT] DNS resolved: %s -> %s (%lums)\n", broker.c_str(), brokerIP.toString().c_str(), dnsElapsed);
   }
-  Serial.printf("[VQTT] DNS resolved: %s -> %s\n", broker.c_str(), brokerIP.toString().c_str());
 
   // Select client and configure
   if (useTLS) {
@@ -369,6 +407,9 @@ static void connectToBroker() {
   if (connectOk) {
     Serial.println("[VQTT] ✓ Connected to broker!");
     mqttConnected = true;
+    // Reset reconnect counters on successful connection
+    mqttReconnectCount = 0;
+    mqttGiveupUntilMs = 0;
     saveEventLog(LOG_INFO, EVENT_SETTINGS_CHANGE, 0);
     
     // Subscribe to commands with QoS 1 (guaranteed delivery)
@@ -407,7 +448,19 @@ static void connectToBroker() {
       Serial.printf("[VQTT] TLS lastError=%d (%s)\n", tlsCode, tlsErr[0] ? tlsErr : "n/a");
     }
     mqttConnected = false;
+
+    // Track reconnect attempts to avoid infinite retry when internet is down
+    mqttReconnectCount++;
+    Serial.printf("[VQTT] Reconnect attempt %d/%d\n", mqttReconnectCount, MQTT_MAX_RECONNECT_ATTEMPTS);
+    if (mqttReconnectCount >= MQTT_MAX_RECONNECT_ATTEMPTS) {
+      mqttGiveupUntilMs = millis() + MQTT_GIVEUP_INTERVAL_MS;
+      Serial.printf("[VQTT] Exceeded max reconnect attempts, giving up until +%lums\n", MQTT_GIVEUP_INTERVAL_MS);
+      saveEventLog(LOG_WARNING, EVENT_SETTINGS_CHANGE, 0);
+    }
   }
+
+  // Clear connecting flag
+  mqttConnecting = false;
 }
 
 void initVQTT() {
@@ -478,6 +531,9 @@ void loopVQTT() {
   if (wifiConnected && !wifiWasConnected) {
     Serial.println("[VQTT] WiFi connected, initiating MQTT connection...");
     wifiWasConnected = true;
+    // WiFi just came back — reset reconnect counters so we try again
+    mqttReconnectCount = 0;
+    mqttGiveupUntilMs = 0;
     lastConnectAttempt = 0;  // Force immediate connection
     connectToBroker();
     return;
@@ -648,6 +704,34 @@ void vqtt_publishLogs() {
                 topic.c_str(), logsText.length(), ok ? "OK" : "FAILED");
 }
 
+/// Publish a single log event to watersystem/logs/event for real-time streaming.
+/// Called from saveEventLog() each time a new event is recorded.
+void vqtt_publishSingleEvent(const EventLog& event) {
+  if (!activeMqtt || !activeMqtt->connected()) {
+    return;
+  }
+
+  char desc[80];
+  getEventTypeLong(event.level, event.eventType, event.eventParam, desc, sizeof(desc));
+
+  DynamicJsonDocument doc(256);
+  char ts[24];
+  snprintf(ts, sizeof(ts), "%02d.%02d.%04d %02d:%02d:%02d",
+           event.day, event.month, event.year, event.hour, event.minute, 0);
+  doc["ts"] = ts;
+  doc["type"] = event.eventType;
+  doc["level"] = (int)event.level;
+  doc["desc"] = desc;
+
+  String out;
+  serializeJson(doc, out);
+  String topic = mqttTopicBase + "/logs/event";
+  bool ok = activeMqtt->publish(topic.c_str(), out.c_str());
+  if (!ok) {
+    Serial.printf("[VQTT] Failed to publish single event to %s\n", topic.c_str());
+  }
+}
+
 void vqtt_publishState() {
   if (!activeMqtt || !activeMqtt->connected()) {
     Serial.println("[VQTT] Not connected, skipping state");
@@ -665,6 +749,14 @@ void vqtt_publishState() {
   bool ok = activeMqtt->publish(topic.c_str(), out.c_str());
   Serial.printf("[VQTT] Published state to %s (%d bytes): %s\n",
                 topic.c_str(), out.length(), ok ? "OK" : "FAILED");
+}
+
+void vqtt_resetReconnectBackoff() {
+  mqttReconnectCount = 0;
+  mqttGiveupUntilMs = 0;
+  reconnectIntervalMs = 5000;
+  mqttConnecting = false;
+  Serial.println("[VQTT] Reconnect backoff reset (call from web UI or engineer menu)");
 }
 
 #endif // ENABLE_WIFI

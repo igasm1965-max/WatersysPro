@@ -95,6 +95,9 @@ export default function LogsScreen() {
       if (MqttService.connected) {
         setLoading(false);
         setMqttConnected(true);
+        // Отправляем команду устройству на принудительную публикацию логов
+        // Устройство подписано на watersystem/cmd/getlogs и вызовет vqtt_publishLogs()
+        MqttService.publish('getlogs', '1');
       }
     }).catch((err) => {
       console.warn('[LogsScreen] MQTT connect error', err);
