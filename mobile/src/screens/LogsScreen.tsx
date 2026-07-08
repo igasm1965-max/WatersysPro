@@ -16,7 +16,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, ScrollView, Text, StyleSheet, Linking, Alert, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
+import { View, ScrollView, Text, StyleSheet, Linking, Alert } from 'react-native';
 import { Card, Title, Button, ActivityIndicator, Paragraph, Chip } from 'react-native-paper';
 import MqttService from '../services/mqttService';
 import { useAppContext } from '../context/AppContext';
@@ -214,7 +214,7 @@ export default function LogsScreen() {
         </View>
       )}
 
-      {/* Блок с логами */}
+      {/* Блок с логами — один вертикальный ScrollView с переносом строк */}
       {logs && (
         <Card style={styles.card}>
           <Card.Content>
@@ -228,25 +228,18 @@ export default function LogsScreen() {
               Логи обновляются автоматически в реальном времени
             </Paragraph>
             <ScrollView
-              horizontal
-              style={styles.logScrollH}
-              contentContainerStyle={styles.logScrollHContent}
+              ref={logScrollRef}
+              style={styles.logScroll}
+              onScroll={(e) => {
+                const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+                const isNearBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - 50;
+                userScrolledUp.current = !isNearBottom;
+              }}
+              scrollEventThrottle={100}
             >
-              <ScrollView
-                ref={logScrollRef}
-                style={styles.logScrollV}
-                onScroll={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
-                  const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
-                  // Если пользователь прокрутил выше, чем на 50px от низа — считаем что он смотрит историю
-                  const isNearBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - 50;
-                  userScrolledUp.current = !isNearBottom;
-                }}
-                scrollEventThrottle={100}
-              >
-                <Text style={styles.logText} selectable>
-                  {logs}
-                </Text>
-              </ScrollView>
+              <Text style={styles.logText} selectable>
+                {logs}
+              </Text>
             </ScrollView>
           </Card.Content>
         </Card>
@@ -305,20 +298,15 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 8,
   },
-  logScrollH: {
+  logScroll: {
     maxHeight: 400,
-  },
-  logScrollHContent: {
-    minWidth: '100%',
-  },
-  logScrollV: {
-    maxHeight: 380,
   },
   logText: {
     fontFamily: 'monospace',
     fontSize: 11,
     lineHeight: 16,
     color: '#333',
+    flexWrap: 'wrap',
   },
   errorText: {
     color: '#c62828',
