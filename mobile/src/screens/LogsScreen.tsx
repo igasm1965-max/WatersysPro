@@ -16,7 +16,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, ScrollView, Text, StyleSheet, Linking, Alert } from 'react-native';
+import { View, ScrollView, Text, StyleSheet, Linking, Alert, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
 import { Card, Title, Button, ActivityIndicator, Paragraph, Chip } from 'react-native-paper';
 import MqttService from '../services/mqttService';
 import { useAppContext } from '../context/AppContext';
@@ -31,6 +31,10 @@ export default function LogsScreen() {
   // последующие полные логи (раз в 60с), т.к. новые события уже приходят
   // по одному через watersystem/logs/event
   const initialLogReceived = useRef(false);
+  // Ref для вертикального ScrollView с логами (авто-скролл вниз)
+  const logScrollRef = useRef<ScrollView>(null);
+  // Флаг: пользователь вручную прокрутил вверх — не сбрасываем скролл
+  const userScrolledUp = useRef(false);
   // IP устройства из глобального контекста (устанавливается на DashboardScreen)
   const { deviceIp } = useAppContext();
 
@@ -118,6 +122,18 @@ export default function LogsScreen() {
       if (unsubEvent) unsubEvent();
     };
   }, []);
+
+  // Авто-скролл вниз при получении новых логов
+  // Если пользователь вручную прокрутил вверх — не сбрасываем позицию
+  useEffect(() => {
+    if (logs && !userScrolledUp.current) {
+      // Небольшая задержка, чтобы DOM успел обновиться
+      const timer = setTimeout(() => {
+        logScrollRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [logs]);
 
   /**
    * Открыть веб-интерфейс устройства в браузере
@@ -216,7 +232,17 @@ export default function LogsScreen() {
               style={styles.logScrollH}
               contentContainerStyle={styles.logScrollHContent}
             >
-              <ScrollView style={styles.logScrollV}>
+              <ScrollView
+                ref={logScrollRef}
+                style={styles.logScrollV}
+                onScroll={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+                  const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+                  // Если пользователь прокрутил выше, чем на 50px от низа — считаем что он смотрит историю
+                  const isNearBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - 50;
+                  userScrolledUp.current = !isNearBottom;
+                }}
+                scrollEventThrottle={100}
+              >
                 <Text style={styles.logText} selectable>
                   {logs}
                 </Text>
