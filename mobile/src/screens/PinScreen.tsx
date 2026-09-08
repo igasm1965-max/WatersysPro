@@ -1,73 +1,116 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 export const PIN_KEY = 'appPin';
 const PIN_LENGTH = 4;
 
+// Защита от подбора кода (brute-force)
+const MAX_ATTEMPTS = 5;
+const LOCK_MS = 30000; // 30 секунд блокировки после MAX_ATTEMPTS неудач
+const ATTEMPTS_KEY = 'pinFailedAttempts';
+const LOCK_UNTIL_KEY = 'pinLockUntil';
+
 interface Props {
-  mode: 'create' | 'unlock';
+  mode: 'create' | 'unlock' | 'change';
   onSuccess: () => void;
 }
 
+type Step = 'verify' | 'enter' | 'confirm';
+
+/** PIN хранится в SecureStore (не в открытом AsyncStorage). */
+async function readPin(): Promise<string | null> {
+  return SecureStore.getItemAsync(PIN_KEY);
+}
+async function writePin(pin: string): Promise<void> {
+  await SecureStore.setItemAsync(PIN_KEY, pin);
+}
+async function readAttempts(): Promise<number> {
+  const raw = await SecureStore.getItemAsync(ATTEMPTS_KEY);
+  const n = raw ? parseInt(raw, 10) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+async function readLockUntil(): Promise<number> {
+  const raw = await SecureStore.getItemAsync(LOCK_UNTIL_KEY);
+  const n = raw ? parseInt(raw, 10) : NaN;
+  return Number.isFinite(n) ? n : 0;
+}
+
 export default function PinScreen({ mode, onSuccess }: Props) {
+  const [step, setStep] = useState<Step>(mode === 'create' ? 'enter' : 'verify');
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
-  const [step, setStep] = useState<'enter' | 'confirm'>('enter');
+  const [lockedUntil, setLockedUntil] = useState(0);
+  const [now, setNow] = useState(Date.now());
 
-  const currentInput = step === 'enter' ? pin : confirmPin;
+  // Проверка блокировки при монтировании + таймер обратного отсчёта
+  useEffect(() => {
+    let timer: ReturnType<typeof setInterval> | null = null;
+    readLockUntil().then((until) => {
+      if (until > Date.now()) {
+        setLockedUntil(until);
+        timer = setInterval(() => setNow(Date.now()), 1000);
+      }
+    });
+    return () => { if (timer) clearInterval(timer); };
+  }, []);
+
+  // Остановить таймер, когда блокировка истекла
+  useEffect(() => {
+    if (lockedUntil > 0 && lockedUntil <= Date.now()) setLockedUntil(0);
+  }, [now, lockedUntil]);
+
+  const currentInput = step === 'verify' || step === 'enter' ? pin : confirmPin;
+  const lockRemaining = lockedUntil > now ? Math.ceil((lockedUntil - now) / 1000) : 0;
 
   const title =
     mode === 'unlock'
       ? 'Введите код доступа'
+      : mode === 'change'
+      ? step === 'verify'
+        ? 'Введите текущий код'
+        : step === 'enter'
+        ? 'Придумайте новый код'
+        : 'Повторите новый код'
       : step === 'enter'
       ? 'Придумайте код (4 цифры)'
       : 'Повторите код';
 
-  const handleDigit = (d: string) => {
-    if (mode === 'unlock') {
-      const next = pin + d;
-      if (next.length > PIN_LENGTH) return;
-      setPin(next);
-      if (next.length === PIN_LENGTH) verifyPin(next);
+  const handleWrongPin = async () => {
+    const attempts = (await readAttempts()) + 1;
+    setPin('');
+    if (attempts >= MAX_ATTEMPTS) {
+      const until = Date.now() + LOCK_MS;
+      await SecureStore.setItemAsync(ATTEMPTS_KEY, '0');
+      await SecureStore.setItemAsync(LOCK_UNTIL_KEY, String(until));
+      setLockedUntil(until);
+      setNow(Date.now());
+      Alert.alert('Слишком много попыток', `Ввод заблокирован на ${Math.round(LOCK_MS / 1000)} секунд`);
     } else {
-      if (step === 'enter') {
-        const next = pin + d;
-        if (next.length > PIN_LENGTH) return;
-        setPin(next);
-        if (next.length === PIN_LENGTH) setTimeout(() => setStep('confirm'), 150);
-      } else {
-        const next = confirmPin + d;
-        if (next.length > PIN_LENGTH) return;
-        setConfirmPin(next);
-        if (next.length === PIN_LENGTH) checkConfirm(pin, next);
-      }
+      await SecureStore.setItemAsync(ATTEMPTS_KEY, String(attempts));
+      Alert.alert('Неверный код', `Попробуйте ещё раз (осталось попыток: ${MAX_ATTEMPTS - attempts})`);
     }
   };
 
-  const handleDelete = () => {
-    if (mode === 'unlock') {
-      setPin(p => p.slice(0, -1));
-    } else if (step === 'enter') {
-      setPin(p => p.slice(0, -1));
-    } else {
-      setConfirmPin(p => p.slice(0, -1));
-    }
-  };
-
-  const verifyPin = async (entered: string) => {
-    const stored = await AsyncStorage.getItem(PIN_KEY);
+  const doVerify = async (entered: string) => {
+    const stored = await readPin();
     if (entered === stored) {
-      onSuccess();
+      await SecureStore.setItemAsync(ATTEMPTS_KEY, '0');
+      if (mode === 'unlock') {
+        onSuccess();
+      } else {
+        // Режим change — переходим к установке нового PIN
+        setPin('');
+        setStep('enter');
+      }
     } else {
-      setPin('');
-      Alert.alert('Неверный код', 'Попробуйте ещё раз');
+      await handleWrongPin();
     }
   };
 
-  const checkConfirm = async (first: string, second: string) => {
+  const doConfirm = async (first: string, second: string) => {
     if (first === second) {
-      await AsyncStorage.setItem(PIN_KEY, first);
+      await writePin(first);
       onSuccess();
     } else {
       Alert.alert('Коды не совпадают', 'Начните заново');
@@ -77,7 +120,45 @@ export default function PinScreen({ mode, onSuccess }: Props) {
     }
   };
 
-  const keys = ['1','2','3','4','5','6','7','8','9','','0','⌫'];
+  const handleDigit = (d: string) => {
+    if (lockRemaining > 0) return;
+    if (step === 'verify') {
+      const next = pin + d;
+      if (next.length > PIN_LENGTH) return;
+      setPin(next);
+      if (next.length === PIN_LENGTH) doVerify(next);
+    } else if (step === 'enter') {
+      const next = pin + d;
+      if (next.length > PIN_LENGTH) return;
+      setPin(next);
+      if (next.length === PIN_LENGTH) setTimeout(() => setStep('confirm'), 150);
+    } else {
+      const next = confirmPin + d;
+      if (next.length > PIN_LENGTH) return;
+      setConfirmPin(next);
+      if (next.length === PIN_LENGTH) doConfirm(pin, next);
+    }
+  };
+
+  const handleDelete = () => {
+    if (step === 'confirm') {
+      setConfirmPin((p) => p.slice(0, -1));
+    } else {
+      setPin((p) => p.slice(0, -1));
+    }
+  };
+
+  const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'];
+
+  if (lockRemaining > 0) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.appName}>WaterSys</Text>
+        <Text style={styles.lockTitle}>🔒 Ввод заблокирован</Text>
+        <Text style={styles.lockTimer}>Повторите через {lockRemaining} с</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -131,6 +212,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#555',
     marginBottom: 36,
+  },
+  lockTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#c62828',
+    marginBottom: 12,
+  },
+  lockTimer: {
+    fontSize: 16,
+    color: '#555',
   },
   dots: {
     flexDirection: 'row',

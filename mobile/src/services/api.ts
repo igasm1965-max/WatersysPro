@@ -1,11 +1,41 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  Telemetry,
+  LogType,
+  DeviceLogsResponse,
+  AuthResponse,
+} from '../types';
 
 // Production builds must use HTTPS. The real server URL is configured in Settings
 // (stored in AsyncStorage 'serverUrl'); this is only a safe default fallback.
 const DEFAULT_API_URL = 'https://your-domain.com/api';
 
+const AUTH_TOKEN_KEY = 'jwtAuthToken';
+
 const api = axios.create({ baseURL: DEFAULT_API_URL, timeout: 8000 });
+
+/**
+ * JWT-токен для REST-бэкенда. Хранится в памяти + дублируется в SecureStore,
+ * чтобы токен не лежал в открытом AsyncStorage.
+ */
+let authToken: string | null = null;
+
+/** Сохранить JWT-токен (в память и SecureStore). */
+export async function setAuthToken(token: string | null): Promise<void> {
+  authToken = token;
+  if (token) {
+    const SecureStore = (await import('expo-secure-store')).default;
+    await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
+  }
+}
+
+/** Инициализировать токен из SecureStore при старте. */
+export async function initAuthToken(): Promise<void> {
+  if (authToken !== null) return;
+  const SecureStore = (await import('expo-secure-store')).default;
+  authToken = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
+}
 
 // Dynamic server URL from Settings + JWT token
 api.interceptors.request.use(async (config) => {
@@ -14,45 +44,44 @@ api.interceptors.request.use(async (config) => {
     const base = serverUrl.replace(/\/$/, '') + '/api';
     config.baseURL = base;
   }
-  const token = await (global as any).authToken;
-  if (token && config.headers) config.headers.Authorization = `Bearer ${token}`;
+  if (authToken && config.headers) config.headers.Authorization = `Bearer ${authToken}`;
   return config;
 });
 
 export default {
-  async getDevices() { const r = await api.get('/devices'); return r.data; },
-  async getStatus(deviceId: string) { const r = await api.get(`/status/${deviceId}`); return r.data; },
-  async getHistory(deviceId: string, days = 7) { const r = await api.get(`/history/${deviceId}?days=${days}`); return r.data; },
-  async getAggregated(deviceId: string, metric = 'pressure', days = 7) { const r = await api.get(`/history-aggregate/${deviceId}?metric=${metric}&days=${days}`); return r.data; },
-  async getRemoteConfig() { const r = await api.get('/remote/config'); return r.data; },
-  async sendRemoteRelay(target: string, value: 'on' | 'off', adminToken?: string) {
-    const headers: any = {};
+  async getDevices(): Promise<unknown[]> { const r = await api.get('/devices'); return r.data; },
+  async getStatus(deviceId: string): Promise<Telemetry> { const r = await api.get(`/status/${deviceId}`); return r.data; },
+  async getHistory(deviceId: string, days = 7): Promise<unknown[]> { const r = await api.get(`/history/${deviceId}?days=${days}`); return r.data; },
+  async getAggregated(deviceId: string, metric = 'pressure', days = 7): Promise<unknown> { const r = await api.get(`/history-aggregate/${deviceId}?metric=${metric}&days=${days}`); return r.data; },
+  async getRemoteConfig(): Promise<unknown> { const r = await api.get('/remote/config'); return r.data; },
+  async sendRemoteRelay(target: string, value: 'on' | 'off', adminToken?: string): Promise<unknown> {
+    const headers: Record<string, string> = {};
     if (adminToken) headers['x-admin-token'] = adminToken;
     const r = await api.post('/remote/command', { target, value }, { headers });
     return r.data;
   },
-  async sendRemoteMode(mode: 'manual' | 'auto', adminToken?: string) {
-    const headers: any = {};
+  async sendRemoteMode(mode: 'manual' | 'auto', adminToken?: string): Promise<unknown> {
+    const headers: Record<string, string> = {};
     if (adminToken) headers['x-admin-token'] = adminToken;
     const r = await api.post('/remote/command', { target: 'set_mode', value: mode }, { headers });
     return r.data;
   },
-  async sendRemoteReset(adminToken?: string) {
-    const headers: any = {};
+  async sendRemoteReset(adminToken?: string): Promise<unknown> {
+    const headers: Record<string, string> = {};
     if (adminToken) headers['x-admin-token'] = adminToken;
     const r = await api.post('/remote/command', { target: 'reset_emergency', value: '1' }, { headers });
     return r.data;
   },
-  async sendCommand(deviceId: string, command: any) { const r = await api.post(`/command/${deviceId}`, command); return r.data; },
-  async registerPushToken(token: string) { return api.post('/push/register', { token }); },
-  async login(email: string, password: string) { const r = await api.post('/auth/login', { email, password }); return r.data; },
-  async register(email: string, password: string) { const r = await api.post('/auth/register', { email, password }); return r.data; },
+  async sendCommand(deviceId: string, command: unknown): Promise<unknown> { const r = await api.post(`/command/${deviceId}`, command); return r.data; },
+  async registerPushToken(token: string): Promise<unknown> { return api.post('/push/register', { token }); },
+  async login(email: string, password: string): Promise<AuthResponse> { const r = await api.post('/auth/login', { email, password }); return r.data; },
+  async register(email: string, password: string): Promise<AuthResponse> { const r = await api.post('/auth/register', { email, password }); return r.data; },
 
   /** Get device IP from the latest telemetry stored on the backend */
   async getDeviceIp(deviceId: string): Promise<string | null> {
     try {
       const status = await this.getStatus(deviceId);
-      const ip = status?.payload?.ip || status?.payload?.device_ip || null;
+      const ip = status?.ip || status?.device_ip || null;
       return ip;
     } catch {
       return null;
@@ -66,16 +95,13 @@ export default {
    * Uses axios directly (not the pre-configured `api` instance) to avoid
    * interceptors that would rewrite the URL to the backend server.
    */
-  async fetchDeviceLogsDirect(deviceIp: string, type: 'events' | 'sd' = 'events'): Promise<string> {
+  async fetchDeviceLogsDirect(deviceIp: string, type: LogType = 'events'): Promise<string> {
     let url: string;
     if (type === 'sd') {
       url = `http://${deviceIp}/api/sd_file?name=/events.log`;
     } else {
       url = `http://${deviceIp}/logs.txt`;
     }
-
-    // Diagnostic: log the actual URL being requested
-    console.log(`[API] fetchDeviceLogsDirect: ${url}`);
 
     // Retry up to 2 times on 500/network errors
     const MAX_RETRIES = 2;
@@ -120,12 +146,12 @@ export default {
   },
 
   /** Fetch event logs from the device via backend proxy (fallback) */
-  async getDeviceLogs(deviceId: string, type: 'events' | 'sd' = 'events') {
-    const r = await api.get(`/device-logs/${deviceId}?type=${type}`, { timeout: 15000 });
+  async getDeviceLogs(deviceId: string, type: LogType = 'events'): Promise<string> {
+    const r = await api.get<DeviceLogsResponse | string>(`/device-logs/${deviceId}?type=${type}`, { timeout: 15000 });
     // New format: { deviceId, logType, content }
-    if (r.data && r.data.content) return r.data.content;
+    if (typeof r.data === 'object' && r.data?.content) return r.data.content;
     // Fallback: plain text (old format)
-    return r.data;
+    return String(r.data);
   },
 
   /**
@@ -133,10 +159,10 @@ export default {
    * Works from any network — no direct connection to ESP32 needed.
    */
   async getDeviceLogsFromDb(deviceId: string): Promise<string> {
-    const r = await api.get(`/device-logs-db/${deviceId}`, { timeout: 10000 });
+    const r = await api.get<DeviceLogsResponse | string>(`/device-logs-db/${deviceId}`, { timeout: 10000 });
     // New format: { deviceId, content, ts }
-    if (r.data && r.data.content) return r.data.content;
+    if (typeof r.data === 'object' && r.data?.content) return r.data.content;
     // Fallback: plain text (old format)
-    return r.data;
+    return String(r.data);
   }
 };

@@ -136,7 +136,6 @@ export class MqttWsClient {
     // Предотвращение множественных параллельных WebSocket-соединений.
     // Если WS уже открыт или в процессе открытия — пропускаем.
     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
-      console.log('[MqttWs] WS already open/connecting (readyState=' + this.ws.readyState + '), skipping connect()');
       return;
     }
     try {
@@ -144,7 +143,6 @@ export class MqttWsClient {
       this.ws.binaryType = 'arraybuffer';
 
       this.ws.onopen = () => {
-        console.log('[MqttWs] WS open, sending CONNECT');
         this._send(buildConnect(this.clientId, this.user, this.pass, this.keepalive));
       };
 
@@ -241,7 +239,6 @@ export class MqttWsClient {
   private _setConnected(v: boolean): void {
     if (this._connected !== v) {
       this._connected = v;
-      console.log('[MqttWs] connected =', v);
       this.connHandlers.forEach(h => h(v));
     }
   }
@@ -249,7 +246,6 @@ export class MqttWsClient {
   private _handlePacket(buf: Uint8Array): void {
     if (buf.length < 2) return;
     const type = (buf[0] & 0xf0) >> 4;
-    console.log('[MqttWs] pkt type=', type, 'len=', buf.length, 'bytes=', buf[0], buf[1], buf[2], buf[3]);
 
     switch (type) {
       case 2: // CONNACK

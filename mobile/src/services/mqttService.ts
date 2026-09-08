@@ -10,6 +10,7 @@
 import { MqttWsClient } from './mqttClient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { loadSetting } from './secureStorage';
+import { Telemetry, RawTelemetry, LogEvent, SystemState } from '../types';
 
 // Default MQTT credentials (can be overridden in Settings)
 const DEFAULT_BROKER = 'm1.wqtt.ru';
@@ -41,17 +42,17 @@ const TOPIC_CMD_BASE  = 'watersystem/cmd';
 
 // Integer state → name (matches SystemState enum in firmware)
 const STATE_NAMES: Record<number, string> = {
-  0: 'IDLE',
-  1: 'FILLING_TANK1',
-  2: 'OZONATION',
-  3: 'AERATION',
-  4: 'SETTLING',
-  5: 'FILTRATION',
-  6: 'BACKWASH',
+  [SystemState.IDLE]: 'IDLE',
+  [SystemState.FILLING_TANK1]: 'FILLING_TANK1',
+  [SystemState.OZONATION]: 'OZONATION',
+  [SystemState.AERATION]: 'AERATION',
+  [SystemState.SETTLING]: 'SETTLING',
+  [SystemState.FILTRATION]: 'FILTRATION',
+  [SystemState.BACKWASH]: 'BACKWASH',
 };
 
 /** Normalize raw MQTT telemetry to the shape DashboardScreen expects. */
-export function normalizeTelemetry(raw: any): any {
+export function normalizeTelemetry(raw: RawTelemetry): Telemetry {
   const stateNum = typeof raw.state === 'number' ? raw.state : -1;
   const stateName = STATE_NAMES[stateNum] ?? String(raw.state ?? '');
   return {
@@ -65,13 +66,13 @@ export function normalizeTelemetry(raw: any): any {
       filterRemaining: raw.timers?.filter_next ?? raw.timers?.filterRemaining ?? 0,
     },
     emergency: raw.emergency ?? { active: false },
-  };
+  } as Telemetry;
 }
 
-type TelemetryCallback   = (data: any) => void;
+type TelemetryCallback   = (data: Telemetry) => void;
 type ConnectionCallback  = (connected: boolean) => void;
 type LogsCallback        = (logs: string) => void;
-type SingleEventCallback = (event: { ts: string; type: number; level: number; desc: string }) => void;
+type SingleEventCallback = (event: LogEvent) => void;
 type LogAckCallback      = () => void;
 
 class MqttService {
@@ -84,100 +85,99 @@ class MqttService {
   private singleEventListeners: SingleEventCallback[] = [];
   private logAckListeners:     LogAckCallback[]       = [];
 
-  /** Connect to MQTT broker via WSS. Resolves when CONNACK received. */
+  /**
+   * Подключиться к MQTT-брокеру через WSS.
+   * Идемпотентно: если уже подключены — мгновенный resolve;
+   * если подключение в процессе — ждём его завершения.
+   * Промис всегда разрешается (успех или неудача) и не зависает.
+   */
   connect(): Promise<void> {
-    // Уже подключены — мгновенный resolve
     if (this.client && this._connected) {
-      console.log('[MQTT-DIAG] connect() called but already connected, resolving immediately');
       return Promise.resolve();
     }
-    // Уже в процессе подключения — ждём завершения
     if (this._connecting) {
-      console.log('[MQTT-DIAG] connect() called but already connecting, waiting...');
       return new Promise<void>((resolve) => {
-        const unsub = this.onConnectionChange((connected) => {
-          console.log('[MQTT-DIAG] connect() pending promise resolved, connected=' + connected);
+        const unsub = this.onConnectionChange(() => {
           unsub();
-          resolve();  // resolve в любом случае (успех или неудача)
+          resolve();
         });
       });
     }
-    // If previous client exists but lost connection — stop its reconnect loop first
     if (this.client && !this._connected) {
-      console.log('[MQTT-DIAG] connect() — disconnecting stale client');
       this.client.disconnect();
       this.client = null;
     }
-
     this._connecting = true;
-    console.log('[MQTT-DIAG] connect() — starting new connection');
-
-    return loadMqttSettings().then(() => {
-      if (!BROKER_URL) {
-        console.warn('[MQTT-DIAG] Broker not configured — check Settings');
+    return loadMqttSettings()
+      .then(() => new Promise<void>((resolve) => this._startNewConnection(resolve)))
+      .catch((err) => {
         this._connecting = false;
-        return;
-      }
-      return new Promise<void>((resolve) => {
-      const clientId = `mob_${Math.random().toString(16).slice(2, 10)}`;
-
-      console.log('[MQTT-DIAG] Creating MqttWsClient, url=' + BROKER_URL + ' clientId=' + clientId);
-
-      this.client = new MqttWsClient(
-        BROKER_URL, clientId, MQTT_USER, MQTT_PASS, 20
-      );
-
-      this.client.onConnChange((connected) => {
-        console.log('[MQTT-DIAG] MqttWsClient.onConnChange called with connected=' + connected + ' (current _connected=' + this._connected + ')');
-        this._connected = connected;
-        if (connected) {
-          // ВАЖНО: Сначала подписываемся на ВСЕ топики, потом оповещаем слушателей.
-          // Это предотвращает race condition: LogsScreen получает connected=true,
-          // отправляет getlogs, но подписка на watersystem/logs ещё не активна.
-          this.client!.subscribe([
-            TOPIC_TELEMETRY,
-            TOPIC_STATUS,
-            TOPIC_LOGS,
-            TOPIC_LOG_EVENT,
-            TOPIC_LOG_ACK,  // НОВЫЙ топик для подтверждения getlogs
-          ]);
-          this._connecting = false;
-          console.log('[MQTT-DIAG] Calling _notifyConn(true) — listeners count=' + this.connListeners.length);
-          this._notifyConn(true);
-          resolve();
-        } else {
-          this._connecting = false;
-          console.log('[MQTT-DIAG] Calling _notifyConn(false) — listeners count=' + this.connListeners.length);
-          this._notifyConn(false);
-        }
+        throw err;
       });
+  }
 
-      this.client.onMessage((topic, payload) => {
-        if (topic === TOPIC_TELEMETRY) {
-          try {
-            const raw  = JSON.parse(payload);
-            const data = normalizeTelemetry(raw);
-            this.telemetryListeners.forEach(cb => cb(data));
-          } catch (_) {}
-        } else if (topic === TOPIC_LOGS) {
-          this.logsListeners.forEach(cb => cb(payload));
-        } else if (topic === TOPIC_LOG_EVENT) {
-          try {
-            const event = JSON.parse(payload);
-            this.singleEventListeners.forEach(cb => cb(event));
-          } catch (_) {}
-        } else if (topic === TOPIC_LOG_ACK) {
-          // Устройство подтвердило получение команды getlogs
-          this.logAckListeners.forEach(cb => cb());
-        }
-      });
-
-      this.client.connect();
-      });
-    }).catch((err) => {
+  /** Создать новый клиент и запустить подключение (гарантированно резолвится). */
+  private _startNewConnection(resolve: () => void): void {
+    if (!BROKER_URL) {
+      console.warn('[MQTT] Broker not configured — check Settings');
       this._connecting = false;
-      throw err;
+      resolve();
+      return;
+    }
+
+    const clientId = `mob_${Math.random().toString(16).slice(2, 10)}`;
+    this.client = new MqttWsClient(BROKER_URL, clientId, MQTT_USER, MQTT_PASS, 20);
+
+    // Таймаут-страховка: если соединение не установилось (например, WS-клиент
+    // не вызвал onConnChange при полном отказе), всё равно завершаем промис.
+    const failTimer = setTimeout(() => {
+      if (this._connecting) {
+        this._connecting = false;
+        console.warn('[MQTT] connect timeout');
+        resolve();
+      }
+    }, 20000);
+
+    this.client.onConnChange((connected) => {
+      clearTimeout(failTimer);
+      this._connected = connected;
+      if (connected) {
+        // ВАЖНО: сначала подписываемся на ВСЕ топики, потом оповещаем слушателей —
+        // это предотвращает race condition (getlogs до активации подписки).
+        this.client!.subscribe([
+          TOPIC_TELEMETRY,
+          TOPIC_STATUS,
+          TOPIC_LOGS,
+          TOPIC_LOG_EVENT,
+          TOPIC_LOG_ACK,
+        ]);
+      }
+      this._connecting = false;
+      this._notifyConn(connected);
+      resolve(); // resolve в любом случае (успех или неудача)
     });
+
+    this.client.onMessage((topic, payload) => {
+      if (topic === TOPIC_TELEMETRY) {
+        try {
+          const raw  = JSON.parse(payload) as RawTelemetry;
+          const data = normalizeTelemetry(raw);
+          this.telemetryListeners.forEach(cb => cb(data));
+        } catch (_) {}
+      } else if (topic === TOPIC_LOGS) {
+        this.logsListeners.forEach(cb => cb(payload));
+      } else if (topic === TOPIC_LOG_EVENT) {
+        try {
+          const event = JSON.parse(payload) as LogEvent;
+          this.singleEventListeners.forEach(cb => cb(event));
+        } catch (_) {}
+      } else if (topic === TOPIC_LOG_ACK) {
+        // Устройство подтвердило получение команды getlogs
+        this.logAckListeners.forEach(cb => cb());
+      }
+    });
+
+    this.client.connect();
   }
 
   /** Subscribe to telemetry updates. Returns unsubscribe fn. */
@@ -206,7 +206,6 @@ class MqttService {
 
   /** Subscribe to connection state changes. Returns unsubscribe fn. */
   onConnectionChange(cb: ConnectionCallback): () => void {
-    console.log('[MQTT-DIAG] onConnectionChange: new listener registered, current _connected=' + this._connected + ', total listeners=' + (this.connListeners.length + 1));
     this.connListeners.push(cb);
     // Синхронно уведомляем о текущем состоянии.
     // setTimeout(0) создавал асинхронный разрыв: LogsScreen подписывался,
@@ -217,7 +216,6 @@ class MqttService {
     // завершения текущего рендера.
     cb(this._connected);
     return () => {
-      console.log('[MQTT-DIAG] onConnectionChange: listener unsubscribed, remaining=' + (this.connListeners.length - 1));
       this.connListeners = this.connListeners.filter(l => l !== cb);
     };
   }
@@ -260,7 +258,6 @@ class MqttService {
 
       const unsub = this.onLogAck(() => {
         clearTimeout(timeout);
-        console.log('[MQTT] getlogs ack received');
         resolve(true);
       });
 
@@ -270,19 +267,16 @@ class MqttService {
 
   /** Force reconnect with fresh settings (call after saving MQTT credentials). */
   reconnect(): Promise<void> {
-    console.log('[MQTT-DIAG] reconnect() called');
     this.disconnect();
     // Небольшая задержка, чтобы старый клиент гарантированно закрылся
     return new Promise((resolve) => {
       setTimeout(() => {
-        console.log('[MQTT-DIAG] reconnect() — calling connect() after delay');
         this.connect().then(resolve).catch(resolve);
       }, 500);
     });
   }
 
   disconnect(): void {
-    console.log('[MQTT-DIAG] disconnect() called, _connected=' + this._connected + ', client=' + (this.client ? 'exists' : 'null'));
     this._connecting = false;
     if (this.client) {
       this.client.disconnect();
@@ -294,7 +288,6 @@ class MqttService {
   get connected(): boolean { return this._connected; }
 
   private _notifyConn(state: boolean) {
-    console.log('[MQTT-DIAG] _notifyConn(' + state + ') — notifying ' + this.connListeners.length + ' listeners');
     this.connListeners.forEach(cb => cb(state));
   }
 }

@@ -50,7 +50,7 @@ export default function SettingsScreen(){
     await saveSetting('mqttUser', mqttUser.trim());
     await saveSetting('mqttPass', mqttPass);
     MqttService.reconnect();
-    alert('Settings saved');
+    alert('Настройки сохранены');
   };
 
   const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));

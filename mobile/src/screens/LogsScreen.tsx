@@ -42,11 +42,8 @@ export default function LogsScreen() {
 
     let destroyed = false;
 
-    console.log('[LOGS-DIAG] LogsScreen mounted, MqttService.connected=' + MqttService.connected);
-
     const unsubLogs = MqttService.onLogs((logsText: string) => {
       if (destroyed) return;
-      console.log('[LOGS-DIAG] onLogs received, length=' + logsText.length);
 
       const trimmed = logsText.trim();
       if (trimmed === '(no events)' || trimmed === '(no events)\n') {
@@ -64,7 +61,6 @@ export default function LogsScreen() {
 
     const unsubEvent = MqttService.onSingleEvent((event) => {
       if (destroyed) return;
-      console.log('[LOGS-DIAG] onSingleEvent received: ' + event.ts + ' - ' + event.desc);
       const line = `${event.ts} - ${event.desc}`;
       logLinesRef.current.push(line);
       setRenderVersion((v) => v + 1);
@@ -72,25 +68,19 @@ export default function LogsScreen() {
 
     const unsubConn = MqttService.onConnectionChange((connected: boolean) => {
       if (destroyed) return;
-      console.log('[LOGS-DIAG] onConnectionChange called with connected=' + connected);
       setMqttConnected(connected);
       if (connected) {
-        console.log('[LOGS-DIAG] onConnectionChange=true, sending getlogs');
         MqttService.publish('getlogs', '1');
       }
     });
 
     if (MqttService.connected) {
-      console.log('[LOGS-DIAG] MqttService.connected is true at mount, setting state and sending getlogs');
       setMqttConnected(true);
       MqttService.publish('getlogs', '1');
-    } else {
-      console.log('[LOGS-DIAG] MqttService.connected is false at mount, waiting for onConnectionChange');
     }
 
     return () => {
       destroyed = true;
-      console.log('[LOGS-DIAG] LogsScreen unmounted');
       unsubLogs();
       unsubEvent();
       unsubConn();

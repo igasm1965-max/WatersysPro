@@ -9,47 +9,23 @@
  * @see plans/logs_screen_redesign_plan.md
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, ScrollView, RefreshControl, Text, Alert } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, ScrollView, RefreshControl, Text, Alert, StyleSheet } from 'react-native';
 import { Card, Title, Paragraph, Button, ActivityIndicator, Chip } from 'react-native-paper';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import MqttService from '../services/mqttService';
-import { useFocusEffect } from '@react-navigation/native';
 import { useAppContext } from '../context/AppContext';
-
-function useCurrentDateTime() {
-  const [now, setNow] = useState(new Date());
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(id);
-  }, []);
-  return now;
-}
-
-function formatDate(d: Date): string {
-  const days = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
-  const months = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
-  const dayName = days[d.getDay()];
-  const day = d.getDate();
-  const month = months[d.getMonth()];
-  const year = d.getFullYear();
-  return `${dayName}, ${day} ${month} ${year}`;
-}
-
-function formatTime(d: Date): string {
-  const h = d.getHours().toString().padStart(2, '0');
-  const m = d.getMinutes().toString().padStart(2, '0');
-  const s = d.getSeconds().toString().padStart(2, '0');
-  return `${h}:${m}:${s}`;
-}
+import { Telemetry } from '../types';
+import { colors, spacing } from '../theme';
+import Clock from '../components/Clock';
 
 export default function DashboardScreen() {
-  const [status, setStatus] = useState<any | null>(null);
+  const [status, setStatus] = useState<Telemetry | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [mqttConnected, setMqttConnected] = useState(false);
-  const prevEmergencyRef = useRef<boolean>(false);
-  const dateTime = useCurrentDateTime();
+  // Baseline для Alert аварии: null = первое полученное значение (не показываем),
+  // далее Alert только на фронте false→true.
+  const prevEmergencyRef = useRef<boolean | null>(null);
   const { setDeviceIp } = useAppContext();
 
   const relayTargets = ['pump1', 'pump2', 'aeration', 'ozone', 'filter', 'backwash'];
@@ -86,25 +62,18 @@ export default function DashboardScreen() {
 
 
 
-  // Alert when emergency becomes active
+  // Alert when emergency becomes active (только фронт false→true, без срабатывания
+  // при первом полученном значении и при повторном монтировании экрана)
   useEffect(() => {
     const isActive = !!status?.emergency?.active;
-    if (isActive && !prevEmergencyRef.current) {
+    const prev = prevEmergencyRef.current;
+    if (prev === false && isActive) {
       Alert.alert('АВАРИЯ', status?.emergency?.message || 'Аварийный режим активирован', [{ text: 'OK' }]);
     }
     prevEmergencyRef.current = isActive;
   }, [status?.emergency?.active]);
 
-  // Reconnect when the screen gains focus (e.g. after Settings change)
-  useFocusEffect(
-    useCallback(() => {
-      if (!mqttConnected) {
-        MqttService.connect().catch(() => {});
-      }
-    }, [mqttConnected])
-  );
-
-  // Connect to MQTT on mount, disconnect on unmount
+  // Подписки на события MQTT (само подключение централизовано в App.tsx)
   useEffect(() => {
     let unsubTelemetry: (() => void) | null = null;
     let unsubConn: (() => void) | null = null;
@@ -124,16 +93,6 @@ export default function DashboardScreen() {
     const timeout = setTimeout(() => {
       setLoading(false);
     }, 10000);
-
-    MqttService.connect()
-      .then(() => {
-        setMqttConnected(true);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.warn('[MQTT] connect error', err);
-        setLoading(false);
-      });
 
     return () => {
       clearTimeout(timeout);
@@ -160,17 +119,17 @@ export default function DashboardScreen() {
     }
     const next = !status?.relays?.[target];
     // Optimistic UI
-    setStatus((prev: any) => ({
-      ...prev,
+    setStatus((prev) => ({
+      ...(prev ?? {}),
       relays: { ...(prev?.relays || {}), [target]: next ? 1 : 0 },
-    }));
+    }) as Telemetry);
     MqttService.publish(target, next ? 'on' : 'off');
   };
 
   const setControlMode = (mode: 'manual' | 'auto') => {
     if (!mqttConnected) { alert('Нет подключения к MQTT брокеру.'); return; }
     MqttService.publish('set_mode', mode);
-    setStatus((prev: any) => ({ ...(prev || {}), control_mode: mode }));
+    setStatus((prev) => ({ ...(prev || {}), control_mode: mode }) as Telemetry);
   };
 
   const resetEmergency = () => {
@@ -179,46 +138,40 @@ export default function DashboardScreen() {
   };
 
   if (loading) return (
-    <View style={{flex:1,justifyContent:'center',alignItems:'center'}}>
+    <View style={styles.centered}>
       <ActivityIndicator size="large" />
-      <Paragraph style={{marginTop:12}}>Подключение к MQTT...</Paragraph>
+      <Paragraph style={styles.topGap}>Подключение к MQTT...</Paragraph>
     </View>
   );
   if (!status) return (
-    <View style={{flex:1,justifyContent:'center',alignItems:'center',paddingHorizontal:24}}>
-      <Title style={{textAlign:'center'}}>Нет данных</Title>
-      <Paragraph style={{textAlign:'center',marginTop:8}}>
+    <View style={[styles.centered, styles.centeredWide]}>
+      <Title style={styles.centerAlign}>Нет данных</Title>
+      <Paragraph style={[styles.centerAlign, styles.topGap]}>
         {mqttConnected ? 'Ожидание телеметрии от устройства...' : 'Нет подключения к MQTT брокеру m1.wqtt.ru'}
       </Paragraph>
     </View>
   );
 
   return (
-    <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />} style={{flex:1}}>
+    <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />} style={styles.screen}>
       {/* MQTT status bar */}
-      <View style={{flexDirection:'row', alignItems:'center', paddingHorizontal:16, paddingTop:10, paddingBottom:4}}>
-        <View style={{width:10, height:10, borderRadius:5, backgroundColor: mqttConnected ? '#22c55e' : '#ef4444', marginRight:6}} />
-        <Text style={{fontSize:12, color: mqttConnected ? '#15803d' : '#b91c1c'}}>
+      <View style={styles.statusBar}>
+        <View style={[styles.statusDot, { backgroundColor: mqttConnected ? colors.ok : colors.dangerLight }]} />
+        <Text style={[styles.statusText, { color: mqttConnected ? colors.okDark : colors.dangerDark }]}>
           {mqttConnected ? 'MQTT: подключено (wqtt.ru)' : 'MQTT: нет связи...'}
         </Text>
       </View>
 
-      {/* Date and time display */}
-      <View style={{alignItems:'center', paddingVertical:8, paddingHorizontal:16}}>
-        <Text style={{fontSize:28, fontWeight:'300', fontFamily:'monospace', color:'#1e293b', letterSpacing:2}}>
-          {formatTime(dateTime)}
-        </Text>
-        <Text style={{fontSize:14, color:'#64748b', marginTop:2}}>
-          {formatDate(dateTime)}
-        </Text>
-      </View>
+      {/* Date and time display — обновляется отдельным компонентом, чтобы
+          секундный таймер не перерисовывал весь экран */}
+      <Clock />
 
-      <Card style={{margin:16}}>
+      <Card style={styles.card}>
         <Card.Content>
           <Title>Текущее состояние</Title>
           <Paragraph>ID устройства: {status.device_id || status.ip || '-'}</Paragraph>
           <Paragraph>IP устройства: {status.ip || '-'}</Paragraph>
-          <View style={{flexDirection:'row',justifyContent:'space-between',marginTop:16}}>
+          <View style={styles.metricsRow}>
             <View><Paragraph>Бак 1</Paragraph><Title>{status.tank1 ?? '-'}%</Title></View>
             <View><Paragraph>Бак 2</Paragraph><Title>{status.tank2 ?? '-'}%</Title></View>
             <View><Paragraph>Uptime</Paragraph><Title>{status.uptime ?? '-'} c</Title></View>
@@ -226,12 +179,12 @@ export default function DashboardScreen() {
         </Card.Content>
       </Card>
 
-      <Card style={{margin:16}}>
+      <Card style={styles.card}>
         <Card.Content>
           <Title>Таймеры</Title>
-          <View style={{flexDirection:'row', marginTop:10}}>
+          <View style={styles.timerLayout}>
             {/* Timer rows */}
-            <View style={{flex:1}}>
+            <View style={styles.timerCol}>
               {([
                 {label:'Озонирование', key:'ozonation', stateKey:'OZONATION'},
                 {label:'Аэрация',      key:'aeration',  stateKey:'AERATION'},
@@ -276,46 +229,46 @@ export default function DashboardScreen() {
             </View>
 
             {/* Vertical tank indicators */}
-            <View style={{flexDirection:'row', marginLeft:14, alignItems:'flex-start'}}>
+            <View style={styles.tankGroup}>
               {([
-                {label:'Б1', val: status?.tank1, color:'#1565c0'},
-                {label:'Б2', val: status?.tank2, color:'#2e7d32'},
-              ] as {label:string; val:any; color:string}[]).map(({label, val, color}) => {
+                {label:'Б1', val: status?.tank1, color: colors.info},
+                {label:'Б2', val: status?.tank2, color: colors.success},
+              ] as {label:string; val:number|undefined; color:string}[]).map(({label, val, color}) => {
                 const raw = Math.min(100, Math.max(0, Number(val) || 0));
                 const fillPct = 100 - raw;
                 return (
-                  <View key={label} style={{alignItems:'center', marginHorizontal:4}}>
-                    <Text style={{fontSize:10, color:'#555', marginBottom:2}}>{val ?? '-'}%</Text>
-                    <View style={{width:28, height:110, backgroundColor:'#e0e0e0', borderRadius:4, borderWidth:1, borderColor:'#9e9e9e', overflow:'hidden', justifyContent:'flex-end'}}>
-                      <View style={{width:'100%', height:`${fillPct}%` as any, backgroundColor: color, borderRadius:3}} />
+                  <View key={label} style={styles.tankItem}>
+                    <Text style={styles.tankValue}>{val ?? '-'}%</Text>
+                    <View style={styles.tankShell}>
+                      <View style={[styles.tankFill, { height: `${fillPct}%` as any, backgroundColor: color }]} />
                     </View>
-                    <Text style={{fontSize:11, color:'#333', marginTop:3, fontWeight:'bold'}}>{label}</Text>
+                    <Text style={styles.tankLabel}>{label}</Text>
                   </View>
                 );
               })}
             </View>
           </View>
-          <Paragraph style={{marginTop:8, fontSize:11, color:'#aaa', textAlign:'center'}}>
+          <Paragraph style={styles.stateNote}>
             {status?.state || '—'}{status?.emergency?.active ? ' ⚠ АВАРИЯ' : ''}
           </Paragraph>
         </Card.Content>
       </Card>
 
-      <Card style={{margin:16}}>
+      <Card style={styles.card}>
         <Card.Content>
           <Title>Режим управления</Title>
-          <View style={{flexDirection:'row',justifyContent:'space-between'}}>
+          <View style={styles.splitRow}>
             <Button
               mode={status.control_mode === 'manual' ? 'contained' : 'outlined'}
               onPress={() => setControlMode('manual')}
-              style={{width:'48%'}}
+              style={styles.halfWidth}
             >
               Ручной
             </Button>
             <Button
               mode={status.control_mode === 'auto' ? 'contained' : 'outlined'}
               onPress={() => setControlMode('auto')}
-              style={{width:'48%'}}
+              style={styles.halfWidth}
             >
               Автомат
             </Button>
@@ -323,23 +276,23 @@ export default function DashboardScreen() {
         </Card.Content>
       </Card>
 
-      <Card style={{margin:16}}>
+      <Card style={styles.card}>
         <Card.Content>
           <Title>Управление реле</Title>
-          <Paragraph style={{marginBottom:12}}>Кнопки как в веб-интерфейсе (toggle ON/OFF).</Paragraph>
-          <View style={{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between'}}>
+          <Paragraph style={styles.bottomGap}>Кнопки как в веб-интерфейсе (toggle ON/OFF).</Paragraph>
+          <View style={styles.relayGrid}>
             {relayTargets.map((target) => {
               const isOn = !!status?.relays?.[target];
               const manualMode = status?.control_mode === 'manual';
-              const btnColor = isOn ? '#2e7d32' : (manualMode ? '#c62828' : '#757575');
+              const btnColor = isOn ? colors.success : (manualMode ? colors.danger : colors.textLight);
               return (
                 <Button
                   key={target}
                   mode="contained"
                   onPress={() => toggleRelay(target)}
                   buttonColor={btnColor}
-                  textColor="#ffffff"
-                  style={{marginBottom:10, width:'48%', opacity: manualMode ? 1 : 0.85}}
+                  textColor={colors.white}
+                  style={[styles.relayButton, { opacity: manualMode ? 1 : 0.85 }]}
                 >
                   {target}: {isOn ? 'ON' : 'OFF'}
                 </Button>
@@ -349,21 +302,67 @@ export default function DashboardScreen() {
         </Card.Content>
       </Card>
 
-      <Card style={{margin:16, backgroundColor: status?.emergency?.active ? '#ffebee' : '#ffffff'}}>
+      <Card style={[styles.card, status?.emergency?.active && styles.emergencyCard]}>
         <Card.Content>
-          <Title style={status?.emergency?.active ? {color: '#c62828'} : undefined}>
+          <Title style={status?.emergency?.active ? { color: colors.danger } : undefined}>
             {status?.emergency?.active ? '⚠ АВАРИЯ' : 'Авария'}
           </Title>
-          <Paragraph style={{marginBottom:12, color: status?.emergency?.active ? '#c62828' : undefined, fontWeight: status?.emergency?.active ? 'bold' : 'normal'}}>
+          <Paragraph style={[
+            styles.bottomGap,
+            status?.emergency?.active ? { color: colors.danger, fontWeight: 'bold' } : undefined,
+          ]}>
             {status?.emergency?.active
               ? `Активна: ${status?.emergency?.message || 'без сообщения'}`
               : 'Авария не активна'}
           </Paragraph>
           {status?.emergency?.active && (
-            <Button mode="contained" buttonColor="#c62828" textColor="#ffffff" onPress={resetEmergency}>Сброс аварии</Button>
+            <Button mode="contained" buttonColor={colors.danger} textColor={colors.white} onPress={resetEmergency}>Сброс аварии</Button>
           )}
         </Card.Content>
       </Card>
     </ScrollView>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: colors.background },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  centeredWide: { paddingHorizontal: 24 },
+  centerAlign: { textAlign: 'center' },
+  topGap: { marginTop: 12 },
+  bottomGap: { marginBottom: 12 },
+  statusBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingTop: 10,
+    paddingBottom: 4,
+  },
+  statusDot: { width: 10, height: 10, borderRadius: 5, marginRight: 6 },
+  statusText: { fontSize: 12 },
+  card: { margin: spacing.md },
+  metricsRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.md },
+  timerLayout: { flexDirection: 'row', marginTop: 10 },
+  timerCol: { flex: 1 },
+  tankGroup: { flexDirection: 'row', marginLeft: 14, alignItems: 'flex-start' },
+  tankItem: { alignItems: 'center', marginHorizontal: 4 },
+  tankValue: { fontSize: 10, color: '#555', marginBottom: 2 },
+  tankShell: {
+    width: 28,
+    height: 110,
+    backgroundColor: colors.border,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: colors.textMuted,
+    overflow: 'hidden',
+    justifyContent: 'flex-end',
+  },
+  tankFill: { width: '100%', borderRadius: 3 },
+  tankLabel: { fontSize: 11, color: colors.textPrimary, marginTop: 3, fontWeight: 'bold' },
+  stateNote: { marginTop: 8, fontSize: 11, color: colors.textFaint, textAlign: 'center' },
+  splitRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  halfWidth: { width: '48%' },
+  relayGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  relayButton: { marginBottom: 10, width: '48%' },
+  emergencyCard: { backgroundColor: colors.dangerBg },
+});
