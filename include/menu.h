@@ -77,23 +77,11 @@ void FilterCleaningPeriodHandler();
 /// Обработчик ручного режима
 void ManualOperation();
 
-/// Обработчик просмотра/управления логами
 /// Обработчик просмотра логов
 void EventLogsHandler();
-/// Обработчик статистики логов
-void EventStatsHandler();
-/// Обработчик графика логов
-void EventGraphHandler();
-/// Обработчик фильтрации логов
-void EventFilterHandler();
 
 /// Очистка всех логов событий (с подтверждением)
 void clearEventLogsMenu();
-
-/// Очистка старых логов событий (с подтверждением)
-void clearOldEventsMenu();
-void pruneEventLogsMenu();
-void formatSdMenu();
 
 /// Сброс настроек к значениям по умолчанию
 void resetToDefaults();

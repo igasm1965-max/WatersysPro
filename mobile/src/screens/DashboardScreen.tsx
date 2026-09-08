@@ -139,7 +139,7 @@ export default function DashboardScreen() {
       clearTimeout(timeout);
       if (unsubTelemetry) unsubTelemetry();
       if (unsubConn) unsubConn();
-      MqttService.disconnect();
+      // MQTT не отключаем — он нужен для LogsScreen и других экранов
     };
   }, []);
 

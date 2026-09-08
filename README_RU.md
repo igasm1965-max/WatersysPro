@@ -2,7 +2,7 @@
 
 WaterSysPro - это full-stack проект автоматизации водоочистки на базе прошивки ESP32, backend-сервиса Node.js и мобильного приложения React Native.
 
-![Версия](https://img.shields.io/badge/version-1.1.0-blue)
+![Версия](https://img.shields.io/badge/version-1.3.5-blue)
 ![Статус](https://img.shields.io/badge/status-active-brightgreen)
 ![Лицензия](https://img.shields.io/badge/license-MIT-green)
 
@@ -194,17 +194,24 @@ Backend предоставляет API-точки для внешних клие
 
 Ключевые документы репозитория:
 - README.md - подробный обзор на английском
-- CHANGELOG.md и CHANGELOG_RU.md - история версий
+- CHANGELOG.md и CHANGELOG_RU.md - история версий (v1.3.0, v1.2.2, v1.2.1, v1.2.0, v1.1.0, v1.0.0)
 - RELEASE_NOTES_v1.1.0.md и RELEASE_NOTES_v1.1.0_RU.md - детали релиза
 - DOCUMENTATION_INDEX.md - навигация по документам
 - docs/SD_INTEGRATION.md - детали SD-интеграции
 - docs/PRODUCTION_HARDENING_TRACKER.md - hardening-задачи для production
+- plans/DEPLOY_INSTRUCTIONS.md - деплой на VPS
+- plans/logs_fix_plan.md - план исправления загрузки логов
+- NTP_SYNC_IMPLEMENTATION.md - синхронизация времени через NTP
+- VERSIONING.md - управление версиями
 
 ## Текущее состояние
 
+- **Текущая версия: 1.3.0** (11 апреля 2026 г.)
 - Репозиторий в активной разработке.
 - Основной стек: ESP32 + Node.js + React Native.
-- Для production-релиза нужен отдельный этап hardening и ревизии секретов.
+- Production hardening выполнен (v1.2.2): TLS-валидация, CORS, аутентификация Mosquitto.
+- Добавлен мониторинг: Prometheus + Grafana (v1.3.0).
+- Rate limiting, аудит-лог, SQL-миграции — все внедрено.
 
 ## Лицензия
 

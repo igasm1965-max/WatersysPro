@@ -94,6 +94,11 @@ static void startConnectAttempt() {
   WiFi.disconnect(true);
   WiFi.mode(WIFI_AP_STA);
   WiFi.begin(cachedSsid.c_str(), cachedPass.c_str());
+  // Disable WiFi power-save (WIFI_PS_NONE). With WIFI_PS_MIN_MODEM (default) the
+  // radio sleeps periodically and drops packets — this aborts TLS handshakes to
+  // the MQTT broker (broker-side "unexpected eof while reading") and causes
+  // mid-session disconnects. Keep the link awake for stable MQTT over TCP/TLS.
+  WiFi.setSleep(false);
   attemptStartMs = millis();
   attemptInProgress = true;
   wifiState = WIFI_CONNECTING;

@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <title>WaterSysPro — Ultrasonic Sensors HC-SR04</title>
+  <description>Схема подключения ультразвуковых датчиков HC-SR04 к ESP32</description>
+
+  <rect width="800" height="600" fill="#FAFAFA" rx="8"/>
+  <text x="400" y="35" text-anchor="middle" font-family="sans-serif" font-size="20" font-weight="bold" fill="#1565C0">Ultrasonic Sensors HC-SR04 — Схема подключения</text>
+
+  <!-- ESP32 -->
+  <rect x="30" y="180" width="200" height="240" rx="8" fill="#E3F2FD" stroke="#1565C0" stroke-width="2"/>
+  <text x="130" y="210" text-anchor="middle" font-family="sans-serif" font-size="15" font-weight="bold" fill="#1565C0">ESP32</text>
+
+  <text x="35" y="250" font-family="monospace" font-size="12" fill="#1565C0">GPIO16 → TRIG1</text>
+  <text x="35" y="275" font-family="monospace" font-size="12" fill="#1565C0">GPIO17 ← ECHO1</text>
+  <text x="35" y="310" font-family="monospace" font-size="12" fill="#1565C0">GPIO5  → TRIG2</text>
+  <text x="35" y="335" font-family="monospace" font-size="12" fill="#1565C0">GPIO18 ← ECHO2</text>
+  <text x="35" y="370" font-family="monospace" font-size="12" fill="#D32F2F">5V → VCC</text>
+  <text x="35" y="395" font-family="monospace" font-size="12" fill="#212121">GND → GND</text>
+
+  <!-- Sensor 1 -->
+  <rect x="350" y="100" width="250" height="180" rx="8" fill="#BBDEFB" stroke="#1565C0" stroke-width="2"/>
+  <text x="475" y="130" text-anchor="middle" font-family="sans-serif" font-size="15" font-weight="bold" fill="#0D47A1">HC-SR04 #1</text>
+  <text x="475" y="150" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#0D47A1">Tank 1 (верхний бак)</text>
+
+  <!-- Sensor 1 visual -->
+  <rect x="400" y="165" width="150" height="30" rx="4" fill="#E3F2FD" stroke="#1565C0" stroke-width="1"/>
+  <text x="475" y="185" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#1565C0">[ T ] [ R ]</text>
+
+  <text x="360" y="225" font-family="monospace" font-size="12" fill="#1565C0">VCC  → 5V</text>
+  <text x="360" y="245" font-family="monospace" font-size="12" fill="#1565C0">TRIG → GPIO16</text>
+  <text x="360" y="265" font-family="monospace" font-size="12" fill="#1565C0">ECHO → GPIO17 (через делитель)</text>
+  <text x="360" y="285" font-family="monospace" font-size="12" fill="#212121">GND  → GND</text>
+
+  <!-- Sensor 2 -->
+  <rect x="350" y="320" width="250" height="180" rx="8" fill="#BBDEFB" stroke="#1565C0" stroke-width="2"/>
+  <text x="475" y="350" text-anchor="middle" font-family="sans-serif" font-size="15" font-weight="bold" fill="#0D47A1">HC-SR04 #2</text>
+  <text x="475" y="370" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#0D47A1">Tank 2 (нижний бак)</text>
+
+  <rect x="400" y="385" width="150" height="30" rx="4" fill="#E3F2FD" stroke="#1565C0" stroke-width="1"/>
+  <text x="475" y="405" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#1565C0">[ T ] [ R ]</text>
+
+  <text x="360" y="445" font-family="monospace" font-size="12" fill="#1565C0">VCC  → 5V</text>
+  <text x="360" y="465" font-family="monospace" font-size="12" fill="#1565C0">TRIG → GPIO5</text>
+  <text x="360" y="485" font-family="monospace" font-size="12" fill="#1565C0">ECHO → GPIO18 (через делитель)</text>
+  <text x="360" y="505" font-family="monospace" font-size="12" fill="#212121">GND  → GND</text>
+
+  <!-- Connection lines -->
+  <line x1="230" y1="250" x2="350" y2="225" stroke="#1565C0" stroke-width="1.5"/>
+  <line x1="230" y1="275" x2="350" y2="265" stroke="#1565C0" stroke-width="1.5"/>
+  <line x1="230" y1="310" x2="350" y2="465" stroke="#1565C0" stroke-width="1.5"/>
+  <line x1="230" y1="335" x2="350" y2="485" stroke="#1565C0" stroke-width="1.5"/>
+  <line x1="230" y1="370" x2="350" y2="225" stroke="#D32F2F" stroke-width="2"/>
+  <line x1="230" y1="395" x2="350" y2="285" stroke="#212121" stroke-width="2"/>
+
+  <!-- Voltage divider section -->
+  <rect x="30" y="440" width="740" height="140" rx="6" fill="#E3F2FD" stroke="#1565C0" stroke-width="1.5"/>
+  <text x="400" y="465" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold" fill="#1565C0">Делитель напряжения для ECHO (5V → 3.3V)</text>
+
+  <text x="40" y="490" font-family="sans-serif" font-size="12" fill="#1565C0">• HC-SR04 работает от 5V, его ECHO выход также 5V</text>
+  <text x="40" y="510" font-family="sans-serif" font-size="12" fill="#1565C0">• ESP32 GPIO толерантны к 5V НЕ ВСЕ — требуется делитель для безопасности</text>
+  <text x="40" y="530" font-family="sans-serif" font-size="12" fill="#1565C0">• Делитель: ECHO → 1кОм → GPIO → 2кОм → GND (коэффициент 1/3: 5V → 3.33V)</text>
+  <text x="40" y="550" font-family="sans-serif" font-size="12" fill="#1565C0">• Альтернатива: диод 1N4148 + стабилитрон 3.3V</text>
+  <text x="40" y="570" font-family="sans-serif" font-size="12" fill="#1565C0">• ⚠ Без делителя можно повредить GPIO ESP32!</text>
+
+  <text x="400" y="595" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#999">WaterSysPro v1.3.5 — docs/schematics/sensors_ultrasonic.svg</text>
+</svg>

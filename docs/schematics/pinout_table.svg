@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <title>WaterSysPro — GPIO Pinout Table</title>
+  <description>Полная таблица распиновки GPIO ESP32 для WaterSysPro</description>
+
+  <rect width="800" height="600" fill="#FAFAFA" rx="8"/>
+  <text x="400" y="30" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="bold" fill="#1565C0">WaterSysPro — Таблица распиновки GPIO</text>
+  <text x="400" y="48" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#666">ESP32 Dev Module — полное назначение всех используемых пинов</text>
+
+  <!-- Table header -->
+  <rect x="20" y="60" width="180" height="28" rx="3" fill="#1565C0"/>
+  <rect x="200" y="60" width="120" height="28" rx="3" fill="#1565C0"/>
+  <rect x="320" y="60" width="200" height="28" rx="3" fill="#1565C0"/>
+  <rect x="520" y="60" width="260" height="28" rx="3" fill="#1565C0"/>
+
+  <text x="110" y="79" text-anchor="middle" font-family="sans-serif" font-size="12" font-weight="bold" fill="#FFF">GPIO</text>
+  <text x="260" y="79" text-anchor="middle" font-family="sans-serif" font-size="12" font-weight="bold" fill="#FFF">Тип</text>
+  <text x="420" y="79" text-anchor="middle" font-family="sans-serif" font-size="12" font-weight="bold" fill="#FFF">Назначение</text>
+  <text x="650" y="79" text-anchor="middle" font-family="sans-serif" font-size="12" font-weight="bold" fill="#FFF">Подключение</text>
+
+  <!-- Helper: row background -->
+  <!-- Row 1: GPIO2 -->
+  <rect x="20" y="88" width="180" height="24" rx="2" fill="#FFF9C4"/>
+  <rect x="200" y="88" width="120" height="24" rx="2" fill="#FFF9C4"/>
+  <rect x="320" y="88" width="200" height="24" rx="2" fill="#FFF9C4"/>
+  <rect x="520" y="88" width="260" height="24" rx="2" fill="#FFF9C4"/>
+  <text x="110" y="105" text-anchor="middle" font-family="monospace" font-size="11" fill="#212121">GPIO2</text>
+  <text x="260" y="105" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">Output</text>
+  <text x="420" y="105" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">Built-in LED</text>
+  <text x="650" y="105" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">Встроенный LED (on=HIGH)</text>
+
+  <!-- Row 2: GPIO4 -->
+  <rect x="20" y="112" width="180" height="24" rx="2" fill="#FFF3E0"/>
+  <rect x="200" y="112" width="120" height="24" rx="2" fill="#FFF3E0"/>
+  <rect x="320" y="112" width="200" height="24" rx="2" fill="#FFF3E0"/>
+  <rect x="520" y="112" width="260" height="24" rx="2" fill="#FFF3E0"/>
+  <text x="110" y="129" text-anchor="middle" font-family="monospace" font-size="11" fill="#212121">GPIO4</text>
+  <text x="260" y="129" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">Output</text>
+  <text x="420" y="129" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">SD SCK</text>
+  <text x="650" y="129" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">SD Card SPI Clock</text>
+
+  <!-- Row 3: GPIO5 -->
+  <rect x="20" y="136" width="180" height="24" rx="2" fill="#E3F2FD"/>
+  <rect x="200" y="136" width="120" height="24" rx="2" fill="#E3F2FD"/>
+  <rect x="320" y="136" width="200" height="24" rx="2" fill="#E3F2FD"/>
+  <rect x="520" y="136" width="260" height="24" rx="2" fill="#E3F2FD"/>
+  <text x="110" y="153" text-anchor="middle" font-family="monospace" font-size="11" fill="#212121">GPIO5</text>
+  <text x="260" y="153" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">Output</text>
+  <text x="420" y="153" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">HC-SR04 #2 TRIG</text>
+  <text x="650" y="153" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">УЗ датчик 2 (бак 2) триггер</text>
+
+  <!-- Row 4: GPIO12 -->
+  <rect x="20" y="160" width="180" height="24" rx="2" fill="#FFEBEE"/>
+  <rect x="200" y="160" width="120" height="24" rx="2" fill="#FFEBEE"/>
+  <rect x="320" y="160" width="200" height="24" rx="2" fill="#FFEBEE"/>
+  <rect x="520" y="160" width="260" height="24" rx="2" fill="#FFEBEE"/>
+  <text x="110" y="177" text-anchor="middle" font-family="monospace" font-size="11" fill="#212121">GPIO12</text>
+  <text x="260" y="177" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">Output</text>
+  <text x="420" y="177" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">PUMP2</text>
+  <text x="650" y="177" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">Реле насоса 2 (фильтрация)</text>
+
+  <!-- Row 5: GPIO13 -->
+  <rect x="20" y="184" width="180" height="24" rx="2" fill="#FFEBEE"/>
+  <rect x="200" y="184" width="120" height="24" rx="2" fill="#FFEBEE"/>
+  <rect x="320" y="184" width="200" height="24" rx="2" fill="#FFEBEE"/>
+  <rect x="520" y="184" width="260" height="24" rx="2" fill="#FFEBEE"/>
+  <text x="110" y="201" text-anchor="middle" font-family="monospace" font-size="11" fill="#212121">GPIO13</text>
+  <text x="260" y="201" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">Output</text>
+  <text x="420" y="201" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">PUMP1</text>
+  <text x="650" y="201" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">Реле насоса 1 (наполнение)</text>
+
+  <!-- Row 6: GPIO14 -->
+  <rect x="20" y="208" width="180" height="24" rx="2" fill="#FFEBEE"/>
+  <rect x="200" y="208" width="120" height="24" rx="2" fill="#FFEBEE"/>
+  <rect x="320" y="208" width="200" height="24" rx="2" fill="#FFEBEE"/>
+  <rect x="520" y="208" width="260" height="24" rx="2" fill="#FFEBEE"/>
+  <text x="110" y="225" text-anchor="middle" font-family="monospace" font-size="11" fill="#212121">GPIO14</text>
+  <text x="260" y="225" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">Output</text>
+  <text x="420" y="225" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">AERATION</text>
+  <text x="650" y="225" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">Реле аэрации</text>
+
+  <!-- Row 7: GPIO16 -->
+  <rect x="20" y="232" width="180" height="24" rx="2" fill="#E3F2FD"/>
+  <rect x="200" y="232" width="120" height="24" rx="2" fill="#E3F2FD"/>
+  <rect x="320" y="232" width="200" height="24" rx="2" fill="#E3F2FD"/>
+  <rect x="520" y="232" width="260" height="24" rx="2" fill="#E3F2FD"/>
+  <text x="110" y="249" text-anchor="middle" font-family="monospace" font-size="11" fill="#212121">GPIO16</text>
+  <text x="260" y="249" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">Output</text>
+  <text x="420" y="249" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">HC-SR04 #1 TRIG</text>
+  <text x="650" y="249" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">УЗ датчик 1 (бак 1) триггер</text>
+
+  <!-- Row 8: GPIO17 -->
+  <rect x="20" y="256" width="180" height="24" rx="2" fill="#E3F2FD"/>
+  <rect x="200" y="256" width="120" height="24" rx="2" fill="#E3F2FD"/>
+  <rect x="320" y="256" width="200" height="24" rx="2" fill="#E3F2FD"/>
+  <rect x="520" y="256" width="260" height="24" rx="2" fill="#E3F2FD"/>
+  <text x="110" y="273" text-anchor="middle" font-family="monospace" font-size="11" fill="#212121">GPIO17</text>
+  <text x="260" y="273" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">Input</text>
+  <text x="420" y="273" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">HC-SR04 #1 ECHO</text>
+  <text x="650" y="273" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">УЗ датчик 1 (бак 1) эхо</text>
+
+  <!-- Row 9: GPIO18 -->
+  <rect x="20" y="280" width="180" height="24" rx="2" fill="#E3F2FD"/>
+  <rect x="200" y="280" width="120" height="24" rx="2" fill="#E3F2FD"/>
+  <rect x="320" y="280" width="200" height="24" rx="2" fill="#E3F2FD"/>
+  <rect x="520" y="280" width="260" height="24" rx="2" fill="#E3F2FD"/>
+  <text x="110" y="297" text-anchor="middle" font-family="monospace" font-size="11" fill="#212121">GPIO18</text>
+  <text x="260" y="297" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">Input</text>
+  <text x="420" y="297" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">HC-SR04 #2 ECHO</text>
+  <text x="650" y="297" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">УЗ датчик 2 (бак 2) эхо</text>
+
+  <!-- Row 10: GPIO19 -->
+  <rect x="20" y="304" width="180" height="24" rx="2" fill="#FFF3E0"/>
+  <rect x="200" y="304" width="120" height="24" rx="2" fill="#FFF3E0"/>
+  <rect x="320" y="304" width="200" height="24" rx="2" fill="#FFF3E0"/>
+  <rect x="520" y="304" width="260" height="24" rx="2" fill="#FFF3E0"/>
+  <text x="110" y="321" text-anchor="middle" font-family="monospace" font-size="11" fill="#212121">GPIO19</text>
+  <text x="260" y="321" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">Input</text>
+  <text x="420" y="321" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">SD MISO</text>
+  <text x="650" y="321" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">SD Card SPI MISO (DO)</text>
+
+  <!-- Row 11: GPIO21 -->
+  <rect x="20" y="328" width="180" height="24" rx="2" fill="#E8F5E9"/>
+  <rect x="200" y="328" width="120" height="24" rx="2" fill="#E8F5E9"/>
+  <rect x="320" y="328" width="200" height="24" rx="2" fill="#E8F5E9"/>
+  <rect x="520" y="328" width="260" height="24" rx="2" fill="#E8F5E9"/>
+  <text x="110" y="345" text-anchor="middle" font-family="monospace" font-size="11" fill="#212121">GPIO21</text>
+  <text x="260" y="345" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">I2C</text>
+  <text x="420" y="345" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">I2C SDA</text>
+  <text x="650" y="345" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">LCD (0x27) + RTC DS3231 (0x68)</text>
+
+  <!-- Row 12: GPIO22 -->
+  <rect x="20" y="352" width="180" height="24" rx="2" fill="#E8F5E9"/>
+  <rect x="200" y="352" width="120" height="24" rx="2" fill="#E8F5E9"/>
+  <rect x="320" y="352" width="200" height="24" rx="2" fill="#E8F5E9"/>
+  <rect x="520" y="352" width="260" height="24" rx="2" fill="#E8F5E9"/>
+  <text x="110" y="369" text-anchor="middle" font-family="monospace" font-size="11" fill="#212121">GPIO22</text>
+  <text x="260" y="369" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">I2C</text>
+  <text x="420" y="369" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">I2C SCL</text>
+  <text x="650" y="369" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">LCD (0x27) + RTC DS3231 (0x68)</text>
+
+  <!-- Row 13: GPIO23 -->
+  <rect x="20" y="376" width="180" height="24" rx="2" fill="#FFF3E0"/>
+  <rect x="200" y="376" width="120" height="24" rx="2" fill="#FFF3E0"/>
+  <rect x="320" y="376" width="200" height="24" rx="2" fill="#FFF3E0"/>
+  <rect x="520" y="376" width="260" height="24" rx="2" fill="#FFF3E0"/>
+  <text x="110" y="393" text-anchor="middle" font-family="monospace" font-size="11" fill="#212121">GPIO23</text>
+  <text x="260" y="393" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">Output</text>
+  <text x="420" y="393" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">SD MOSI</text>
+  <text x="650" y="393" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">SD Card SPI MOSI (DI)</text>
+
+  <!-- Row 14: GPIO25 -->
+  <rect x="20" y="400" width="180" height="24" rx="2" fill="#FFEBEE"/>
+  <rect x="200" y="400" width="120" height="24" rx="2" fill="#FFEBEE"/>
+  <rect x="320" y="400" width="200" height="24" rx="2" fill="#FFEBEE"/>
+  <rect x="520" y="400" width="260" height="24" rx="2" fill="#FFEBEE"/>
+  <text x="110" y="417" text-anchor="middle" font-family="monospace" font-size="11" fill="#212121">GPIO25</text>
+  <text x="260" y="417" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">Output</text>
+  <text x="420" y="417" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">BACKWASH</text>
+  <text x="650" y="417" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">Реле обратной промывки</text>
+
+  <!-- Row 15: GPIO26 -->
+  <rect x="20" y="424" width="180" height="24" rx="2" fill="#FFEBEE"/>
+  <rect x="200" y="424" width="120" height="24" rx="2" fill="#FFEBEE"/>
+  <rect x="320" y="424" width="200" height="24" rx="2" fill="#FFEBEE"/>
+  <rect x="520" y="424" width="260" height="24" rx="2" fill="#FFEBEE"/>
+  <text x="110" y="441" text-anchor="middle" font-family="monospace" font-size="11" fill="#212121">GPIO26</text>
+  <text x="260" y="441" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">Output</text>
+  <text x="420" y="441" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">FILTER</text>
+  <text x="650" y="441" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">Реле фильтра</text>
+
+  <!-- Row 16: GPIO27 -->
+  <rect x="20" y="448" width="180" height="24" rx="2" fill="#FFEBEE"/>
+  <rect x="200" y="448" width="120" height="24" rx="2" fill="#FFEBEE"/>
+  <rect x="320" y="448" width="200" height="24" rx="2" fill="#FFEBEE"/>
+  <rect x="520" y="448" width="260" height="24" rx="2" fill="#FFEBEE"/>
+  <text x="110" y="465" text-anchor="middle" font-family="monospace" font-size="11" fill="#212121">GPIO27</text>
+  <text x="260" y="465" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">Output</text>
+  <text x="420" y="465" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">OZONE</text>
+  <text x="650" y="465" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">Реле озонатора</text>
+
+  <!-- Row 17: GPIO32 -->
+  <rect x="20" y="472" width="180" height="24" rx="2" fill="#E3F2FD"/>
+  <rect x="200" y="472" width="120" height="24" rx="2" fill="#E3F2FD"/>
+  <rect x="320" y="472" width="200" height="24" rx="2" fill="#E3F2FD"/>
+  <rect x="520" y="472" width="260" height="24" rx="2" fill="#E3F2FD"/>
+  <text x="110" y="489" text-anchor="middle" font-family="monospace" font-size="11" fill="#212121">GPIO32</text>
+  <text x="260" y="489" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">Input</text>
+  <text x="420" y="489" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">Encoder SW</text>
+  <text x="650" y="489" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">Кнопка энкодера (pull-up)</text>
+
+  <!-- Row 18: GPIO33 -->
+  <rect x="20" y="496" width="180" height="24" rx="2" fill="#FFF3E0"/>
+  <rect x="200" y="496" width="120" height="24" rx="2" fill="#FFF3E0"/>
+  <rect x="320" y="496" width="200" height="24" rx="2" fill="#FFF3E0"/>
+  <rect x="520" y="496" width="260" height="24" rx="2" fill="#FFF3E0"/>
+  <text x="110" y="513" text-anchor="middle" font-family="monospace" font-size="11" fill="#212121">GPIO33</text>
+  <text x="260" y="513" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">Output</text>
+  <text x="420" y="513" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">SD CS</text>
+  <text x="650" y="513" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">SD Card SPI Chip Select</text>
+
+  <!-- Row 19: GPIO34 -->
+  <rect x="20" y="520" width="180" height="24" rx="2" fill="#E3F2FD"/>
+  <rect x="200" y="520" width="120" height="24" rx="2" fill="#E3F2FD"/>
+  <rect x="320" y="520" width="200" height="24" rx="2" fill="#E3F2FD"/>
+  <rect x="520" y="520" width="260" height="24" rx="2" fill="#E3F2FD"/>
+  <text x="110" y="537" text-anchor="middle" font-family="monospace" font-size="11" fill="#212121">GPIO34</text>
+  <text x="260" y="537" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">Input</text>
+  <text x="420" y="537" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">Encoder DT</text>
+  <text x="650" y="537" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">Энкодер DT (инвертирован)</text>
+
+  <!-- Row 20: GPIO35 -->
+  <rect x="20" y="544" width="180" height="24" rx="2" fill="#E3F2FD"/>
+  <rect x="200" y="544" width="120" height="24" rx="2" fill="#E3F2FD"/>
+  <rect x="320" y="544" width="200" height="24" rx="2" fill="#E3F2FD"/>
+  <rect x="520" y="544" width="260" height="24" rx="2" fill="#E3F2FD"/>
+  <text x="110" y="561" text-anchor="middle" font-family="monospace" font-size="11" fill="#212121">GPIO35</text>
+  <text x="260" y="561" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">Input</text>
+  <text x="420" y="561" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">Encoder CLK</text>
+  <text x="650" y="561" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">Энкодер CLK (инвертирован)</text>
+
+  <!-- Row 21: GPIO39 -->
+  <rect x="20" y="568" width="180" height="24" rx="2" fill="#FFF3E0"/>
+  <rect x="200" y="568" width="120" height="24" rx="2" fill="#FFF3E0"/>
+  <rect x="320" y="568" width="200" height="24" rx="2" fill="#FFF3E0"/>
+  <rect x="520" y="568" width="260" height="24" rx="2" fill="#FFF3E0"/>
+  <text x="110" y="585" text-anchor="middle" font-family="monospace" font-size="11" fill="#212121">GPIO39</text>
+  <text x="260" y="585" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">Input</text>
+  <text x="420" y="585" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">SD CD</text>
+  <text x="650" y="585" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#212121">SD Card Detect (опционально)</text>
+
+  <!-- Footer -->
+  <text x="400" y="598" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#999">WaterSysPro v1.3.5 — docs/schematics/pinout_table.svg</text>
+</svg>

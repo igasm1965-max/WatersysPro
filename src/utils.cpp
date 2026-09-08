@@ -281,7 +281,7 @@ String formatTimeHH_MM_SS(uint32_t seconds) {
 void printSystemVersion() {
   Serial.println(isEnglish() ? "\n=== System Information ===" : "\n=== Информация о системе ===");
   Serial.println(isEnglish() ? "Product: Water purification system" : "Продукт: Система очистки воды");
-  Serial.println(isEnglish() ? "Version: 12.0" : "Версия: 12.0");
+  Serial.printf(isEnglish() ? "Version: %s\n" : "Версия: %s\n", FIRMWARE_VERSION);
   Serial.println(isEnglish() ? "Platform: ESP32" : "Платформа: ESP32");
   Serial.print(isEnglish() ? "Build date: " : "Дата сборки: "); Serial.println(__DATE__ " " __TIME__);
   Serial.println(isEnglish() ? "===========================\n" : "===========================\n");

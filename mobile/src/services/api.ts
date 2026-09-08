@@ -1,7 +1,9 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const DEFAULT_API_URL = 'http://192.168.0.103:3000/api';
+// Production builds must use HTTPS. The real server URL is configured in Settings
+// (stored in AsyncStorage 'serverUrl'); this is only a safe default fallback.
+const DEFAULT_API_URL = 'https://your-domain.com/api';
 
 const api = axios.create({ baseURL: DEFAULT_API_URL, timeout: 8000 });
 
@@ -61,9 +63,10 @@ export default {
    * Fetch logs DIRECTLY from the ESP32 device on the local network.
    * The phone must be on the same WiFi as the device.
    * Falls back to the backend proxy if direct connection fails.
+   * Uses axios directly (not the pre-configured `api` instance) to avoid
+   * interceptors that would rewrite the URL to the backend server.
    */
   async fetchDeviceLogsDirect(deviceIp: string, type: 'events' | 'sd' = 'events'): Promise<string> {
-    const port = 80; // ESP32 web server runs on port 80
     let url: string;
     if (type === 'sd') {
       url = `http://${deviceIp}/api/sd_file?name=/events.log`;
@@ -71,26 +74,49 @@ export default {
       url = `http://${deviceIp}/logs.txt`;
     }
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
+    // Diagnostic: log the actual URL being requested
+    console.log(`[API] fetchDeviceLogsDirect: ${url}`);
 
-    try {
-      const response = await fetch(url, {
-        signal: controller.signal,
-        headers: { 'Accept': 'text/plain, */*' },
-      });
-      clearTimeout(timeout);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    // Retry up to 2 times on 500/network errors
+    const MAX_RETRIES = 2;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const response = await axios.get(url, {
+          timeout: 15000,
+          headers: { 'Accept': 'text/plain, */*' },
+          // Don't let axios throw on non-2xx — we handle it ourselves
+          validateStatus: () => true,
+        });
+
+        if (response.status >= 200 && response.status < 300) {
+          return response.data;
+        }
+
+        // 500 error — retry if attempts remain
+        if (response.status === 500 && attempt < MAX_RETRIES) {
+          console.warn(`[API] fetchDeviceLogsDirect got 500, retry ${attempt + 1}/${MAX_RETRIES}`);
+          await new Promise(r => setTimeout(r, 1000 * (attempt + 1))); // 1s, 2s backoff
+          continue;
+        }
+
+        // Include response body in error for better diagnostics
+        const body = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+        const detail = body ? ` (${body.substring(0, 100)})` : '';
+        throw new Error(`HTTP ${response.status}: ${response.statusText}${detail}`);
+      } catch (err: any) {
+        if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+          throw new Error('Таймаут подключения к устройству');
+        }
+        // On network error, retry if attempts remain
+        if (attempt < MAX_RETRIES) {
+          console.warn(`[API] fetchDeviceLogsDirect error, retry ${attempt + 1}/${MAX_RETRIES}:`, err.message);
+          await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+          continue;
+        }
+        throw err;
       }
-      return await response.text();
-    } catch (err: any) {
-      clearTimeout(timeout);
-      if (err.name === 'AbortError') {
-        throw new Error('Таймаут подключения к устройству');
-      }
-      throw err;
     }
+    throw new Error('Не удалось загрузить логи после нескольких попыток');
   },
 
   /** Fetch event logs from the device via backend proxy (fallback) */

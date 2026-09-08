@@ -1,7 +1,8 @@
 import { io, Socket } from 'socket.io-client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const DEFAULT_SERVER_URL = 'http://192.168.0.103:3000';
+// Production builds must use HTTPS/WSS. Real server URL is configured in Settings.
+const DEFAULT_SERVER_URL = 'https://your-domain.com';
 
 class WebSocketService {
   private socket: Socket | null = null;

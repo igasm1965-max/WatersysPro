@@ -2,7 +2,7 @@
 
 WaterSysPro is a full-stack water treatment automation project built around ESP32 firmware, a Node.js backend, and a React Native mobile app.
 
-![Version](https://img.shields.io/badge/version-1.1.0-blue)
+![Version](https://img.shields.io/badge/version-1.3.5-blue)
 ![Status](https://img.shields.io/badge/status-active-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -23,6 +23,7 @@ WaterSysPro combines three layers:
 - REST API for integration and service workflows
 - WebSocket channel for real-time updates
 - Docker-ready local deployment flow
+- Emergency alerts via Telegram (primary), MAX (messenger) and SMS (backup) — see [docs/NOTIFICATIONS_SETUP_RU.md](docs/NOTIFICATIONS_SETUP_RU.md)
 
 ### 3. Mobile App (React Native)
 - Login, dashboard, and settings screens

@@ -8,6 +8,7 @@
 #include "display.h"
 #include "menu.h"
 #include "event_logging.h"
+#include "vqtt.h"   // for vqtt_publishSingleEvent()
 #include "utils.h"  // for sdMux
 
 // helper to determine whether we should write/read logs from SD card
@@ -16,447 +17,7 @@ static bool logsOnSD() {
     return sdPresent;
 }
 
-void displayEventStats() {
-  extern SafeLCD lcd;
-  int total = getEventCount();
-  // Подсчёт количества по типам (максимум 32 уникальных типа)
-  uint8_t typeCounts[32] = {0};
-  char typeNames[32][17];
-  int uniqueTypes = 0;
-  for (int i = 0; i < total; ++i) {
-    EventLog* ev = getEventByIndexSimple(i);
-    if (!ev) continue;
-    // Группируем по коду события (без учёта уровня)
-    int idx = -1;
-    for (int t = 0; t < uniqueTypes; ++t) {
-      if (typeNames[t][0] == 0) continue;
-      char buf[17];
-      const char* txt = getEventText(ev->eventType);
-      strncpy(buf, txt, sizeof(buf) - 1);
-      buf[sizeof(buf) - 1] = '\0';
-      if (strncmp(typeNames[t], buf, sizeof(buf)) == 0) {
-        idx = t;
-        break;
-      }
-    }
-    if (idx == -1 && uniqueTypes < 32) {
-      // Новый тип (по тексту события)
-      char buf[17];
-      const char* txt = getEventText(ev->eventType);
-      strncpy(buf, txt, sizeof(buf) - 1);
-      buf[sizeof(buf) - 1] = '\0';
-      strncpy(typeNames[uniqueTypes], buf, sizeof(typeNames[0]) - 1);
-      typeNames[uniqueTypes][sizeof(typeNames[0]) - 1] = 0;
-      typeCounts[uniqueTypes] = 1;
-      uniqueTypes++;
-    } else if (idx != -1) {
-      typeCounts[idx]++;
-    }
-  }
 
-  int page = 0;
-  bool exit = false;
-  bool needUpdate = true;
-  while (!exit) {
-    if (needUpdate) {
-      lcd.clear();
-      // Формируем и печатаем заголовок целиком, с очисткой остатка строки
-      // Заголовок на ASCII, ограниченный 20 байтами (без многобайтовых символов)
-      char headerBuf[21];
-      snprintf(headerBuf, sizeof(headerBuf), "Tot:%d T:%d", total, uniqueTypes);
-      if (strlen(headerBuf) > 20) headerBuf[20] = '\0';
-      lcd.setCursor(0, 0);
-      lcd.print(headerBuf);
-      for (int _p = strlen(headerBuf); _p < 20; ++_p) lcd.print(' ');
-
-      // Показываем по 3 типа на страницу с барами
-      for (int i = 0; i < 3; ++i) {
-        int idx = page * 3 + i;
-        if (idx >= uniqueTypes) {
-          // Очистка строки, если нет элемента
-          lcd.setCursor(0, i + 1);
-          for (int k = 0; k < 20; ++k) lcd.print(' ');
-          continue;
-        }
-        // Короткое имя типа
-        char shortName[5];
-        strncpy(shortName, typeNames[idx], 4);
-        shortName[4] = '\0';
-
-        // Простой бар (макс 10 символов)
-        int barLen = min(10, (typeCounts[idx] * 10) / (total > 0 ? total : 1));
-        char bar[11];
-        for (int b = 0; b < barLen; ++b) bar[b] = '#';
-        bar[barLen] = '\0';
-
-        char line[21];
-        snprintf(line, sizeof(line), "%-4s:%2d %s", shortName, typeCounts[idx], bar);
-        // Гарантируем, что строка не длиннее 20 байт
-        if (strlen(line) > 20) line[20] = '\0';
-        lcd.setCursor(0, i + 1);
-        lcd.print(line);
-        for (int k = strlen(line); k < 20; ++k) lcd.print(' ');
-      }
-
-      // Нижняя строка с подсказкой (показываем ASCII-совместную подсказку и очищаем остаток)
-      // Нижняя строка - ASCII подсказка, не более 20 символов
-      const char* bottom = "< >:nav Hold:exit";
-      char bottomBuf[21];
-      strncpy(bottomBuf, bottom, 20);
-      bottomBuf[20] = '\0';
-      lcd.setCursor(0, 3);
-      lcd.print(bottomBuf);
-      for (int _p = strlen(bottomBuf); _p < 20; ++_p) lcd.print(' ');
-      needUpdate = false;
-    }
-    int delta = readEncoderDelta();
-    if (delta != 0) {
-      if (delta < 0 && page > 0) page--;
-      else if (delta > 0 && (page + 1) * 3 < uniqueTypes) page++;
-      needUpdate = true;
-    }
-    
-    // Обработка нажатия кнопки
-    static bool prevButtonHigh = true;
-    bool currButtonLow = (digitalRead(pinSW) == LOW);
-    if (currButtonLow && prevButtonHigh) {
-      // Новое нажатие
-      unsigned long pressStart = millis();
-      while (digitalRead(pinSW) == LOW) {
-        WDT_RESET();
-        if (millis() - pressStart > 700) {
-          // Долгое удержание — выход
-          while (digitalRead(pinSW) == LOW) {
-            delay(10);
-          }
-          exit = true;
-          break;
-        }
-        delay(10);
-      }
-    }
-    prevButtonHigh = !currButtonLow;
-    
-    WDT_RESET();
-    delay(120);
-  }
-}
-
-void selectEventTypeForFilter() {
-  extern uint8_t selectedEventType;
-  extern SafeLCD lcd;
-  const char* types[] = {"All", "Wash Start", "Emergency", "Sys Start", "Sys Stop", "Stats Clear", "Settings", "State Chg", "Manual Op", "Menu Act", "Watchdog", "RTC Lost", "Sensor Err", "Unexp Chg", "State Rest"};
-  int selected = selectedEventType;
-  bool exit = false;
-  bool needUpdate = true;
-  while (!exit) {
-    if (needUpdate) {
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("Select Event Type:");
-      lcd.setCursor(0, 1);
-      if (selected == 0) lcd.print(">");
-      else lcd.print(" ");
-      lcd.print(types[selected]);
-      if (selected < 14) {
-        lcd.setCursor(0, 2);
-        lcd.print(" ");
-        lcd.print(types[selected + 1]);
-      }
-      needUpdate = false;
-    }
-    int delta = readEncoderDelta();
-    if (delta != 0) {
-      if (delta > 0 && selected < 14) selected++;
-      else if (delta < 0 && selected > 0) selected--;
-      needUpdate = true;
-    }
-    // Обработка нажатия кнопки
-    static bool prevButtonHigh = true;
-    bool currButtonLow = (digitalRead(pinSW) == LOW);
-    if (currButtonLow && prevButtonHigh) {
-      // Новое нажатие
-      unsigned long pressStart = millis();
-      while (digitalRead(pinSW) == LOW) {
-        WDT_RESET();
-        if (millis() - pressStart > 700) {
-          // Долгое удержание — выход без выбора
-          while (digitalRead(pinSW) == LOW) {
-            delay(10);
-          }
-          exit = true;
-          break;
-        }
-        delay(10);
-      }
-      if (!exit) {
-        // Короткое нажатие — выбор
-        selectedEventType = selected;
-        exit = true;
-      }
-    }
-    prevButtonHigh = !currButtonLow;
-    WDT_RESET();
-    delay(120);
-  }
-}
-
-void selectDateRangeForFilter() {
-  extern DateTime filterStartDate;
-  extern DateTime filterEndDate;
-  extern SafeLCD lcd;
-  extern RTC_DS3231 rtc;
-  // Простая настройка даты (только день/месяц/год)
-  DateTime now = rtc.now();
-  filterStartDate = DateTime(now.year(), now.month(), 1, 0, 0, 0); // Начало месяца
-  filterEndDate = now;
-  // Для простоты, используем текущий месяц
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("Filter: This Month");
-  lcd.setCursor(0, 1);
-  char bufFrom[24];
-  snprintf(bufFrom, sizeof(bufFrom), "From: %02d.%02d.%04d", filterStartDate.day(), filterStartDate.month(), filterStartDate.year());
-  lcd.print(bufFrom);
-  lcd.setCursor(0, 2);
-  char bufTo[24];
-  snprintf(bufTo, sizeof(bufTo), "To: %02d.%02d.%04d", filterEndDate.day(), filterEndDate.month(), filterEndDate.year());
-  lcd.print(bufTo);
-  delay(3000);
-}
-
-void displayFilteredEvents(uint8_t filterTypeParam) {
-  extern uint8_t filterType;
-  extern uint8_t selectedEventType;
-  extern DateTime filterStartDate;
-  extern DateTime filterEndDate;
-  extern EventLog eventLogs[200];
-  extern SafeLCD lcd;
-  int total = getEventCount();
-  EventLog filtered[200];
-  int filteredCount = 0;
-
-  // Фильтрация
-  for (int i = 0; i < total; i++) {
-    EventLog* ev = getEventByIndexSimple(i);
-    if (!ev) continue;
-    bool include = true;
-    if (filterType == 1 && selectedEventType != 0 && ev->eventType != selectedEventType - 1) include = false;
-    if (filterType == 2) {
-      DateTime evDate(ev->year, ev->month, ev->day, ev->hour, ev->minute, 0);
-      if (evDate < filterStartDate || evDate > filterEndDate) include = false;
-    }
-    if (include && filteredCount < 200) {
-      // Insert at front to have newest-first order
-      for (int k = filteredCount; k > 0; --k) filtered[k] = filtered[k-1];
-      filtered[0] = *ev;
-      filteredCount++;
-    }
-  }
-
-  // Отображение (новейшие сперва)
-  int currentIndex = 0;
-  bool exit = false;
-  while (!exit) {
-    if (filteredCount == 0) {
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("No events match");
-      lcd.setCursor(0, 1);
-      lcd.print("filter criteria");
-      delay(2000);
-      exit = true;
-      continue;
-    }
-    EventLog* event = &filtered[currentIndex];
-    lcd.clear();
-    // Line 0: date
-    lcd.setCursor(0, 0);
-    if (event->day < 10) lcd.print('0'); lcd.print(event->day); lcd.print('.');
-    if (event->month < 10) lcd.print('0'); lcd.print(event->month); lcd.print('.'); lcd.print(event->year);
-    // Line 1: time
-    lcd.setCursor(0, 1);
-    if (event->hour < 10) lcd.print('0'); lcd.print(event->hour); lcd.print(':');
-    if (event->minute < 10) lcd.print('0'); lcd.print(event->minute);
-    // Line 2: event name
-    lcd.setCursor(0, 2);
-    char eventDesc[21];
-    strncpy(eventDesc, getEventText(event->eventType), sizeof(eventDesc)-1);
-    eventDesc[sizeof(eventDesc)-1] = '\0';
-    if (strlen(eventDesc) > 20) { eventDesc[20] = '\0'; }
-    lcd.print(eventDesc);
-    for (int i = strlen(eventDesc); i < 20; ++i) lcd.print(' ');
-    // Line 3: code and importance with short level label
-    lcd.setCursor(0, 3);
-    char idxBuf[21];
-    char levelLabel[4] = "[ ]";
-    switch (event->level) {
-      case LOG_DEBUG: levelLabel[1] = 'D'; break;
-      case LOG_INFO: levelLabel[1] = 'I'; break;
-      case LOG_WARNING: levelLabel[1] = 'W'; break;
-      case LOG_ERROR: levelLabel[1] = 'E'; break;
-      default: levelLabel[1] = ' '; break;
-    }
-    snprintf(idxBuf, sizeof(idxBuf), "Code:%03d %s", event->eventType, levelLabel);
-    lcd.print(idxBuf);
-    for (int i = strlen(idxBuf); i < 20; ++i) lcd.print(' ');
-
-    int delta = readEncoderDelta();
-    if (delta < 0 && currentIndex > 0) currentIndex--;
-    else if (delta > 0 && currentIndex < filteredCount - 1) currentIndex++;
-    if (isEncoderButtonPressed()) {
-      waitForEncoderRelease();
-      exit = true;
-    }
-    WDT_RESET();
-    delay(120);
-  }
-}
-
-void displayEventGraph() {
-  extern SafeLCD lcd;
-  extern RTC_DS3231 rtc;
-  int total = getEventCount();
-  if (total == 0) {
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("No events");
-    delay(2000);
-    return;
-  }
-
-  DateTime now = rtc.now();
-  int currentDay = now.day();
-  int currentMonth = now.month();
-  int currentYear = now.year();
-
-  // Счетчик событий по дням (последние 7 дней)
-  int eventCounts[7] = {0};
-
-  for (int i = 0; i < total; i++) {
-    EventLog* ev = getEventByIndexSimple(i);
-    if (!ev) continue;
-    // Рассчитываем разницу в днях
-    DateTime evDate(ev->year, ev->month, ev->day, 0, 0, 0);
-    DateTime today(currentYear, currentMonth, currentDay, 0, 0, 0);
-    TimeSpan diff = today - evDate;
-    int daysDiff = diff.days();
-    if (daysDiff >= 0 && daysDiff < 7) {
-      eventCounts[6 - daysDiff]++;
-    }
-  }
-
-  // Отображение
-  // Обновляем экран один раз, так как информация статическая
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("Events last 7 days:");
-  for (int i = 0; i < 3; i++) {
-    int dayIdx = 6 - i * 2; // 6,4,2
-    if (dayIdx >= 0) {
-      DateTime d = now - TimeSpan(dayIdx, 0, 0, 0);
-      lcd.setCursor(0, i + 1);
-      char perDayBuf[20];
-      snprintf(perDayBuf, sizeof(perDayBuf), "%02d.%02d:%2d ", d.day(), d.month(), eventCounts[dayIdx]);
-      lcd.print(perDayBuf);
-      // Бар
-      int barLen = min(10, eventCounts[dayIdx]);
-      for (int b = 0; b < barLen; b++) lcd.print("#");
-    }
-  }
-  lcd.setCursor(0, 3);
-  lcd.print("Hold:exit");
-
-  bool exit = false;
-  while (!exit) {
-    // Обработка нажатия кнопки
-    static bool prevButtonHigh = true;
-    bool currButtonLow = (digitalRead(pinSW) == LOW);
-    if (currButtonLow && prevButtonHigh) {
-      // Новое нажатие
-      unsigned long pressStart = millis();
-      while (digitalRead(pinSW) == LOW) {
-        WDT_RESET();
-        if (millis() - pressStart > 700) {
-          // Долгое удержание — выход
-          while (digitalRead(pinSW) == LOW) {
-            delay(10);
-          }
-          exit = true;
-          break;
-        }
-        delay(10);
-      }
-    }
-    prevButtonHigh = !currButtonLow;
-    
-    WDT_RESET();
-    delay(120);
-  }
-}
-
-void showFilterTypeMenu() {
-  extern uint8_t filterType;
-  extern SafeLCD lcd;
-  const char* options[] = {"All Events", "By Type", "By Date"};
-  int selected = filterType;
-  bool exit = false;
-  bool needUpdate = true;
-  while (!exit) {
-    if (needUpdate) {
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("Select Filter:");
-      for (int i = 0; i < 3; i++) {
-        lcd.setCursor(0, i + 1);
-        if (i == selected) lcd.print(">");
-        else lcd.print(" ");
-        lcd.print(options[i]);
-      }
-      needUpdate = false;
-    }
-    int delta = readEncoderDelta();
-    if (delta != 0) {
-      if (delta > 0 && selected < 2) selected++;
-      else if (delta < 0 && selected > 0) selected--;
-      needUpdate = true;
-    }
-    // Обработка нажатия кнопки
-    static bool prevButtonHigh = true;
-    bool currButtonLow = (digitalRead(pinSW) == LOW);
-    if (currButtonLow && prevButtonHigh) {
-      // Новое нажатие
-      unsigned long pressStart = millis();
-      while (digitalRead(pinSW) == LOW) {
-        WDT_RESET();
-        if (millis() - pressStart > 700) {
-          // Долгое удержание — выход без выбора
-          while (digitalRead(pinSW) == LOW) {
-            delay(10);
-          }
-          exit = true;
-          break;
-        }
-        delay(10);
-      }
-      if (!exit) {
-        // Короткое нажатие — выбор
-        filterType = selected;
-        if (filterType == 1) {
-          // Выбор типа события
-          selectEventTypeForFilter();
-        } else if (filterType == 2) {
-          // Выбор даты
-          selectDateRangeForFilter();
-        }
-        exit = true;
-      }
-    }
-    prevButtonHigh = !currButtonLow;
-    WDT_RESET();
-    delay(120);
-  }
-}
 /**
  * @file event_logging.cpp
  * @brief Реализация логирования событий в SPIFFS
@@ -478,13 +39,6 @@ void showFilterTypeMenu() {
 
 // forward declarations
 static const char* getLogSourceString(LogSource src);
-
-// ============ ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ДЛЯ ФИЛЬТРА ============
-
-uint8_t filterType = 0; // 0 - все, 1 - по типу, 2 - по дате
-uint8_t selectedEventType = 0; // Для фильтра по типу
-DateTime filterStartDate; // Дата начала
-DateTime filterEndDate;   // Дата конца
 
 // ============ ИНИЦИАЛИЗАЦИЯ ФАЙЛОВОЙ СИСТЕМЫ ============
 
@@ -623,6 +177,13 @@ void saveEventLog(LogLevel level, uint8_t eventType, uint16_t param, uint16_t ad
   uint32_t bit = mapEventToBit(eventType, level);
   if (bit != 0 && (filterMask & bit)) shouldWrite = true;
 
+  // Публикуем событие через MQTT ВСЕГДА, независимо от фильтра записи на SD.
+  // Фильтр логов управляет только записью на SD-карту, но не стримингом.
+  // Это гарантирует, что мобильное приложение получает все события в реальном времени.
+  #ifdef ENABLE_WIFI
+  vqtt_publishSingleEvent(entry);
+  #endif
+
   if (shouldWrite) {
     // dedupe: same event within same minute?
     if (entry.eventType == lastPersisted.eventType &&
@@ -637,6 +198,7 @@ void saveEventLog(LogLevel level, uint8_t eventType, uint16_t param, uint16_t ad
       repeatCount++;
       return; // skip writing duplicate
     }
+
     // if we had repeats, write a summary line first
     if (repeatCount > 0) {
       char rpt[100];
@@ -1018,7 +580,23 @@ String exportEventsAsText() {
   extern EventLog eventLogs[200];
   extern uint8_t eventLogIndex; // next write position
   int total = getEventLogCount();
-  String out = "";
+  
+  // Pre-allocate to avoid heap fragmentation from repeated +=
+  // Max possible size: 200 entries * ~160 bytes each = ~32KB
+  String out;
+  out.reserve(total * 160 + 64);
+
+  // Добавляем заголовок с мета-информацией для диагностики
+  char header[64];
+  int headerLen = snprintf(header, sizeof(header),
+    "# Events: %d | Buffer: %d/200\n", total, total);
+  out.concat(header, headerLen);
+
+  // Если нет событий — возвращаем только заголовок с пометкой
+  if (total == 0) {
+    out.concat("(no events)\n");
+    return out;
+  }
 
   // If buffer never wrapped, entries are packed at [0..total-1].
   // If it wrapped, the oldest entry is at eventLogIndex.
@@ -1031,14 +609,45 @@ String exportEventsAsText() {
     char desc[80];
     getEventTypeLong(e.level, e.eventType, e.eventParam, desc, sizeof(desc));
     char buf[200];
-    snprintf(buf, sizeof(buf), "%02d.%02d.%04d %02d:%02d - type:%02d param:%u lvl:%d - %s\n",
+    // Упрощённый формат: убрали type:XX param:XX lvl:X — они не нужны пользователю
+    int len = snprintf(buf, sizeof(buf), "%02d.%02d.%04d %02d:%02d - %s\n",
+             e.day, e.month, e.year, e.hour, e.minute, desc);
+    // Используем concat() вместо += String(buf), чтобы не создавать
+    // временный String на каждой итерации — это фрагментирует кучу
+    // и вызывает ошибку 500 при нехватке непрерывной памяти.
+    out.concat(buf, len);
+  }
+  return out;
+}
+
+/// Стримит события напрямую в Print-интерфейс (например, AsyncResponseStream)
+/// без создания промежуточной String. Это предотвращает двойное выделение памяти
+/// и ошибку 500 при нехватке кучи.
+void streamEventsAsText(Print& output) {
+  extern EventLog eventLogs[200];
+  extern uint8_t eventLogIndex;
+  int total = getEventLogCount();
+
+  int start = (total < 200) ? 0 : eventLogIndex;
+  bool anyWritten = false;
+
+  for (int n = 0; n < total; ++n) {
+    int idx = (start + n) % 200;
+    EventLog &e = eventLogs[idx];
+    if (e.eventType == 0) continue;
+    char desc[80];
+    getEventTypeLong(e.level, e.eventType, e.eventParam, desc, sizeof(desc));
+    char buf[200];
+    int len = snprintf(buf, sizeof(buf), "%02d.%02d.%04d %02d:%02d - type:%02d param:%u lvl:%d - %s\n",
              e.day, e.month, e.year, e.hour, e.minute,
              e.eventType, e.eventParam, (int)e.level,
              desc);
-    out += String(buf);
+    output.write((const uint8_t*)buf, len);
+    anyWritten = true;
   }
-  if (out.length() == 0) out = "(no events)\n";
-  return out;
+  if (!anyWritten) {
+    output.print("(no events)\n");
+  }
 }
 
 /// Получает количество событий (обертка для совместимости)

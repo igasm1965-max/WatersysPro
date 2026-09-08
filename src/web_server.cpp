@@ -1077,6 +1077,7 @@ static void handleGetMqtt(AsyncWebServerRequest* request) {
   doc["secure"] = preferences.getBool(PREF_KEY_MQTT_SECURE, DEFAULT_MQTT_SECURE);
   doc["tls_port"] = preferences.getUInt(PREF_KEY_MQTT_TLS_PORT, DEFAULT_MQTT_TLS_PORT);
   doc["insecure"] = preferences.getBool(PREF_KEY_MQTT_INSECURE, DEFAULT_MQTT_INSECURE);
+  doc["connected"] = vqtt_isConnected();
   String out;
   serializeJson(doc, out);
   request->send(200, "application/json", out);
@@ -1138,6 +1139,8 @@ static void handlePostMqttBody(AsyncWebServerRequest* request, uint8_t* data, si
   preferences.putUInt(PREF_KEY_MQTT_TLS_PORT, (uint32_t)tls_port);
   preferences.putBool(PREF_KEY_MQTT_INSECURE, requestedInsecure);
   saveEventLog(LOG_INFO, EVENT_SETTINGS_CHANGE, 0);
+  // Reset reconnect backoff so new settings take effect immediately
+  vqtt_resetReconnectBackoff();
   request->send(200, "application/json", "{\"ok\":true}\n");
   // Re-init VQTT so new settings are applied immediately
   initVQTT();
@@ -1229,6 +1232,16 @@ void initWebServer() {
   server.on("/api/mqtt", HTTP_POST, [](AsyncWebServerRequest* request) {
     // Response is sent by handlePostMqttBody()
   }, NULL, handlePostMqttBody);
+
+  // Reset MQTT reconnect backoff and force reconnect attempt
+  server.on("/api/mqtt_reconnect", HTTP_GET, [](AsyncWebServerRequest* request) {
+    Serial.println("[Web] /api/mqtt_reconnect called");
+    vqtt_resetReconnectBackoff();
+    // Force an immediate reconnect attempt
+    extern void initVQTT();
+    initVQTT();
+    request->send(200, "application/json", "{\"ok\":true}\n");
+  });
 
   // Log filter API: GET to read mask and options, POST to set mask (requires admin token)
   server.on("/api/log_filter", HTTP_GET, [](AsyncWebServerRequest* request) {
@@ -1341,9 +1354,10 @@ void initWebServer() {
     request->send(200, "application/json", out);
   });
 
-  // Download a single SD file by name
+  // Download a single SD file by name — native SD send with content type
   server.on("/api/sd_file", HTTP_GET, [](AsyncWebServerRequest* request) {
     extern bool sdPresent;
+    IPAddress clientIP = request->client()->remoteIP();
     if (!request->hasParam("name")) {
       request->send(400, "application/json", "{\"error\":\"name required\"}");
       return;
@@ -1363,7 +1377,34 @@ void initWebServer() {
       request->send(404, "text/plain", "not found");
       return;
     }
-    request->send(SD, path);
+    // Check file size before sending to avoid out-of-memory on large files
+    File f = SD.open(path, FILE_READ);
+    if (!f) {
+      request->send(500, "text/plain", "failed to open file");
+      return;
+    }
+    size_t fileSize = f.size();
+    f.close();
+    // Reject files larger than 45KB to prevent heap exhaustion (maxAlloc ~61KB)
+    if (fileSize > 45000) {
+      request->send(413, "text/plain", "file too large");
+      return;
+    }
+    // Determine content type based on file extension
+    const char* contentType = "text/plain; charset=utf-8";
+    if (path.endsWith(".html") || path.endsWith(".htm")) {
+      contentType = "text/html; charset=utf-8";
+    } else if (path.endsWith(".json")) {
+      contentType = "application/json";
+    } else if (path.endsWith(".csv")) {
+      contentType = "text/csv; charset=utf-8";
+    } else if (path.endsWith(".log") || path.endsWith(".txt")) {
+      contentType = "text/plain; charset=utf-8";
+    }
+    Serial.printf("[Web] GET /api/sd_file?name=%s from %s (size=%u)\n", path.c_str(), clientIP.toString().c_str(), (unsigned int)fileSize);
+    AsyncWebServerResponse *response = request->beginResponse(SD, path, contentType);
+    response->addHeader("Access-Control-Allow-Origin", "*");
+    request->send(response);
   });
 
   // Manage SD files (delete)
@@ -1404,10 +1445,19 @@ void initWebServer() {
       }
     });
 
-  // Export readable logs
+  // Export readable logs — используем стриминг для предотвращения ошибки 500
+  // при нехватке непрерывной памяти на больших кучах String
   server.on("/logs.txt", HTTP_GET, [](AsyncWebServerRequest* request) {
-    String txt = exportEventsAsText();
-    request->send(200, "text/plain", txt);
+    IPAddress clientIP = request->client()->remoteIP();
+    Serial.printf("[Web] GET /logs.txt from %s\n", clientIP.toString().c_str());
+    AsyncResponseStream *response = request->beginResponseStream("text/plain; charset=utf-8");
+    if (!response) {
+      request->send(500, "text/plain", "Internal Server Error");
+      return;
+    }
+    response->addHeader("Access-Control-Allow-Origin", "*");
+    streamEventsAsText(*response);
+    request->send(response);
   });
 
 
@@ -1496,7 +1546,7 @@ void initWebServer() {
       }
       sdUploadOk = false;
     },
-    [&sdUploadFile, &sdUploadOk](AsyncWebServerRequest* request, const String& filename,
+    [](AsyncWebServerRequest* request, const String& filename,
                                   size_t index, uint8_t* data, size_t len, bool final) {
       extern bool sdPresent;
       if (index == 0) {

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <title>WaterSysPro — Encoder KY-040 подключение</title>
+  <description>Схема подключения энкодера KY-040 к ESP32</description>
+
+  <rect width="800" height="600" fill="#FAFAFA" rx="8"/>
+  <text x="400" y="35" text-anchor="middle" font-family="sans-serif" font-size="20" font-weight="bold" fill="#1565C0">Encoder KY-040 — Схема подключения</text>
+
+  <!-- ESP32 -->
+  <rect x="50" y="200" width="200" height="200" rx="8" fill="#E3F2FD" stroke="#1565C0" stroke-width="2"/>
+  <text x="150" y="230" text-anchor="middle" font-family="sans-serif" font-size="15" font-weight="bold" fill="#1565C0">ESP32</text>
+
+  <text x="55" y="270" font-family="monospace" font-size="13" fill="#1565C0">GPIO35 ← CLK</text>
+  <text x="55" y="300" font-family="monospace" font-size="13" fill="#1565C0">GPIO34 ← DT</text>
+  <text x="55" y="330" font-family="monospace" font-size="13" fill="#1565C0">GPIO32 ← SW</text>
+  <text x="55" y="360" font-family="monospace" font-size="13" fill="#D32F2F">3.3V → VCC</text>
+  <text x="55" y="390" font-family="monospace" font-size="13" fill="#212121">GND  → GND</text>
+
+  <!-- Encoder -->
+  <rect x="400" y="160" width="300" height="280" rx="10" fill="#E3F2FD" stroke="#1565C0" stroke-width="2"/>
+  <text x="550" y="195" text-anchor="middle" font-family="sans-serif" font-size="16" font-weight="bold" fill="#1565C0">Encoder KY-040</text>
+
+  <!-- Encoder visual representation -->
+  <circle cx="550" cy="260" r="50" fill="none" stroke="#1565C0" stroke-width="2"/>
+  <circle cx="550" cy="260" r="8" fill="#1565C0"/>
+  <line x1="550" y1="210" x2="550" y2="260" stroke="#1565C0" stroke-width="2"/>
+  <line x1="550" y1="260" x2="590" y2="280" stroke="#1565C0" stroke-width="1.5"/>
+  <text x="550" y="330" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#666">Rotary Encoder</text>
+
+  <!-- Encoder pins -->
+  <text x="410" y="370" font-family="monospace" font-size="12" fill="#1565C0">Pin 1 (CLK) → GPIO35</text>
+  <text x="410" y="395" font-family="monospace" font-size="12" fill="#1565C0">Pin 2 (DT)  → GPIO34</text>
+  <text x="410" y="420" font-family="monospace" font-size="12" fill="#1565C0">Pin 3 (SW)  → GPIO32 (кнопка)</text>
+  <text x="410" y="445" font-family="monospace" font-size="12" fill="#D32F2F">Pin 4 (VCC) → 3.3V</text>
+  <text x="410" y="470" font-family="monospace" font-size="12" fill="#212121">Pin 5 (GND) → GND</text>
+
+  <!-- Connection lines -->
+  <line x1="250" y1="270" x2="400" y2="370" stroke="#1565C0" stroke-width="1.5"/>
+  <line x1="250" y1="300" x2="400" y2="395" stroke="#1565C0" stroke-width="1.5"/>
+  <line x1="250" y1="330" x2="400" y2="420" stroke="#1565C0" stroke-width="1.5"/>
+  <line x1="250" y1="360" x2="400" y2="445" stroke="#D32F2F" stroke-width="2"/>
+  <line x1="250" y1="390" x2="400" y2="470" stroke="#212121" stroke-width="2"/>
+
+  <!-- Pull-up resistors section -->
+  <rect x="50" y="440" width="700" height="140" rx="6" fill="#E3F2FD" stroke="#1565C0" stroke-width="1.5"/>
+  <text x="400" y="465" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold" fill="#1565C0">Подтягивающие резисторы (Pull-up)</text>
+
+  <text x="60" y="490" font-family="sans-serif" font-size="12" fill="#1565C0">• CLK → 10кОм → 3.3V (подтяжка к питанию)</text>
+  <text x="60" y="510" font-family="sans-serif" font-size="12" fill="#1565C0">• DT  → 10кОм → 3.3V (подтяжка к питанию)</text>
+  <text x="60" y="530" font-family="sans-serif" font-size="12" fill="#1565C0">• SW  → 10кОм → 3.3V (подтяжка к питанию, кнопка замыкает на GND)</text>
+  <text x="60" y="555" font-family="sans-serif" font-size="12" fill="#1565C0">• Примечание: CLK и DT инвертированы в коде (pinCLK=35, pinDT=34) для коррекции направления вращения</text>
+
+  <text x="400" y="595" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#999">WaterSysPro v1.3.5 — docs/schematics/encoder.svg</text>
+</svg>

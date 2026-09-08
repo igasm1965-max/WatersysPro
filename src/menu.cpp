@@ -32,22 +32,6 @@ extern volatile bool encoderButtonPressed;
 // ============ FORWARD DECLARATIONS ============
 
 
-/// Обработчик статистики логов
-void EventStatsHandler() {
-  displayEventStats();
-}
-
-
-/// Обработчик графика логов
-void EventGraphHandler() {
-  displayEventGraph();
-}
-
-
-/// Обработчик фильтрации логов
-void EventFilterHandler() {
-  showFilterTypeMenu();
-}
 // Функции из preferences.cpp
 void saveTimerSetting(uint8_t timerType, uint8_t hours, uint8_t minutes, uint8_t seconds);
 void saveTankSettings(uint8_t tankNumber, int minLevel, int maxLevel);
@@ -1072,38 +1056,6 @@ void clearEventLogsMenu() {
   lcd.setCursor(0, 0);
   lcd.print("Logs cleared");
   delay(1200);
-}
-
-/// Очистка старых логов (с подтверждением)
-void clearOldEventsMenu() {
-  if (!confirmAction("Clear old logs?")) {
-    return;
-  }
-
-  deleteOldEventLogs(30 * 24 * 3600UL);
-  saveEventLog(LOG_INFO, EVENT_STATS_CLEAR, 1);
-
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("Old logs cleared");
-  delay(1200);
-}
-
-void pruneEventLogsMenu() {
-  if (!confirmAction("Prune logs older than 30d?")) {
-    return;
-  }
-  pruneEventLogs(30 * 24 * 3600UL);
-  saveEventLog(LOG_INFO, EVENT_STATS_CLEAR, 2);
-  lcd.clear(); lcd.setCursor(0,0); lcd.print("Logs pruned"); delay(1200);
-}
-
-void formatSdMenu() {
-  if (!confirmAction("Format SD? All files lost!")) return;
-  bool ok = formatSDCard();
-  lcd.clear(); lcd.setCursor(0,0);
-  lcd.print(ok ? "SD formatted" : "Format failed");
-  delay(1500);
 }
 
 /// Сброс настроек

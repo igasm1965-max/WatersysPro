@@ -19,10 +19,10 @@
 ## P0 - Блокеры релиза
 
 ### P0.1 Секреты и креды: удалить из кода/доков, оставить только env
-- [ ] **Task ID**: P0.1
+- [x] **Task ID**: P0.1
 - **Owner**: DevOps + Backend + Docs
 - **Estimate**: 1.0d
-- **Status**: To Do
+- **Status**: Done
 - **Files**: `backend/src/server.js`, `docker-compose.yml`, `backend/.env.example`, `README.md`, `README_RU.md`
 - **DoD**:
   - Нет рабочих паролей/токенов в git-tracked файлах.
@@ -31,10 +31,10 @@
   - Пройден ручной grep по паттернам `password|token|secret|mqtt://.*:.*@`.
 
 ### P0.2 MQTT TLS: запретить небезопасный insecure по умолчанию
-- [ ] **Task ID**: P0.2
+- [x] **Task ID**: P0.2
 - **Owner**: Firmware
 - **Estimate**: 1.0d
-- **Status**: To Do
+- **Status**: Done
 - **Files**: `src/vqtt.cpp`, `include/config.h` (при необходимости), `README.md`, `README_RU.md`
 - **DoD**:
   - Убрано безусловное `setInsecure()` из production-path.
@@ -89,10 +89,10 @@
   - Есть dependency/secret scan (минимум базовый).
 
 ### P1.2 Backend readiness: health зависит от DB/MQTT
-- [ ] **Task ID**: P1.2
+- [x] **Task ID**: P1.2
 - **Owner**: Backend
 - **Estimate**: 1.0d
-- **Status**: To Do
+- **Status**: Done
 - **Files**: `backend/src/server.js`, `backend/src/db.js`, `backend/README.md`
 - **DoD**:
   - Разделены `liveness` и `readiness` endpoint-ы.
@@ -172,3 +172,6 @@
 - 2026-03-19: Трекер создан.
 - 2026-04-20: Добавлен pre-release checklist (`docs/PRODUCTION_RELEASE_CHECKLIST.md`), удалены из индекса git runtime-артефакты Mosquitto (`mosquitto.log`, `mosquitto.db`), обновлен `.gitignore`, убрана жесткая локальная привязка `upload_port` в `platformio.ini`.
 - 2026-04-20: Сформирован финальный отчёт готовности к релизу `docs/PRODUCTION_READINESS_REPORT_2026-04-20.md` с Go/No-Go условиями.
+- 2026-09-08: **P0.1 Done** — утёкший Telegram-токен убран из `.env.cloud.example` (заменён на `<CHANGE_ME>`); admin-token больше не использует известный дефолт `admin` — генерируется случайно при первом включении (`src/preferences.cpp`).
+- 2026-09-08: **P0.2 Done** — убран автоматический insecure TLS-fallback в `src/vqtt.cpp`; `mqtt_insec` игнорируется в production-сборке (`PROD_BUILD`), добавлен профиль `esp32dev-prod` в `platformio.ini`.
+- 2026-09-08: **P1.2 Done** — разделены `/api/health` (liveness) и `/api/ready` (readiness: DB + MQTT); `/api/auth/register` закрыт флагом `ALLOW_REGISTRATION` (по умолчанию выключен); пустой `MQTT_BROKER` обрабатывается заглушкой без падения; `usesCleartextTraffic=false` и HTTPS-URL в мобильном приложении.

@@ -387,9 +387,12 @@ void setup() {
     lcd.display();
     lcd.clear();
     lcd.setCursor(0, 0);
-    lcd.print("W.System v12.0");
+    lcd.print("WatersysPro v");
+    lcd.print(FIRMWARE_VERSION);
     lcd.setCursor(0, 1);
     lcd.print("Initializing...");
+    // Пауза 5 секунд для читаемости заставки
+    delay(5000);
 
     // Инициализация пинов
     initPins();

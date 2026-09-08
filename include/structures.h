@@ -76,13 +76,6 @@ enum MenuItem {
   mkToggleNightMode = 28,
   mkResetSettings = 29,
   mkEXIT = 30,
-  mkViewEventLogs = 200,
-  mkEventStats = 201,
-  mkEventGraph = 202,
-  mkFilterByType = 203,
-  mkClearOldEvents = 204,
-  mkPruneEventLogs = 205,
-  mkFormatSdCard = 206,
   
   // Инженерное меню (требует пароль)
   mkEngineerMenu = 300,

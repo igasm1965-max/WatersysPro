@@ -1,0 +1,24 @@
+Starting project at d:\WatersysPro\WatersysPro\WatersysPro2\mobile
+Starting Metro Bundler
+
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+The following packages should be updated for best compatibility with the installed expo version:
+  expo@55.0.9 - expected version: ~55.0.27
+  expo-build-properties@55.0.13 - expected version: ~55.0.15
+  expo-notifications@55.0.18 - expected version: ~55.0.24
+  expo-secure-store@55.0.13 - expected version: ~55.0.15
+  react-native@0.83.4 - expected version: 0.83.6
+  react-native-webview@14.0.1 - expected version: 13.16.0
+Your project may not work correctly until you install the expected versions of the packages.
+Waiting on http://localhost:8081
+Logs for your project will appear below.
+Android node_modules\expo\AppEntry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android node_modules\expo\AppEntry.js ▓▓▓░░░░░░░░░░░░░ 19.3% (18/41)
+Android node_modules\expo\AppEntry.js ▓▓▓▓▓▓▓▓▓▓▓▓░░░░ 76.2% (220/511)
+Android node_modules\expo\AppEntry.js ▓▓▓▓▓▓▓▓▓▓▓▓░░░░ 79.0% (832/936)
+Android Bundled 14092ms node_modules\expo\AppEntry.js (1100 modules)
+Android node_modules\expo\AppEntry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (1100/1100)
+Android node_modules\expo\AppEntry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android Bundled 1280ms node_modules\expo\AppEntry.js (1 module)
+
+d:\WatersysPro\WatersysPro\WatersysPro2\mobile>

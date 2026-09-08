@@ -12,7 +12,8 @@ import api from '../services/api';
 export default function SettingsScreen(){
   const { lockApp } = useAppContext();
   const [notifications, setNotifications] = useState(true);
-  const [serverUrl, setServerUrl] = useState('http://192.168.0.103:3000');
+  // Production builds must use HTTPS. Real server URL is configured here by the user.
+  const [serverUrl, setServerUrl] = useState('https://your-domain.com');
   const [adminToken, setAdminToken] = useState('');
   const [autoFlush, setAutoFlush] = useState(false);
   const [mqttBroker, setMqttBroker] = useState('m1.wqtt.ru');

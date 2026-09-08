@@ -1048,10 +1048,11 @@
 
             <div class="btn-row">
               <button class="btn-primary" onclick="saveMqtt()">Save MQTT</button>
+              <button class="btn-secondary" onclick="reconnectMqtt()" style="margin-left:8px">Reconnect MQTT</button>
               <span id="mqttMsg"></span>
             </div>
 
-            <div class="section-footer-note">После сохранения устройство может переподключиться к брокеру.</div>
+            <div class="section-footer-note">После сохранения устройство может переподключиться к брокеру. Кнопка Reconnect MQTT сбрасывает счётчик неудачных попыток и принудительно переподключается.</div>
           </div>
         </div>
       </section>
@@ -1699,6 +1700,18 @@
         // Clear password input after save for safety
         document.getElementById('mqtt_pass').value = '';
       }).catch(e=>{ console.warn('saveMqtt error', e); });
+  }
+
+  async function reconnectMqtt(){
+    const msg = document.getElementById('mqttMsg');
+    try {
+      const r = await fetch('/api/mqtt_reconnect');
+      const j = await r.json();
+      if (msg) { msg.innerText = JSON.stringify(j); setTimeout(()=>{ msg.innerText=''; }, 3000); }
+    } catch(e) {
+      console.warn('reconnectMqtt error', e);
+      if (msg) { msg.innerText = 'reconnect error'; setTimeout(()=>{ msg.innerText=''; }, 3000); }
+    }
   }
 
   async function saveAdminToken(){

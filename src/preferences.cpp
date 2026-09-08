@@ -7,6 +7,7 @@
 #include "prefs.h"
 #include "config.h"
 #include "structures.h"
+#include "esp_system.h"   // esp_random() for secure token/password generation
 
 // ============ ИНИЦИАЛИЗАЦИЯ ХРАНИЛИЩА ============
 
@@ -21,15 +22,27 @@ void initializePreferences() {
   }
 
   // Ensure admin token exists in Preferences. Do NOT overwrite an existing token.
-  // If no token stored, set repository default; otherwise preserve stored value.
+  // Factory default for NEW devices is the well-known DEFAULT_ADMIN_TOKEN ("admin"),
+  // so a fresh unit can be reached immediately. The user is expected to change it
+  // via the web UI or engineer menu right after first login.
   {
     String stored = preferences.getString(PREF_KEY_ADMIN_TOKEN, "");
     if (stored.length() == 0) {
-      preferences.putString(PREF_KEY_ADMIN_TOKEN, DEFAULT_ADMIN_TOKEN);
-      Serial.println("[INFO] Admin token set to default (was empty)");
+      preferences.putString(PREF_KEY_ADMIN_TOKEN, String(DEFAULT_ADMIN_TOKEN));
+      Serial.printf("[INFO] Set default admin token: %s\n", DEFAULT_ADMIN_TOKEN);
+      Serial.println("[WARN] Change the admin token after first login!");
     } else {
       Serial.println("[INFO] Admin token preserved");
     }
+  }
+
+  // Engineer menu password: factory default is ENGINEER_PASSWORD (123456).
+  // A fresh unit uses this standard code so it can be reached immediately.
+  // The user is expected to change it in the engineer menu after first login.
+  if (!preferences.isKey("sf_pwd")) {
+    preferences.putULong("sf_pwd", ENGINEER_PASSWORD);
+    Serial.printf("[INFO] Set default engineer password: %lu\n", (unsigned long)ENGINEER_PASSWORD);
+    Serial.println("[WARN] Change the engineer password in the engineer menu after first login!");
   }
 
   // Pre-create a few common string keys so that early "getString"

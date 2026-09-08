@@ -56,20 +56,10 @@ sMenuItem mainMenu[] = {
   { mkViewDateTime, mkDateTimeSettings, "View Date/Time", DateTimeSettingsHandler },
   { mkBack, mkDateTimeSettings, "Back", NULL },
 
-  // Логирование системы
-  { mkEventLogs, mkSystemLogging, "Event Logs", EventLogsHandler },
-  { mkClearEventLogs, mkSystemLogging, "Clear Event Logs", clearEventLogsMenu },
-  { mkPruneEventLogs, mkSystemLogging, "Prune Event Logs", pruneEventLogsMenu },
-  { mkFormatSdCard, mkSystemLogging, "Format SD Card", formatSdMenu },
+  // Логирование системы (плоская структура)
+  { mkEventLogs, mkSystemLogging, "View Logs", EventLogsHandler },
+  { mkClearEventLogs, mkSystemLogging, "Clear Logs", clearEventLogsMenu },
   { mkBack, mkSystemLogging, "Back", NULL },
-
-  // Подменю логов
-  { mkViewEventLogs, mkEventLogs, "View Event Logs", EventLogsHandler },
-  { mkEventStats, mkEventLogs, "Event Statistics", EventStatsHandler },
-  { mkEventGraph, mkEventLogs, "Event Graph", EventGraphHandler },
-  { mkFilterByType, mkEventLogs, "Filter by Type", EventFilterHandler },
-  { mkClearOldEvents, mkEventLogs, "Clear Old Events", clearOldEventsMenu },
-  { mkBack, mkEventLogs, "Back", NULL },
 
   // Расписание
   { mkSetScheduleStart, mkScheduleSettings, "Set Start Time", ScheduleSettingsHandler },

@@ -42,6 +42,10 @@ void saveEventLog(LogLevel level, uint8_t eventType, uint16_t param, uint16_t ad
 /// Экспорт событий в удобочитаемом текстовом формате
 String exportEventsAsText();
 
+/// Стримит события напрямую в Print-интерфейс (AsyncResponseStream)
+/// без создания промежуточной String. Предотвращает ошибку 500 при нехватке кучи.
+void streamEventsAsText(Print& output);
+
 /// Поворот/архивация логов (events.log -> events.log.bak) и создание нового пустого журнала
 
 /// Удаляет события старше указанного возраста (секунды) из памяти и диска
@@ -102,35 +106,15 @@ void cleanOldLogs();
 /// Проверка и очистка старых логов (вызывается периодически)
 void checkAndCleanOldLogs();
 
-/// Меню выбора типа для фильтрации
-void showFilterTypeMenu();
-
-/// Просмотр отфильтрованных событий
-void displayFilteredEvents(uint8_t filterType);
-
-/// Статистика событий
-void displayEventStats();
-
 /// Получает время последнего события указанного типа и параметра
 /// Возвращает true если найдено, заполняет hour и minute
 bool getLastEventTime(uint8_t eventType, uint16_t param, uint8_t &hour, uint8_t &minute);
-
-/// График событий
-void displayEventGraph();
 
 /// Очистка всех событий
 void clearEventLogs();
 
 /// Удаляет старые события (старше N секунд)
 void deleteOldEventLogs(uint32_t maxAgeSeconds);
-
-
-/// Меню выбора типа фильтра
-void showFilterTypeMenu();
-
-/// Просмотр отфильтрованных событий
-void displayFilteredEvents(uint8_t filterType);
-
 
 
 /// Экспортирует файлы журнала из SPIFFS на карту SD (если доступна).

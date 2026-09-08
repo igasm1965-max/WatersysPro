@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <title>WaterSysPro — I2C Bus: LCD + RTC DS3231</title>
+  <description>Схема подключения I2C шины: LCD 20x4 дисплей и RTC DS3231 модуль</description>
+
+  <rect width="800" height="600" fill="#FAFAFA" rx="8"/>
+  <text x="400" y="35" text-anchor="middle" font-family="sans-serif" font-size="20" font-weight="bold" fill="#2E7D32">I2C Bus — LCD 20x4 + RTC DS3231</text>
+
+  <!-- ESP32 -->
+  <rect x="50" y="220" width="180" height="160" rx="8" fill="#E3F2FD" stroke="#1565C0" stroke-width="2"/>
+  <text x="140" y="250" text-anchor="middle" font-family="sans-serif" font-size="15" font-weight="bold" fill="#1565C0">ESP32</text>
+  <text x="140" y="270" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#666">I2C Master</text>
+
+  <text x="55" y="310" font-family="monospace" font-size="13" fill="#2E7D32">GPIO21 → SDA</text>
+  <text x="55" y="340" font-family="monospace" font-size="13" fill="#2E7D32">GPIO22 → SCL</text>
+
+  <!-- I2C Bus line -->
+  <line x1="230" y1="300" x2="750" y2="300" stroke="#2E7D32" stroke-width="2"/>
+  <line x1="230" y1="330" x2="750" y2="330" stroke="#2E7D32" stroke-width="2"/>
+  <text x="480" y="290" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#2E7D32">SDA (GPIO21)</text>
+  <text x="480" y="350" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#2E7D32">SCL (GPIO22)</text>
+
+  <!-- Pull-up resistors -->
+  <rect x="300" y="140" width="180" height="50" rx="4" fill="#E8F5E9" stroke="#2E7D32" stroke-width="1.5"/>
+  <text x="390" y="162" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#1B5E20">Pull-up 4.7кОм</text>
+  <text x="390" y="180" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#1B5E20">SDA → 3.3V, SCL → 3.3V</text>
+
+  <line x1="390" y1="190" x2="390" y2="300" stroke="#2E7D32" stroke-width="1.5"/>
+  <line x1="390" y1="190" x2="390" y2="330" stroke="#2E7D32" stroke-width="1.5"/>
+
+  <!-- LCD 20x4 -->
+  <rect x="500" y="400" width="220" height="120" rx="8" fill="#C8E6C9" stroke="#2E7D32" stroke-width="2"/>
+  <text x="610" y="430" text-anchor="middle" font-family="sans-serif" font-size="15" font-weight="bold" fill="#1B5E20">LCD 20x4</text>
+  <text x="610" y="450" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#1B5E20">I2C адрес: 0x27</text>
+  <text x="610" y="470" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#1B5E20">I2C backpack (PCF8574)</text>
+  <text x="610" y="490" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#666">VCC=5V, GND</text>
+
+  <line x1="610" y1="400" x2="610" y2="330" stroke="#2E7D32" stroke-width="2"/>
+  <line x1="610" y1="400" x2="610" y2="300" stroke="#2E7D32" stroke-width="2"/>
+
+  <!-- RTC DS3231 -->
+  <rect x="500" y="80" width="220" height="100" rx="8" fill="#C8E6C9" stroke="#2E7D32" stroke-width="2"/>
+  <text x="610" y="110" text-anchor="middle" font-family="sans-serif" font-size="15" font-weight="bold" fill="#1B5E20">RTC DS3231</text>
+  <text x="610" y="130" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#1B5E20">I2C адрес: 0x68</text>
+  <text x="610" y="150" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#1B5E20">Точные часы реального времени</text>
+  <text x="610" y="170" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#666">VCC=3.3V, GND, батарея CR2032</text>
+
+  <line x1="610" y1="180" x2="610" y2="300" stroke="#2E7D32" stroke-width="2"/>
+  <line x1="610" y1="180" x2="610" y2="330" stroke="#2E7D32" stroke-width="2"/>
+
+  <!-- Notes -->
+  <rect x="50" y="480" width="700" height="100" rx="6" fill="#E8F5E9" stroke="#2E7D32" stroke-width="1.5"/>
+  <text x="400" y="505" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold" fill="#1B5E20">Примечания</text>
+  <text x="60" y="528" font-family="sans-serif" font-size="12" fill="#1B5E20">• LCD использует I2C backpack на базе PCF8574 — преобразует I2C в параллельный интерфейс</text>
+  <text x="60" y="548" font-family="sans-serif" font-size="12" fill="#1B5E20">• RTC DS3231 имеет встроенную батарею CR2032 для сохранения времени при отключении питания</text>
+  <text x="60" y="568" font-family="sans-serif" font-size="12" fill="#1B5E20">• Подтягивающие резисторы 4.7кОм обязательны для корректной работы I2C шины</text>
+
+  <text x="400" y="595" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#999">WaterSysPro v1.3.5 — docs/schematics/i2c_bus.svg</text>
+</svg>

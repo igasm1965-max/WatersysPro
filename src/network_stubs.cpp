@@ -31,6 +31,9 @@ String vqtt_getBroker() { return String(); }
 String vqtt_getTopicBase() __attribute__((weak));
 String vqtt_getTopicBase() { return String(); }
 
+void vqtt_resetReconnectBackoff() __attribute__((weak));
+void vqtt_resetReconnectBackoff() { }
+
 bool vqtt_fetchBrokerFromWqtt() __attribute__((weak));
 bool vqtt_fetchBrokerFromWqtt() { return false; }
 

@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" width="1200" height="800">
+  <title>WaterSysPro — Полная электросхема системы</title>
+  <description>Полная электрическая схема подключения всех модулей к ESP32 Dev Module для системы управления водоочисткой WaterSysPro</description>
+
+  <!-- Background -->
+  <rect width="1200" height="800" fill="#FAFAFA" rx="8"/>
+
+  <!-- Title -->
+  <text x="600" y="35" text-anchor="middle" font-family="sans-serif" font-size="22" font-weight="bold" fill="#1565C0">WaterSysPro — Полная электросхема системы</text>
+  <text x="600" y="55" text-anchor="middle" font-family="sans-serif" font-size="13" fill="#666">ESP32 Dev Module — полная распиновка и подключение всех модулей</text>
+
+  <!-- Legend -->
+  <rect x="20" y="760" width="12" height="12" fill="#D32F2F"/>
+  <text x="36" y="771" font-family="sans-serif" font-size="11" fill="#212121">Питание (VCC)</text>
+  <rect x="120" y="760" width="12" height="12" fill="#212121"/>
+  <text x="136" y="771" font-family="sans-serif" font-size="11" fill="#212121">GND</text>
+  <rect x="200" y="760" width="12" height="12" fill="#1565C0"/>
+  <text x="216" y="771" font-family="sans-serif" font-size="11" fill="#212121">Сигнал</text>
+  <rect x="290" y="760" width="12" height="12" fill="#2E7D32"/>
+  <text x="306" y="771" font-family="sans-serif" font-size="11" fill="#212121">I2C</text>
+  <rect x="360" y="760" width="12" height="12" fill="#E65100"/>
+  <text x="376" y="771" font-family="sans-serif" font-size="11" fill="#212121">SPI</text>
+
+  <!-- ==================== ESP32 Dev Module (center) ==================== -->
+  <rect x="440" y="280" width="320" height="200" rx="8" fill="#E3F2FD" stroke="#1565C0" stroke-width="2"/>
+  <text x="600" y="310" text-anchor="middle" font-family="sans-serif" font-size="16" font-weight="bold" fill="#1565C0">ESP32 Dev Module</text>
+  <text x="600" y="330" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#666">ESP32-WROOM-32 / ESP32-D0WDQ6</text>
+
+  <!-- ESP32 Pin labels - left side -->
+  <text x="435" y="365" text-anchor="end" font-family="monospace" font-size="10" fill="#1565C0">GPIO23</text>
+  <text x="435" y="385" text-anchor="end" font-family="monospace" font-size="10" fill="#1565C0">GPIO22</text>
+  <text x="435" y="405" text-anchor="end" font-family="monospace" font-size="10" fill="#1565C0">GPIO21</text>
+  <text x="435" y="425" text-anchor="end" font-family="monospace" font-size="10" fill="#1565C0">GPIO19</text>
+  <text x="435" y="445" text-anchor="end" font-family="monospace" font-size="10" fill="#1565C0">GPIO18</text>
+  <text x="435" y="465" text-anchor="end" font-family="monospace" font-size="10" fill="#1565C0">GPIO5</text>
+
+  <!-- ESP32 Pin labels - right side -->
+  <text x="765" y="365" text-anchor="start" font-family="monospace" font-size="10" fill="#1565C0">GPIO13</text>
+  <text x="765" y="385" text-anchor="start" font-family="monospace" font-size="10" fill="#1565C0">GPIO12</text>
+  <text x="765" y="405" text-anchor="start" font-family="monospace" font-size="10" fill="#1565C0">GPIO14</text>
+  <text x="765" y="425" text-anchor="start" font-family="monospace" font-size="10" fill="#1565C0">GPIO27</text>
+  <text x="765" y="445" text-anchor="start" font-family="monospace" font-size="10" fill="#1565C0">GPIO26</text>
+  <text x="765" y="465" text-anchor="start" font-family="monospace" font-size="10" fill="#1565C0">GPIO25</text>
+
+  <!-- ESP32 Pin labels - bottom -->
+  <text x="530" y="485" text-anchor="middle" font-family="monospace" font-size="10" fill="#1565C0">GPIO16</text>
+  <text x="580" y="485" text-anchor="middle" font-family="monospace" font-size="10" fill="#1565C0">GPIO17</text>
+  <text x="640" y="485" text-anchor="middle" font-family="monospace" font-size="10" fill="#1565C0">GPIO4</text>
+  <text x="690" y="485" text-anchor="middle" font-family="monospace" font-size="10" fill="#1565C0">GPIO33</text>
+
+  <!-- ESP32 Pin labels - top -->
+  <text x="490" y="295" text-anchor="middle" font-family="monospace" font-size="10" fill="#1565C0">GPIO34</text>
+  <text x="540" y="295" text-anchor="middle" font-family="monospace" font-size="10" fill="#1565C0">GPIO35</text>
+  <text x="590" y="295" text-anchor="middle" font-family="monospace" font-size="10" fill="#1565C0">GPIO32</text>
+  <text x="650" y="295" text-anchor="middle" font-family="monospace" font-size="10" fill="#1565C0">GPIO2</text>
+  <text x="700" y="295" text-anchor="middle" font-family="monospace" font-size="10" fill="#1565C0">GPIO39</text>
+
+  <!-- ==================== SD Card (left) ==================== -->
+  <rect x="100" y="340" width="180" height="120" rx="6" fill="#FFF3E0" stroke="#E65100" stroke-width="2"/>
+  <text x="190" y="370" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold" fill="#E65100">SD Card (SPI)</text>
+  <text x="190" y="390" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#666">microSD card module</text>
+
+  <!-- SD pins -->
+  <text x="105" y="415" font-family="monospace" font-size="10" fill="#E65100">SCK</text>
+  <text x="105" y="432" font-family="monospace" font-size="10" fill="#E65100">MISO</text>
+  <text x="105" y="449" font-family="monospace" font-size="10" fill="#E65100">MOSI</text>
+  <text x="105" y="466" font-family="monospace" font-size="10" fill="#E65100">CS</text>
+
+  <!-- SD to ESP32 lines -->
+  <line x1="280" y1="415" x2="435" y2="445" stroke="#E65100" stroke-width="1.5"/>
+  <line x1="280" y1="432" x2="435" y2="425" stroke="#E65100" stroke-width="1.5"/>
+  <line x1="280" y1="449" x2="435" y2="365" stroke="#E65100" stroke-width="1.5"/>
+  <line x1="280" y1="466" x2="690" y2="485" stroke="#E65100" stroke-width="1.5"/>
+
+  <!-- SD pin labels on lines -->
+  <text x="340" y="418" font-family="monospace" font-size="9" fill="#E65100">GPIO4</text>
+  <text x="340" y="435" font-family="monospace" font-size="9" fill="#E65100">GPIO19</text>
+  <text x="340" y="452" font-family="monospace" font-size="9" fill="#E65100">GPIO23</text>
+  <text x="460" y="490" font-family="monospace" font-size="9" fill="#E65100">GPIO33</text>
+
+  <!-- ==================== I2C Bus (left-top) ==================== -->
+  <rect x="100" y="140" width="180" height="130" rx="6" fill="#E8F5E9" stroke="#2E7D32" stroke-width="2"/>
+  <text x="190" y="165" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold" fill="#2E7D32">I2C Bus</text>
+
+  <!-- LCD -->
+  <rect x="115" y="180" width="150" height="35" rx="4" fill="#C8E6C9" stroke="#2E7D32" stroke-width="1"/>
+  <text x="190" y="202" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#1B5E20">LCD 20x4 (0x27)</text>
+
+  <!-- RTC -->
+  <rect x="115" y="222" width="150" height="35" rx="4" fill="#C8E6C9" stroke="#2E7D32" stroke-width="1"/>
+  <text x="190" y="244" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#1B5E20">RTC DS3231 (0x68)</text>
+
+  <!-- I2C lines -->
+  <line x1="280" y1="200" x2="435" y2="405" stroke="#2E7D32" stroke-width="2"/>
+  <line x1="280" y1="240" x2="435" y2="385" stroke="#2E7D32" stroke-width="2"/>
+
+  <text x="340" y="310" font-family="monospace" font-size="10" fill="#2E7D32">SDA → GPIO21</text>
+  <text x="340" y="330" font-family="monospace" font-size="10" fill="#2E7D32">SCL → GPIO22</text>
+
+  <!-- ==================== Encoder (top) ==================== -->
+  <rect x="100" y="30" width="180" height="90" rx="6" fill="#E3F2FD" stroke="#1565C0" stroke-width="2"/>
+  <text x="190" y="55" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold" fill="#1565C0">Encoder KY-040</text>
+
+  <text x="105" y="78" font-family="monospace" font-size="10" fill="#1565C0">CLK → GPIO35</text>
+  <text x="105" y="95" font-family="monospace" font-size="10" fill="#1565C0">DT  → GPIO34</text>
+  <text x="105" y="112" font-family="monospace" font-size="10" fill="#1565C0">SW  → GPIO32</text>
+
+  <!-- Encoder lines -->
+  <line x1="280" y1="75" x2="490" y2="295" stroke="#1565C0" stroke-width="1.5"/>
+  <line x1="280" y1="95" x2="540" y2="295" stroke="#1565C0" stroke-width="1.5"/>
+  <line x1="280" y1="112" x2="590" y2="295" stroke="#1565C0" stroke-width="1.5"/>
+
+  <!-- ==================== Built-in LED (top-right) ==================== -->
+  <rect x="800" y="30" width="150" height="60" rx="6" fill="#FFF9C4" stroke="#F57F17" stroke-width="2"/>
+  <text x="875" y="55" text-anchor="middle" font-family="sans-serif" font-size="13" font-weight="bold" fill="#F57F17">Built-in LED</text>
+  <text x="875" y="75" text-anchor="middle" font-family="monospace" font-size="11" fill="#F57F17">GPIO2</text>
+
+  <line x1="800" y1="60" x2="650" y2="295" stroke="#1565C0" stroke-width="1.5"/>
+
+  <!-- ==================== Relays (right) ==================== -->
+  <rect x="800" y="280" width="250" height="200" rx="6" fill="#FFEBEE" stroke="#D32F2F" stroke-width="2"/>
+  <text x="925" y="305" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold" fill="#D32F2F">Relay Module (6ch)</text>
+  <text x="925" y="322" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#666">SRD-05VDC / ULN2003 driver</text>
+
+  <!-- Relay list -->
+  <text x="810" y="345" font-family="monospace" font-size="11" fill="#B71C1C">IN1 → GPIO13  PUMP1</text>
+  <text x="810" y="365" font-family="monospace" font-size="11" fill="#B71C1C">IN2 → GPIO12  PUMP2</text>
+  <text x="810" y="385" font-family="monospace" font-size="11" fill="#B71C1C">IN3 → GPIO14  AERATION</text>
+  <text x="810" y="405" font-family="monospace" font-size="11" fill="#B71C1C">IN4 → GPIO27  OZONE</text>
+  <text x="810" y="425" font-family="monospace" font-size="11" fill="#B71C1C">IN5 → GPIO26  FILTER</text>
+  <text x="810" y="445" font-family="monospace" font-size="11" fill="#B71C1C">IN6 → GPIO25  BACKWASH</text>
+
+  <!-- Relay lines -->
+  <line x1="765" y1="365" x2="800" y2="345" stroke="#1565C0" stroke-width="1.5"/>
+  <line x1="765" y1="385" x2="800" y2="365" stroke="#1565C0" stroke-width="1.5"/>
+  <line x1="765" y1="405" x2="800" y2="385" stroke="#1565C0" stroke-width="1.5"/>
+  <line x1="765" y1="425" x2="800" y2="405" stroke="#1565C0" stroke-width="1.5"/>
+  <line x1="765" y1="445" x2="800" y2="425" stroke="#1565C0" stroke-width="1.5"/>
+  <line x1="765" y1="465" x2="800" y2="445" stroke="#1565C0" stroke-width="1.5"/>
+
+  <!-- ==================== Ultrasonic Sensors (bottom) ==================== -->
+  <rect x="100" y="530" width="280" height="120" rx="6" fill="#E3F2FD" stroke="#1565C0" stroke-width="2"/>
+  <text x="240" y="555" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold" fill="#1565C0">Ultrasonic Sensors HC-SR04</text>
+
+  <!-- Sensor 1 -->
+  <rect x="115" y="570" width="120" height="65" rx="4" fill="#BBDEFB" stroke="#1565C0" stroke-width="1"/>
+  <text x="175" y="590" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#0D47A1">Sensor 1 (Tank 1)</text>
+  <text x="120" y="608" font-family="monospace" font-size="10" fill="#1565C0">TRIG → GPIO16</text>
+  <text x="120" y="625" font-family="monospace" font-size="10" fill="#1565C0">ECHO → GPIO17</text>
+
+  <!-- Sensor 2 -->
+  <rect x="245" y="570" width="120" height="65" rx="4" fill="#BBDEFB" stroke="#1565C0" stroke-width="1"/>
+  <text x="305" y="590" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#0D47A1">Sensor 2 (Tank 2)</text>
+  <text x="250" y="608" font-family="monospace" font-size="10" fill="#1565C0">TRIG → GPIO5</text>
+  <text x="250" y="625" font-family="monospace" font-size="10" fill="#1565C0">ECHO → GPIO18</text>
+
+  <!-- Sensor lines -->
+  <line x1="175" y1="570" x2="530" y2="485" stroke="#1565C0" stroke-width="1.5"/>
+  <line x1="305" y1="570" x2="580" y2="485" stroke="#1565C0" stroke-width="1.5"/>
+
+  <!-- ==================== Power Supply (bottom-right) ==================== -->
+  <rect x="800" y="530" width="250" height="120" rx="6" fill="#FFEBEE" stroke="#D32F2F" stroke-width="2"/>
+  <text x="925" y="555" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold" fill="#D32F2F">Power Supply</text>
+
+  <text x="810" y="578" font-family="sans-serif" font-size="11" fill="#B71C1C">Input: 12V / 24V DC</text>
+  <text x="810" y="598" font-family="sans-serif" font-size="11" fill="#B71C1C">5V → HC-SR04, Relay coils</text>
+  <text x="810" y="618" font-family="sans-serif" font-size="11" fill="#B71C1C">3.3V → ESP32, SD, I2C, Encoder</text>
+  <text x="810" y="638" font-family="sans-serif" font-size="11" fill="#B71C1C">GND → Common ground</text>
+
+  <!-- ==================== CD pin (top-right) ==================== -->
+  <text x="800" y="120" font-family="monospace" font-size="10" fill="#E65100">SD_CD → GPIO39 (opt)</text>
+  <line x1="800" y1="120" x2="700" y2="295" stroke="#E65100" stroke-width="1" stroke-dasharray="4,3"/>
+
+  <!-- Footer -->
+  <text x="600" y="795" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#999">WaterSysPro v1.3.5 — docs/schematics/full_system.svg</text>
+</svg>

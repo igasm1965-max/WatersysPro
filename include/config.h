@@ -240,7 +240,10 @@ enum eEncoderState {
 #define PREF_KEY_BACKLIGHT "backlight"
 #define PREF_KEY_FILTER_PERIOD "filter_per"
 #define PREF_KEY_ADMIN_TOKEN "admin_tok"
-#define DEFAULT_ADMIN_TOKEN "admin"  // Дефолтный токен; сменить через инженерное меню или веб-интерфейс
+// DEFAULT_ADMIN_TOKEN is the factory default for NEW devices. A fresh unit boots
+// with token "admin" so it can be reached immediately; the user must change it
+// after first login (web UI or engineer menu).
+#define DEFAULT_ADMIN_TOKEN "admin"
 #define ADMIN_TOKEN_MAX_LEN 20  ///< Максимальная длина admin token (используется по всему коду)
 #define PREF_KEY_WIFI_SSID "wifi_ssid"
 #define PREF_KEY_WIFI_PASS "wifi_pass"
@@ -292,6 +295,10 @@ enum eEncoderState {
 // Log everything by default so that logs are always available via MQTT and direct access.
 // Users can restrict via the log filter UI (web or engineer menu) if they want to reduce SD writes.
 #define PREF_KEY_LOG_FILTER_DEFAULT (LOG_FILTER_WIFI | LOG_FILTER_MANUAL | LOG_FILTER_EMERGENCY | LOG_FILTER_WATCHDOG | LOG_FILTER_SENSOR | LOG_FILTER_SETTINGS | LOG_FILTER_WEB | LOG_FILTER_STATECHANGE | LOG_FILTER_ERRORS)
+
+// ============ ВЕРСИЯ ПРОШИВКИ ============
+/// Актуальная версия прошивки (синхронизировать с файлом VERSION)
+#define FIRMWARE_VERSION "1.3.5"
 
 // ============ КОНСТАНТЫ РЕЛЕ ============
 #define RELAY_PUMP1 0       ///< Реле насоса 1

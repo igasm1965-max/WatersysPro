@@ -30,8 +30,15 @@ services:
     depends_on:
       - mosquitto
       - postgres
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     environment:
       PORT: 3000
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-false}
       MQTT_BROKER: ${MQTT_BROKER:?Set MQTT_BROKER in .env}
       MQTT_TOPIC_BASE: watersystem
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
@@ -43,6 +50,23 @@ services:
       PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       PGDATABASE: watersys
       PGPORT: 5432
+      # Уведомления об авариях (Telegram + SMS)
+      TG_BOT_TOKEN: ${TG_BOT_TOKEN:-}
+      TG_CHAT_ID: ${TG_CHAT_ID:-}
+      SMS_PROVIDER: ${SMS_PROVIDER:-none}
+      SMS_PHONE: ${SMS_PHONE:-}
+      SMS_FROM: ${SMS_FROM:-WATERSYS}
+      SMSAERO_EMAIL: ${SMSAERO_EMAIL:-}
+      SMSAERO_API_KEY: ${SMSAERO_API_KEY:-}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_FROM: ${TWILIO_FROM:-}
+      NOTIFY_REPEAT_MIN: ${NOTIFY_REPEAT_MIN:-10}
+      NOTIFY_REPEAT_MAX: ${NOTIFY_REPEAT_MAX:-5}
+      # MAX (мессенджер через WQTT MQTT-мост)
+      WQTT_TOKEN: ${WQTT_TOKEN:-}
+      WQTT_TOPIC: ${WQTT_TOPIC:-maxmsg}
+      WQTT_HOST: ${WQTT_HOST:-dash.wqtt.ru}
     ports:
       - '3000:3000'
 

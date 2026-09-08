@@ -19,6 +19,7 @@ const rateLimit = require('express-rate-limit');
 const socketIo = require('socket.io');
 const mqtt = require('mqtt');
 const { httpGet } = require('./httpClient');
+const notificationService = require('./notificationService');
 let Expo;
 let expo = null;
 try {
@@ -49,6 +50,9 @@ const MQTT_CLIENT_ID = process.env.MQTT_CLIENT_ID || `watersys-backend-${Math.ra
 const JWT_SECRET = process.env.JWT_SECRET || '';   // Must be configured via env
 const REMOTE_ADMIN_TOKEN = process.env.REMOTE_ADMIN_TOKEN || '';
 const REMOTE_REQUIRE_TOKEN = (process.env.REMOTE_REQUIRE_TOKEN || 'true') !== 'false';
+// Public self-registration is DISABLED by default (production hardening).
+// Set ALLOW_REGISTRATION=true explicitly only for trusted/staging environments.
+const ALLOW_REGISTRATION = (process.env.ALLOW_REGISTRATION || 'false') === 'true';
 const REPO_ROOT = path.join(__dirname, '..', '..');
 const DOCS_APP_ROOT = path.join(REPO_ROOT, 'docs', 'app');
 const DOCS_ALLOWED_FILES = new Set([
@@ -191,7 +195,16 @@ const mqttOpts = {
 // Add MQTT credentials if provided
 if (process.env.MQTT_USER) mqttOpts.username = process.env.MQTT_USER;
 if (process.env.MQTT_PASS) mqttOpts.password = process.env.MQTT_PASS;
-const client = mqtt.connect(MQTT_BROKER, mqttOpts);
+// Create the MQTT client only if a broker is configured. When MQTT_BROKER is empty
+// (misconfiguration/dev), use a no-op stub so startup does not crash and all existing
+// client.on/subscribe/publish calls degrade gracefully instead of throwing.
+let client;
+if (MQTT_BROKER) {
+  client = mqtt.connect(MQTT_BROKER, mqttOpts);
+} else {
+  console.error('[MQTT] MQTT_BROKER not configured — MQTT features disabled.');
+  client = { connected: false, subscribe() {}, publish() { return false; }, on() {} };
+}
 client.on('connect', () => {
   console.log('MQTT connected to', MQTT_BROKER);
   console.log('Remote topic base:', MQTT_TOPIC_BASE);
@@ -261,6 +274,8 @@ client.on('message', async (topic, payload) => {
       if (emActive && !emPrev) {
         const emMessage = (em && em.message) ? String(em.message) : 'Аварийный режим на устройстве';
         await sendPushNotification(`Авария: ${deviceId}`, emMessage, { deviceId, type: 'emergency' });
+        // Оповещение об аварии в Telegram (основной) и SMS (резервный)
+        await notificationService.notifyEmergency(deviceId, true, emMessage, 'critical');
       }
       emergencyActiveByDevice.set(deviceId, emActive);
     } else if (kind === 'logs') {
@@ -307,6 +322,9 @@ client.on('message', async (topic, payload) => {
       io.emit('alert', { deviceId, ...obj });
       // send push (optional)
       await sendPushNotification(`Alert on ${deviceId}: ${obj.type || 'alert'}`, obj.message || 'See device', { deviceId });
+      // Оповещение об аварии (Telegram + SMS). severity берём из объекта или по умолчанию.
+      const alertSeverity = String(obj.severity || 'critical');
+      await notificationService.notifyEmergency(deviceId, true, obj.message || `Алерт: ${obj.type || 'alert'}`, alertSeverity);
     }
   } catch (err) {
     metricsCounters.mqttErrors++;
@@ -435,12 +453,17 @@ app.get('/metrics', (req, res) => {
   res.send(lines.join('\n') + '\n');
 });
 
+// Liveness probe: process is up and serving requests. Always 200 if the server runs.
 app.get('/api/health', (req, res) => {
-  res.json({
-    ok: true,
-    dbReady,
-    docsReady: true,
-  });
+  res.json({ ok: true, dbReady, docsReady: true });
+});
+
+// Readiness probe: returns OK only when the backend can actually serve telemetry
+// (DB available AND MQTT broker connected). Used by orchestrators/load balancers.
+app.get('/api/ready', (req, res) => {
+  const mqttOk = !!(client && client.connected);
+  const ready = dbReady && mqttOk;
+  res.status(ready ? 200 : 503).json({ ok: ready, dbReady, mqttConnected: mqttOk });
 });
 
 // Firmware metadata (used by devices to check updates)
@@ -509,7 +532,10 @@ app.get('/api/history/:deviceId', async (req, res) => {
   const days = Number(req.query.days || 7);
   if (isDbAvailable()) {
     try {
-      const r = await getPool().query('SELECT ts, payload FROM telemetry WHERE device_id=$1 AND ts >= now() - ($2::int || " days")::interval ORDER BY ts ASC', [deviceId, days]);
+      const r = await getPool().query(
+        'SELECT ts, payload FROM telemetry WHERE device_id=$1 AND ts >= now() - ($2::int * interval \'1 day\') ORDER BY ts ASC',
+        [deviceId, days]
+      );
       return res.json(r.rows.map(row => ({ ts: row.ts, ...row.payload })));
     } catch (err) {
       console.error('[DB] Error fetching history:', err.message);
@@ -530,7 +556,7 @@ app.get('/api/history-aggregate/:deviceId', async (req, res) => {
   const metric = req.query.metric || 'pressure';
   if (isDbAvailable()) {
     try {
-      const q = `SELECT date_trunc('day', ts) AS day, avg( (payload ->> $3)::numeric ) AS avg_val FROM telemetry WHERE device_id=$1 AND ts >= now() - ($2::int || '' days'')::interval GROUP BY day ORDER BY day`;
+      const q = `SELECT date_trunc('day', ts) AS day, avg( (payload ->> $3)::numeric ) AS avg_val FROM telemetry WHERE device_id=$1 AND ts >= now() - ($2::int * interval '1 day') GROUP BY day ORDER BY day`;
       const r = await getPool().query(q, [deviceId, days, metric]);
       return res.json(r.rows.map(row => ({ day: row.day, avg: row.avg_val })));
     } catch (err) { console.error(err); }
@@ -681,8 +707,34 @@ app.post('/api/push/register', async (req, res) => {
   res.json({ ok: true });
 });
 
+// --- Notification channels (Telegram + SMS) ---
+
+// Status of configured notification channels
+app.get('/api/notify/status', async (req, res) => {
+  try {
+    const status = await notificationService.getStatus();
+    res.json({ ok: true, ...status });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to get notification status', detail: err.message });
+  }
+});
+
+// Send a test notification through both channels
+app.post('/api/notify/test', async (req, res) => {
+  try {
+    const result = await notificationService.testChannels();
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    res.status(500).json({ error: 'Test notification failed', detail: err.message });
+  }
+});
+
 // --- AUTH: register/login + middleware ---
 app.post('/api/auth/register', async (req, res) => {
+  // Production hardening: public self-registration is OFF by default.
+  if (!ALLOW_REGISTRATION) {
+    return res.status(403).json({ error: 'registration disabled' });
+  }
   if (!isDbAvailable()) {
     return res.status(503).json({ error: 'Database unavailable — registration disabled' });
   }

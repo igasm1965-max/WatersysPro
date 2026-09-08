@@ -29,7 +29,7 @@ function initPool() {
     : new Pool({
         host: process.env.PGHOST || 'localhost',
         user: process.env.PGUSER || 'postgres',
-        password: process.env.PGPASSWORD || 'postgres',
+        password: process.env.PGPASSWORD || '',
         database: process.env.PGDATABASE || 'watersys',
         port: process.env.PGPORT ? Number(process.env.PGPORT) : 5432,
       });

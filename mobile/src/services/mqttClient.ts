@@ -123,7 +123,7 @@ export class MqttWsClient {
   private reconnectMs = 5000;  // Exponential backoff: 5s initial
   private destroyed = false;
 
-  constructor(url: string, clientId: string, user: string, pass: string, keepalive = 120) {
+  constructor(url: string, clientId: string, user: string, pass: string, keepalive = 20) {
     this.url       = url;
     this.clientId  = clientId;
     this.user      = user;
@@ -133,6 +133,12 @@ export class MqttWsClient {
 
   connect(): void {
     if (this.destroyed) return;
+    // Предотвращение множественных параллельных WebSocket-соединений.
+    // Если WS уже открыт или в процессе открытия — пропускаем.
+    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+      console.log('[MqttWs] WS already open/connecting (readyState=' + this.ws.readyState + '), skipping connect()');
+      return;
+    }
     try {
       this.ws = new WebSocket(this.url, ['mqtt']);
       this.ws.binaryType = 'arraybuffer';
@@ -272,6 +278,7 @@ export class MqttWsClient {
       }
 
       case 13: // PINGRESP
+        // Пинг от брокера получен — соединение живо, ничего не делаем.
         break;
 
       default:

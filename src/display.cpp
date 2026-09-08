@@ -768,14 +768,6 @@ void buildSettingsMenu() {
   flags.inMenu = false;
 }
 
-/// Построение меню статистики
-void buildStatsMenu() {
-  extern SystemFlags flags;
-  flags.inMenu = true;
-  showMenuByParent(mainMenu, mainMenuLength, mkSystemLogging);
-  flags.inMenu = false;
-}
-
 /// Построение меню информации о системе
 void buildInfoMenu() {
   extern SafeLCD lcd;

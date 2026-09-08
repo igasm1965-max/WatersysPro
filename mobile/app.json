@@ -17,7 +17,7 @@
     },
     "android": {
       "package": "com.igas65.watersysmobile",
-      "versionCode": 21,
+      "versionCode": 24,
       "permissions": [
         "INTERNET",
         "ACCESS_NETWORK_STATE",
@@ -35,7 +35,7 @@
         "expo-build-properties",
         {
           "android": {
-            "usesCleartextTraffic": true
+            "usesCleartextTraffic": false
           }
         }
       ]
