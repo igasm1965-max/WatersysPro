@@ -41,7 +41,17 @@ static unsigned long logsPublishIntervalMs = 60000; // publish logs every 60s
 static String mqttTopicBase = DEFAULT_MQTT_TOPIC_BASE;
 static String mqttClientId;
 static unsigned long lastConnectAttempt = 0;
-static unsigned long reconnectIntervalMs = 5000;
+// Base reconnect delay (before jitter). Raised from 5s to 8s so a burst of
+// aborted TLS handshakes no longer hits the broker every few seconds — that
+// "retry storm" showed up on the broker as repeated
+// "OpenSSL Error: unexpected eof while reading" / "<unknown>, disconnecting".
+static unsigned long reconnectIntervalMs = 8000;
+
+// Random jitter added to reconnectIntervalMs so multiple retries / devices are
+// not synchronized and an unstable link does not keep hammering the broker.
+static unsigned long jitterMs(unsigned long baseMs) {
+  return baseMs + (unsigned long)(esp_random() % (baseMs / 2));
+}
 
 // Reconnect attempt limiting to prevent infinite loops when internet is down
 static int mqttReconnectCount = 0;
@@ -160,7 +170,7 @@ static void onMqttMessage(char* topic, byte* payload, unsigned int length) {
   // Используется мобильным приложением при входе на экран логов
   if (cmd == "getlogs") {
     Serial.println("[VQTT] Forced log publish via getlogs command");
-    vqtt_publishLogs();
+    vqtt_publishLogsWithAck();
     return;
   }
 
@@ -336,21 +346,31 @@ static void connectToBroker() {
       "hkiG9w0BAQsFAAOCAgEAVR9YqbyyqFDQDLHYGmkgJykIrGF1XIpu+ILlaS/V9lZL\n"
       "ubhzEFnTIZd+50xx+7LSYK05qAvqFyFWhfFQDlnrzuBZ6brJFe+GnY+EgPbk6ZGQ\n"
       "3BebYhtF8GaV0nxvwuo77x/Py9auJ/GpsMiu/X1+mvoiBOv/2X/qkSsisRcOj/KK\n"
-      "NFtY2PwByVS5uCbMiogZiUvsNG4Eb/GP559FhG2l/naYUoYEETTFE0nUMmC+vElj\n"
-      "MJeZMQDGBReYUVFSa9gKLHGTpSGLNCnpMChOQgGOfyiCOCNEDj/e3J7PH/c3rpc5\n"
-      "gGNoGpU30DKPZLNGAjqghR5GfEJlU7GnV16IcKAVYFCB9c8aOLnEFX9e/28k+7GY\n"
-      "uvnWV5Ye7GEUuHThIGyf5WmAZJuv+JDB9K1cp+09BZRSlHuNxJjEuwTMKTj6Dvq/\n"
-      "OoW2EvJRKbswZBPlOYvdp3JB20NkXpPvBnXBOiEk9PN3aRMSFCA49TFJRBJJOAjM\n"
-      "VFOBxMMPSlaSdUMaKls8z5hMVdG2RRJB70WUIH7bCV6XVOEeaNJSLXBlcVBBHZ5k\n"
-      "iVMSBwfUVkp3JNXWU+7yHMe7VPxzNFBO+kkNqCxL1lSpxpFl0YEBk4Ymam0K9vS\n"
-      "Sc8OuKEaBO2i0SQja7bDPf7OQKL12yTwSGjUKRF8vbMS5h3jXJ47/4Ss5Tk=\n"
+      "NFtY2PwByVS5uCbMiogziUwthDyC3+6WVwW6LLv3xLfHTjuCvjHIInNzktHCgKQ5\n"
+      "ORAzI4JMPJ+GslWYHb4phowim57iaztXOoJwTdwJx4nLCgdNbOhdjsnvzqvHu7Ur\n"
+      "TkXWStAmzOVyyghqpZXjFaH3pO3JLF+l+/+sKAIuvtd7u+Nxe5AW0wdeRlN8NwdC\n"
+      "jNPElpzVmbUq4JUagEiuTDkHzsxHpFKVK7q4+63SM1N95R1NbdWhscdCb+ZAJzVc\n"
+      "oyi3B43njTOQ5yOf+1CceWxG1bQVs5ZufpsMljq4Ui0/1lvh+wjChP4kqKOJ2qxq\n"
+      "4RgqsahDYVvTH9w7jXbyLeiNdd8XM2w9U/t7y0Ff/9yi0GE44Za4rF2LN9d11TPA\n"
+      "mRGunUHBcnWEvgJBQl9nJEiU0Zsnvgc/ubhPgXRR4Xq37Z0j4r7g1SgEEzwxA57d\n"
+      "emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=\n"
       "-----END CERTIFICATE-----\n";
+#ifdef PROD_BUILD
+    // Production build: certificate validation is mandatory.
+    // mqtt_insec is intentionally ignored here; it must never disable TLS checks in production.
     if (useInsecureTLS) {
-      Serial.println("[VQTT] WARNING: TLS certificate verification is DISABLED (mqtt_insec=1)");
+      Serial.println("[VQTT] WARNING: mqtt_insec=1 is set but ignored in production build (PROD_BUILD). Certificate validation remains ENABLED.");
+    }
+    wifiClientSecure.setCACert(MQTT_CA_CERT);
+#else
+    // Dev build: allow explicit opt-out of certificate validation for testing only.
+    if (useInsecureTLS) {
+      Serial.println("[VQTT] WARNING: TLS certificate verification is DISABLED (mqtt_insec=1) — DEV BUILD ONLY");
       wifiClientSecure.setInsecure();
     } else {
       wifiClientSecure.setCACert(MQTT_CA_CERT);
     }
+#endif
     // 5s is too aggressive for some routers/links and can abort TLS handshake mid-flight.
     wifiClientSecure.setTimeout(20);
     mqttClientSecure.setServer(broker.c_str(), port);
@@ -388,18 +408,19 @@ static void connectToBroker() {
 
   connectOk = tryConnect();
 
-  // If CA parsing fails, fallback to insecure TLS for this runtime.
+  // NOTE: No insecure TLS fallback here on purpose.
+  // Previously, a CA parse failure (-8576) silently downgraded to setInsecure(),
+  // disabling certificate validation at runtime (MITM risk). For production,
+  // a failed CA verification MUST abort the connection rather than weaken it.
+  // mqtt_insec (PREF_KEY_MQTT_INSECURE) remains available only as an explicit
+  // dev flag; it must never be reached automatically from a secure path.
   if (!connectOk && useTLS && !useInsecureTLS) {
     char tlsErr[128] = {0};
     int tlsCode = wifiClientSecure.lastError(tlsErr, sizeof(tlsErr));
-    if (tlsCode == -8576) {
-      Serial.println("[VQTT] CA parse failed, retrying with insecure TLS for current session");
-      wifiClientSecure.stop();
-      wifiClientSecure.setInsecure();
-      connectOk = tryConnect();
-    }
+    Serial.printf("[VQTT] TLS handshake failed (code=%d: %s). Aborting secure connection (no insecure fallback).\n",
+                  tlsCode, tlsErr[0] ? tlsErr : "n/a");
   }
-  
+
   // Возвращаем задачу под контроль WDT
   esp_task_wdt_add(NULL);
   esp_task_wdt_reset();
@@ -551,7 +572,7 @@ void loopVQTT() {
   if (!activeMqtt->connected()) {
     unsigned long now = millis();
     
-    if (now - lastConnectAttempt >= reconnectIntervalMs) {
+    if (now - lastConnectAttempt >= jitterMs(reconnectIntervalMs)) {
       Serial.printf("[VQTT] Reconnecting (wifi=%s)...\n", wifiConnected ? "OK" : "DOWN");
       connectToBroker();
       lastConnectAttempt = now;
@@ -568,8 +589,8 @@ void loopVQTT() {
   activeMqtt->loop();
 
   // Reset backoff on successful connection
-  if (reconnectIntervalMs > 5000) {
-    reconnectIntervalMs = 5000;
+  if (reconnectIntervalMs > 8000) {
+    reconnectIntervalMs = 8000;
   }
 
   // Periodic telemetry publish
@@ -704,6 +725,26 @@ void vqtt_publishLogs() {
                 topic.c_str(), logsText.length(), ok ? "OK" : "FAILED");
 }
 
+/// Публикует логи + подтверждение в топик watersystem/logs/ack.
+/// Используется для ответа на команду getlogs — мобильное приложение
+/// получает подтверждение, что логи были опубликованы.
+void vqtt_publishLogsWithAck() {
+  if (!activeMqtt || !activeMqtt->connected()) {
+    Serial.println("[VQTT] Cannot publish logs with ack: MQTT not connected");
+    return;
+  }
+
+  // Публикуем сами логи
+  vqtt_publishLogs();
+
+  // Публикуем подтверждение в топик watersystem/logs/ack
+  String ackTopic = mqttTopicBase + "/logs/ack";
+  String ackPayload = "ok";
+  bool ackOk = activeMqtt->publish(ackTopic.c_str(), ackPayload.c_str());
+  Serial.printf("[VQTT] Published log ack to %s: %s\n",
+                ackTopic.c_str(), ackOk ? "OK" : "FAILED");
+}
+
 /// Publish a single log event to watersystem/logs/event for real-time streaming.
 /// Called from saveEventLog() each time a new event is recorded.
 void vqtt_publishSingleEvent(const EventLog& event) {
@@ -754,7 +795,7 @@ void vqtt_publishState() {
 void vqtt_resetReconnectBackoff() {
   mqttReconnectCount = 0;
   mqttGiveupUntilMs = 0;
-  reconnectIntervalMs = 5000;
+  reconnectIntervalMs = 8000;
   mqttConnecting = false;
   Serial.println("[VQTT] Reconnect backoff reset (call from web UI or engineer menu)");
 }
