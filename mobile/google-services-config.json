@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "232306394197",
+    "project_id": "watersyspro2",
+    "storage_bucket": "watersyspro2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:232306394197:android:d8887d7fbf6bcec3d800dc",
+        "android_client_info": {
+          "package_name": "com.igas65.watersysmobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBgiE5DlnaKqK48OozLV3Emi6Sx-DW_dcc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
