@@ -11,7 +11,7 @@ WaterSysPro is a full-stack water treatment automation project built around ESP3
 WaterSysPro combines three layers:
 
 ### 1. ESP32 Firmware
-- Controls 7 relays (pumps, aeration, ozone, filtration, backwash, emergency)
+- Controls 6 relays (pumps, aeration, ozone, filtration,backwash, emergency)
 - Implements an FSM for water treatment operating cycles
 - Reads dual ultrasonic level sensors
 - Exposes a web interface for configuration and diagnostics
