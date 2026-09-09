@@ -1,0 +1,26 @@
+# EAS Build ignore rules.
+# This file overrides .gitignore for the EAS Build archive.
+# IMPORTANT: google-services.json is intentionally NOT listed here so that
+# EAS Build includes it (Firebase push notifications need it).
+
+# Dependencies & tooling
+node_modules/
+.expo/
+dist/
+web-build/
+android/
+ios/
+
+# Logs / artifacts
+*.log
+metro.log
+*.orig
+*.rej
+
+# Local env
+.env
+.env.local
+.env.*.local
+
+# Temp
+.metro-health-check*

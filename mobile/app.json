@@ -17,6 +17,7 @@
     },
     "android": {
       "package": "com.igas65.watersysmobile",
+      "googleServicesFile": "./google-services.json",
       "versionCode": 24,
       "permissions": [
         "INTERNET",

@@ -10,10 +10,11 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
+import * as Notifications from 'expo-notifications';
 
 import DashboardScreen from './src/screens/DashboardScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
@@ -23,6 +24,23 @@ import { AppContext } from './src/context/AppContext';
 import MqttService from './src/services/mqttService';
 
 const Tab = createBottomTabNavigator();
+
+/**
+ * Глобальный обработчик уведомлений (Expo Notifications).
+ * Позволяет показывать push-уведомления поверх экрана даже когда приложение
+ * открыто (foreground). Без этого при активном приложении уведомления не видны.
+ */
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: false,
+    shouldSetBadge: false,
+  }),
+});
+
+// Ref для навигации из обработчика нажатия на push-уведомление.
+const navigationRef = createNavigationContainerRef();
 
 export default function App() {
   // null = loading, 'create' = no pin yet, 'unlock' = pin exists, 'open' = authenticated,
@@ -53,6 +71,19 @@ export default function App() {
     }
   }, [pinState]);
 
+  // Обработка нажатия на push-уведомление: переходим в раздел «Логи»
+  // (или «Главная», если в payload указан data.screen === 'dashboard').
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data || {};
+      const target = data.screen === 'dashboard' ? 'Главная' : 'Логи';
+      if (navigationRef.isReady()) {
+        navigationRef.navigate(target as never);
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
   if (pinState === 'loading') return null;
 
   if (pinState === 'create' || pinState === 'unlock' || pinState === 'change') {
@@ -61,7 +92,7 @@ export default function App() {
 
   return (
     <AppContext.Provider value={{ lockApp, deviceIp, setDeviceIp }}>
-      <NavigationContainer>
+      <NavigationContainer ref={navigationRef}>
         <Tab.Navigator screenOptions={({ route }) => ({
           tabBarIcon: ({ focused, color, size }) => {
             const icons: Record<string, [string, string]> = {
