@@ -24,7 +24,8 @@ let Expo;
 let expo = null;
 try {
   Expo = require('expo-server-sdk').Expo;
-  expo = new Expo();
+  // Передаём EXPO_ACCESS_TOKEN, если задан (авторизованные вызовы Expo Push API).
+  expo = new Expo({ accessToken: process.env.EXPO_ACCESS_TOKEN || undefined });
 } catch (err) {
   console.warn('expo-server-sdk not installed — push notifications disabled');
   expo = null;
@@ -78,6 +79,9 @@ const REMOTE_TARGETS = new Set(['pump1', 'pump2', 'aeration', 'ozone', 'filter',
 
 
 const app = express();
+// Trust only the nearest proxy (1 hop) for X-Forwarded-For headers set by
+// Railway/nginx/CDN. 'true' is rejected by express-rate-limit as too permissive.
+app.set('trust proxy', 1);
 
 // CORS: restrict to known origins in production
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
@@ -163,23 +167,86 @@ async function loadPushTokens() {
   }
 }
 
+function removePushToken(token) {
+  if (pushTokensCache.delete(token)) {
+    console.log(`[Push] Removed stale token from cache: ${String(token).slice(0, 40)}...`);
+  }
+  if (isDbAvailable()) {
+    getPool().query('DELETE FROM push_tokens WHERE token=$1', [token])
+      .catch(err => console.error('push delete db error', err.message));
+  }
+}
+
 async function sendPushNotification(title, body, data = {}) {
-  if (!expo) return;
+  if (!expo) return { ok: false, reason: 'expo-not-setup', sent: 0, errored: 0, errors: [{ kind: 'setup', error: 'expo-server-sdk not configured' }] };
+
   const messages = [];
   for (let token of pushTokensCache) {
     if (!Expo.isExpoPushToken(token)) continue;
     messages.push({ to: token, sound: 'default', title, body, data });
   }
-  if (messages.length === 0) return;
-  const chunks = expo.chunkPushNotifications(messages);
-  for (const chunk of chunks) {
+  if (messages.length === 0) return { ok: true, reason: 'no-tokens', sent: 0, errored: 0, errors: [] };
+
+  const results = { ok: true, sent: 0, errored: 0, errors: [] };
+  const idToToken = new Map();
+
+  for (const chunk of expo.chunkPushNotifications(messages)) {
+    let tickets = [];
     try {
-      const receipts = await expo.sendPushNotificationsAsync(chunk);
-      console.log('Push receipts', receipts);
+      tickets = await expo.sendPushNotificationsAsync(chunk);
     } catch (err) {
-      console.error('Push error', err);
+      console.error('[Push] sendPushNotificationsAsync error:', err.message || err);
+      results.ok = false;
+      results.errored += chunk.length;
+      results.errors.push({ kind: 'send-error', message: err.message || String(err) });
+      continue;
+    }
+
+    const pendingIds = [];
+    for (let i = 0; i < tickets.length; i++) {
+      const t = tickets[i];
+      if (!t) continue;
+      const token = (chunk[i] && chunk[i].to) || '';
+      if (t.status === 'ok' && t.id) {
+        idToToken.set(t.id, token);
+        pendingIds.push(t.id);
+      } else {
+        results.errored++;
+        const detail = (t.details && t.details.error) || t.message || 'unknown';
+        results.errors.push({ kind: 'ticket-error', error: detail, token: token.slice(0, 40) + '...' });
+        console.warn(`[Push] Ticket error for ${token.slice(0, 40)}...: ${detail}`);
+        if (detail === 'DeviceNotRegistered') removePushToken(token);
+      }
+    }
+
+    if (pendingIds.length > 0) {
+      try {
+        const receipts = await expo.getPushNotificationReceiptsAsync(pendingIds);
+        for (const id of pendingIds) {
+          const r = receipts[id];
+          if (!r) continue;
+          if (r.status === 'ok') {
+            results.sent++;
+          } else {
+            results.errored++;
+            const detail = (r.details && r.details.error) || 'unknown';
+            const token = idToToken.get(id) || '';
+            results.errors.push({ kind: 'receipt-error', error: detail, token: token.slice(0, 40) + '...' });
+            console.warn(`[Push] Receipt error ${id}: ${detail}`);
+            if (detail === 'DeviceNotRegistered') removePushToken(token);
+          }
+        }
+      } catch (err) {
+        console.error('[Push] getPushNotificationReceiptsAsync error:', err.message || err);
+      }
     }
   }
+
+  console.log(
+    `[Push] "${title}": sent=${results.sent}, errored=${results.errored}` +
+    (results.errors.length ? ` errors=${JSON.stringify(results.errors)}` : '')
+  );
+  return results;
 }
 
 // --- MQTT client ---
@@ -238,12 +305,15 @@ client.on('message', async (topic, payload) => {
     updateRemoteSeen(topic);
 
     let obj = null;
-    if (kind === 'telemetry') {
+    if (kind === 'telemetry' || kind === 'alert' || kind === 'state') {
       try {
         obj = JSON.parse(txt);
       } catch (parseErr) {
-        console.warn(`[MQTT] Non-JSON telemetry from ${deviceId}:`, parseErr.message);
-        return;
+        if (kind === 'telemetry') {
+          console.warn(`[MQTT] Non-JSON telemetry from ${deviceId}:`, parseErr.message);
+          return;
+        }
+        // alert/state могут приходить и как не-JSON; оставляем obj=null
       }
     }
 
@@ -727,6 +797,36 @@ app.post('/api/notify/test', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Test notification failed', detail: err.message });
   }
+});
+
+// Send a test PUSH notification to all registered Expo push tokens.
+// This verifies the actual FCM/Expo delivery path (unlike /api/notify/test
+// which only tests Telegram/SMS/MAX channels).
+app.post('/api/push/test', async (req, res) => {
+  try {
+    if (!expo) {
+      return res.status(503).json({ ok: false, error: 'expo-server-sdk not configured' });
+    }
+    const body = req.body || {};
+    const result = await sendPushNotification(
+      String(body.title || '🧪 Тест WatersysPro'),
+      String(body.message || 'Тестовое push-уведомление. Канал доставки настроен корректно.'),
+      { type: 'test', ...(body.data || {}) }
+    );
+    res.json({ ok: result.ok, registered: pushTokensCache.size, ...result });
+  } catch (err) {
+    res.status(500).json({ error: 'Test push failed', detail: err.message });
+  }
+});
+
+// Report the number of registered Expo push tokens (useful for diagnostics).
+app.get('/api/push/status', (req, res) => {
+  res.json({
+    ok: true,
+    configured: !!expo,
+    registered: pushTokensCache.size,
+    tokens: Array.from(pushTokensCache).map(t => String(t).slice(0, 30) + '...'),
+  });
 });
 
 // --- AUTH: register/login + middleware ---
