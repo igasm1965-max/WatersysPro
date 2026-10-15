@@ -59,20 +59,23 @@ const DOCS_APP_ROOT = path.join(REPO_ROOT, 'docs', 'app');
 const DOCS_ALLOWED_FILES = new Set([
   'DOCUMENTATION_INDEX.md',
   'README.md',
-  'README_RU.md',
   'CHANGELOG.md',
-  'CHANGELOG_RU.md',
-  'RELEASE_NOTES_v1.1.0.md',
-  'RELEASE_NOTES_v1.1.0_RU.md',
+  'VERSIONING.md',
+  'NTP_SYNC_IMPLEMENTATION.md',
   'PROJECT_STATUS.md',
-  'docs/WORKTREE_CHANGES_2026-03-19.md',
-  'docs/PRODUCTION_HARDENING_TRACKER.md',
+  'FINAL_ANALYSIS_REPORT.md',
+  'docs/ARCHITECTURE.md',
   'docs/SD_INTEGRATION.md',
-  'docs/REFRACTOR_AND_SMOKE_SUMMARY.md',
-  'mobile/START_HERE.md',
-  'mobile/BUILD_APK_GUIDE.md',
-  'mobile/CHECKLIST.md',
+  'docs/NOTIFICATIONS_SETUP_RU.md',
+  'docs/PRODUCTION_RELEASE_CHECKLIST.md',
+  'docs/archive/PRODUCTION_HARDENING_TRACKER.md',
+  'docs/archive/PRODUCTION_READINESS_REPORT_2026-04-20.md',
+  'plans/DEPLOY_INSTRUCTIONS.md',
+  'plans/wifi_troubleshooting_guide.md',
+  'mobile/README.md',
+  'mobile/BUILD.md',
   'mobile/DEVICE_CONTROL_GUIDE.md',
+  'mobile/FCM_SETUP_RU.md',
 ]);
 
 const REMOTE_TARGETS = new Set(['pump1', 'pump2', 'aeration', 'ozone', 'filter', 'backwash', 'set_mode', 'reset_emergency']);
@@ -167,6 +170,9 @@ async function loadPushTokens() {
   }
 }
 
+// Удаляет токен устройства из кэша и БД (используется, когда Expo
+// сообщает DeviceNotRegistered — устройство удалило приложение).
+// Добавлено сегодня для поддержки /api/push/test и диагностики доставки.
 function removePushToken(token) {
   if (pushTokensCache.delete(token)) {
     console.log(`[Push] Removed stale token from cache: ${String(token).slice(0, 40)}...`);
@@ -177,6 +183,10 @@ function removePushToken(token) {
   }
 }
 
+// Отправка push-уведомлений через Expo Push API с полной диагностикой:
+// возвращает объект с количеством отправленных/ошибочных и деталями ошибок,
+// а также чистит невалидные токены (DeviceNotRegistered).
+// Доработано сегодня: добавлен подсчёт результатов и обработка receipts.
 async function sendPushNotification(title, body, data = {}) {
   if (!expo) return { ok: false, reason: 'expo-not-setup', sent: 0, errored: 0, errors: [{ kind: 'setup', error: 'expo-server-sdk not configured' }] };
 
@@ -187,10 +197,14 @@ async function sendPushNotification(title, body, data = {}) {
   }
   if (messages.length === 0) return { ok: true, reason: 'no-tokens', sent: 0, errored: 0, errors: [] };
 
+  // results накапливает статистику доставки по всем чанкам; idToToken
+  // связывает ticket/receipt id с исходным токеном для очистки невалидных.
   const results = { ok: true, sent: 0, errored: 0, errors: [] };
   const idToToken = new Map();
 
   for (const chunk of expo.chunkPushNotifications(messages)) {
+    // Отправляем пачку (chunk) и разбираем ответы (tickets).
+    // Невалидные ticket/receipt ошибки учитываются и логируются.
     let tickets = [];
     try {
       tickets = await expo.sendPushNotificationsAsync(chunk);
@@ -305,6 +319,9 @@ client.on('message', async (topic, payload) => {
     updateRemoteSeen(topic);
 
     let obj = null;
+    // Сегодня расширено: теперь парсим JSON не только для telemetry,
+    // но и для alert/state. При этом alert/state могут приходить и
+    // не-JSON строками, поэтому ошибка парсинга там не фатальна (obj=null).
     if (kind === 'telemetry' || kind === 'alert' || kind === 'state') {
       try {
         obj = JSON.parse(txt);
@@ -802,6 +819,7 @@ app.post('/api/notify/test', async (req, res) => {
 // Send a test PUSH notification to all registered Expo push tokens.
 // This verifies the actual FCM/Expo delivery path (unlike /api/notify/test
 // which only tests Telegram/SMS/MAX channels).
+// Эндпоинт добавлен сегодня для проверки реального канала FCM/Expo.
 app.post('/api/push/test', async (req, res) => {
   try {
     if (!expo) {
@@ -820,6 +838,8 @@ app.post('/api/push/test', async (req, res) => {
 });
 
 // Report the number of registered Expo push tokens (useful for diagnostics).
+// Диагностический эндпоинт добавлен сегодня: показывает, настроен ли expo,
+// сколько токенов зарегистрировано и их первые 30 символов.
 app.get('/api/push/status', (req, res) => {
   res.json({
     ok: true,
@@ -899,7 +919,12 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => console.log('ws client disconnected', socket.id));
 });
 
+// Export app and server so tests can import them without starting the listener.
+module.exports = { app, server };
+
 // --- start ---
+// Only auto-start when executed directly (not when imported by tests).
+if (require.main === module) {
 (async () => {
   try {
     await initDb();
@@ -915,7 +940,8 @@ io.on('connection', (socket) => {
     console.log(`Backend listening on http://localhost:${PORT}`);
     if (!dbReady) {
       console.log('Docs are available at /docs/, DB-dependent API may fail until PostgreSQL is up.');
-      console.log('In-memory storage active — MQTT logs and telemetry will work without PostgreSQL.');
-    }
-  });
-})();
+        console.log('In-memory storage active — MQTT logs and telemetry will work without PostgreSQL.');
+      }
+    });
+  })();
+  }

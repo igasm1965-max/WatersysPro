@@ -312,22 +312,21 @@
 
   <script>
     const DOCS = [
-      { id: 'doc-index', title: 'Documentation Index', group: 'Core', path: 'DOCUMENTATION_INDEX.md' },
-      { id: 'readme-ru', title: 'README RU', group: 'Core', path: 'README_RU.md' },
-      { id: 'readme-en', title: 'README EN', group: 'Core', path: 'README.md' },
-      { id: 'changelog-ru', title: 'Changelog RU', group: 'Core', path: 'CHANGELOG_RU.md' },
-      { id: 'changelog-en', title: 'Changelog EN', group: 'Core', path: 'CHANGELOG.md' },
-      { id: 'release-ru', title: 'Release Notes RU', group: 'Core', path: 'RELEASE_NOTES_v1.1.0_RU.md' },
-      { id: 'release-en', title: 'Release Notes EN', group: 'Core', path: 'RELEASE_NOTES_v1.1.0.md' },
-      { id: 'project-status', title: 'Project Status', group: 'Core', path: 'PROJECT_STATUS.md' },
-      { id: 'worktree', title: 'Worktree Changes 2026-03-19', group: 'Docs', path: 'docs/WORKTREE_CHANGES_2026-03-19.md' },
-      { id: 'hardening', title: 'Production Hardening Tracker', group: 'Docs', path: 'docs/PRODUCTION_HARDENING_TRACKER.md' },
+      { id: 'doc-index', title: 'Указатель документации', group: 'Core', path: 'DOCUMENTATION_INDEX.md' },
+      { id: 'readme', title: 'README', group: 'Core', path: 'README.md' },
+      { id: 'changelog', title: 'История изменений', group: 'Core', path: 'CHANGELOG.md' },
+      { id: 'arch', title: 'Архитектура', group: 'Core', path: 'docs/ARCHITECTURE.md' },
+      { id: 'versioning', title: 'Управление версиями', group: 'Core', path: 'VERSIONING.md' },
+      { id: 'ntp', title: 'NTP Sync', group: 'Core', path: 'NTP_SYNC_IMPLEMENTATION.md' },
+      { id: 'project-status', title: 'Статус проекта', group: 'Core', path: 'PROJECT_STATUS.md' },
       { id: 'sd', title: 'SD Integration', group: 'Docs', path: 'docs/SD_INTEGRATION.md' },
-      { id: 'refactor', title: 'Refactor and Smoke Summary', group: 'Docs', path: 'docs/REFRACTOR_AND_SMOKE_SUMMARY.md' },
-      { id: 'mobile-start', title: 'Mobile Start Here', group: 'Mobile', path: 'mobile/START_HERE.md' },
-      { id: 'mobile-build', title: 'Mobile Build APK Guide', group: 'Mobile', path: 'mobile/BUILD_APK_GUIDE.md' },
-      { id: 'mobile-check', title: 'Mobile Checklist', group: 'Mobile', path: 'mobile/CHECKLIST.md' },
-      { id: 'mobile-device', title: 'Mobile Device Control Guide', group: 'Mobile', path: 'mobile/DEVICE_CONTROL_GUIDE.md' },
+      { id: 'notifications', title: 'Настройка уведомлений', group: 'Docs', path: 'docs/NOTIFICATIONS_SETUP_RU.md' },
+      { id: 'deploy', title: 'Деплой на VPS', group: 'Plans', path: 'plans/DEPLOY_INSTRUCTIONS.md' },
+      { id: 'wifi', title: 'Решение проблем WiFi', group: 'Plans', path: 'plans/wifi_troubleshooting_guide.md' },
+      { id: 'mobile-readme', title: 'Mobile README', group: 'Mobile', path: 'mobile/README.md' },
+      { id: 'mobile-build', title: 'Mobile Build APK', group: 'Mobile', path: 'mobile/BUILD.md' },
+      { id: 'mobile-device', title: 'Mobile Device Control', group: 'Mobile', path: 'mobile/DEVICE_CONTROL_GUIDE.md' },
+      { id: 'mobile-fcm', title: 'Mobile Push (FCM)', group: 'Mobile', path: 'mobile/FCM_SETUP_RU.md' },
     ];
 
     const docsListEl = document.getElementById('docsList');

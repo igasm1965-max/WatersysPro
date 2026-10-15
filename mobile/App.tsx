@@ -14,6 +14,8 @@ import { NavigationContainer, createNavigationContainerRef } from '@react-naviga
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
+// Push-уведомления (добавлено сегодня): глобальный обработчик уведомлений,
+// подписка на FCM через Expo Notifications и навигация по нажатию.
 import * as Notifications from 'expo-notifications';
 
 import DashboardScreen from './src/screens/DashboardScreen';
@@ -40,6 +42,8 @@ Notifications.setNotificationHandler({
 });
 
 // Ref для навигации из обработчика нажатия на push-уведомление.
+// Создан сегодня вместе с функционалом push-уведомлений, чтобы из
+// фонового обработчика переходить на нужный экран приложения.
 const navigationRef = createNavigationContainerRef();
 
 export default function App() {
@@ -71,8 +75,9 @@ export default function App() {
     }
   }, [pinState]);
 
-  // Обработка нажатия на push-уведомление: переходим в раздел «Логи»
-  // (или «Главная», если в payload указан data.screen === 'dashboard').
+  // Обработка нажатия на push-уведомление (добавлено сегодня):
+  // переходим в раздел «Логи» (или «Главная», если в payload указан
+  // data.screen === 'dashboard'). Подписка снимается при размонтировании.
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data || {};
@@ -92,6 +97,7 @@ export default function App() {
 
   return (
     <AppContext.Provider value={{ lockApp, deviceIp, setDeviceIp }}>
+      {/* ref подключён для программной навигации из push-уведомлений (сегодня) */}
       <NavigationContainer ref={navigationRef}>
         <Tab.Navigator screenOptions={({ route }) => ({
           tabBarIcon: ({ focused, color, size }) => {

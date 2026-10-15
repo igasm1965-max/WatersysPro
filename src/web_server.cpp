@@ -1026,9 +1026,11 @@ static void handlePostAdminTokenBody(AsyncWebServerRequest* request, uint8_t* da
   Serial.printf("[Web] admin token change request token_admin_len=%u new_token_len=%u\n",
                 token_admin ? strlen(token_admin) : 0,
                 new_token ? strlen(new_token) : 0);
-  // Also print actual strings (beware of sensitive info in logs)
-  if (token_admin) Serial.printf("[Web] token_admin='%s'\n", token_admin);
-  if (new_token) Serial.printf("[Web] new_token='%s'\n", new_token);
+  // SECURITY HARDENING (production): do NOT print admin tokens to the serial log.
+  // Previously these two lines dumped the current and the new admin token in full,
+  // leaking credentials into Serial / monitor.log. Keep the log but drop the values.
+  // if (token_admin) Serial.printf("[Web] token_admin='%s'\n", token_admin);
+  // if (new_token) Serial.printf("[Web] new_token='%s'\n", new_token);
   String storedToken = preferences.getString(PREF_KEY_ADMIN_TOKEN, "");
   if (storedToken.length() == 0) {
     // No admin token set yet — allow initial setup without current token

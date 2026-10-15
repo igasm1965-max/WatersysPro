@@ -55,3 +55,11 @@ mosquitto/data/*.db
 # Mobile secrets (must be provided out-of-band)
 mobile/google-services.json
 mobile/*firebase-adminsdk*.json
+mobile/google-services-config.json
+
+# Backend runtime logs / diagnostics artifacts
+backend/server.log
+backend/smoke.log
+backend/tunnel.log
+monitor.log
+output.txt

@@ -109,20 +109,23 @@ void applyStateOutputs(SystemState state) {
             turnOffAllRelays();
             break;
         case STATE_FILTRATION:
+            // Порядок включения: СНАЧАЛА клапан фильтра, ПОТОМ насос.
+            // Это предотвращает работу насоса при закрытом клапане.
             turnOffPump1();
-            turnOnPump2();
             turnOffOzone();
             turnOffAeration();
-            turnOnFilter();
+            turnOnFilter();     // клапан фильтра включается первым
             turnOffBackwash();
+            turnOnPump2();      // насос запускается после открытия клапана
             break;
         case STATE_BACKWASH:
+            // Порядок включения: СНАЧАЛА клапан промывки, ПОТОМ насос.
             turnOffPump1();
-            turnOnPump2();
             turnOffOzone();
             turnOffAeration();
             turnOffFilter();
-            turnOnBackwash();
+            turnOnBackwash();   // клапан промывки включается первым
+            turnOnPump2();      // насос запускается после открытия клапана
             break;
         default:
             break;
@@ -345,7 +348,9 @@ void processAutomaticControl() {
                     currentBackwashRemaining =
                         filterWashDuration;  // Инициализируем таймер промывки
                     flags.backwashInProgress = 1;
-                    saveEventLog(LOG_INFO, 15, 0);  // EVENT_FILTER_WASH_START
+                    // Вместо магического числа 15 используем именованную
+                    // константу EVENT_FILTER_WASH_START (читаемость кода).
+                    saveEventLog(LOG_INFO, EVENT_FILTER_WASH_START, 0);
                     break;
                 }
             }
@@ -442,7 +447,8 @@ void processAutomaticControl() {
                             changeState(STATE_BACKWASH);
                             currentBackwashRemaining = filterWashDuration;
                             flags.backwashInProgress = 1;
-                            saveEventLog(LOG_INFO, 15, 0);  // EVENT_FILTER_WASH_START
+                            // Именованная константа вместо магического числа 15
+                            saveEventLog(LOG_INFO, EVENT_FILTER_WASH_START, 0);
                         }
                     }
                 }
@@ -477,7 +483,8 @@ void processAutomaticControl() {
                     changeState(STATE_BACKWASH);
                     currentBackwashRemaining = filterWashDuration;
                     flags.backwashInProgress = 1;
-                    saveEventLog(LOG_INFO, 15, 0);  // EVENT_FILTER_WASH_START
+                    // Именованная константа вместо магического числа 15
+                    saveEventLog(LOG_INFO, EVENT_FILTER_WASH_START, 0);
                 } else {
                     changeState(STATE_IDLE);
                 }

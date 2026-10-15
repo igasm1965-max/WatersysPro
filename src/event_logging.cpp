@@ -114,7 +114,7 @@ void saveEventLog(LogLevel level, uint8_t eventType, uint16_t param) {
 
 /// Сохраняет событие в журнал (в памяти и SPIFFS)
 void saveEventLog(LogLevel level, uint8_t eventType, uint16_t param, uint16_t additionalInfo) {
-  extern EventLog eventLogs[200];
+  extern EventLog eventLogs[EVENT_LOG_BUFFER_SIZE];
   extern uint8_t eventLogIndex;
   extern RTC_DS3231 rtc;
   
@@ -145,7 +145,7 @@ void saveEventLog(LogLevel level, uint8_t eventType, uint16_t param, uint16_t ad
   entry.additionalInfo = additionalInfo; // treat as source or extra
   eventLogs[eventLogIndex] = entry;
   int savedIndex = eventLogIndex;
-  eventLogIndex = (eventLogIndex + 1) % 200;
+  eventLogIndex = (eventLogIndex + 1) % EVENT_LOG_BUFFER_SIZE;
 
   // Debug: log to Serial that we saved to RAM
   Serial.printf("[EventLog] saved to RAM idx=%d type=%d level=%d param=%u src=%u\n", savedIndex, eventType, level, (unsigned int)param, additionalInfo);
@@ -216,7 +216,7 @@ void saveEventLog(LogLevel level, uint8_t eventType, uint16_t param, uint16_t ad
     getEventTypeLong(level, eventType, param, desc, sizeof(desc));
 
     // write a human-readable line including the description
-    char buf[200];
+    char buf[EVENT_LOG_LINE_LEN];
     int len = snprintf(buf, sizeof(buf), "%02d.%02d.%04d %02d:%02d:%02d - type:%02d param:%u lvl:%d - %s",
                        entry.day, entry.month, entry.year,
                        entry.hour, entry.minute, now.second(),
@@ -317,7 +317,7 @@ static bool parseLogLine(const String &line, EventLog &out) {
 }
 
 void loadEventLogs() {
-  extern EventLog eventLogs[200];
+  extern EventLog eventLogs[EVENT_LOG_BUFFER_SIZE];
   extern uint8_t eventLogIndex;
   
   File f;
@@ -337,7 +337,7 @@ void loadEventLogs() {
       eventLogs[index++] = ev;
     }
   }
-  eventLogIndex = index % 200;
+  eventLogIndex = index % EVENT_LOG_BUFFER_SIZE;
   f.close();
 }
 
@@ -439,7 +439,7 @@ void loadWDTStats() {
 
 /// Удаляет все события из журнала
 void clearEventLogs() {
-  extern EventLog eventLogs[200];
+  extern EventLog eventLogs[EVENT_LOG_BUFFER_SIZE];
   extern uint8_t eventLogIndex;
   
   memset(eventLogs, 0, sizeof(eventLogs));
@@ -455,16 +455,16 @@ void clearEventLogs() {
 
 /// Удаляет старые события (старше N дней)
 void deleteOldEventLogs(uint32_t maxAgeSeconds) {
-  extern EventLog eventLogs[200];
+  extern EventLog eventLogs[EVENT_LOG_BUFFER_SIZE];
   extern uint8_t eventLogIndex;
   extern RTC_DS3231 rtc;
 
   DateTime now = rtc.now();
 
-  EventLog filtered[200];
+  EventLog filtered[EVENT_LOG_BUFFER_SIZE];
   int newCount = 0;
 
-  for (int i = 0; i < 200; i++) {
+  for (int i = 0; i < EVENT_LOG_BUFFER_SIZE; i++) {
     if (eventLogs[i].eventType == 0) continue;
 
     DateTime eventTime(eventLogs[i].year,
@@ -480,7 +480,7 @@ void deleteOldEventLogs(uint32_t maxAgeSeconds) {
     }
 
     if (age <= maxAgeSeconds) {
-      if (newCount < 200) {
+      if (newCount < EVENT_LOG_BUFFER_SIZE) {
         filtered[newCount++] = eventLogs[i];
       }
     }
@@ -490,7 +490,7 @@ void deleteOldEventLogs(uint32_t maxAgeSeconds) {
   for (int i = 0; i < newCount; i++) {
     eventLogs[i] = filtered[i];
   }
-  eventLogIndex = newCount % 200;
+  eventLogIndex = newCount % EVENT_LOG_BUFFER_SIZE;
 
   // rewrite persistent log in text format on appropriate medium
   if (logsOnSD()) {
@@ -514,10 +514,10 @@ void deleteOldEventLogs(uint32_t maxAgeSeconds) {
 
 /// Получает количество событий в журнале
 int getEventLogCount() {
-  extern EventLog eventLogs[200];
+  extern EventLog eventLogs[EVENT_LOG_BUFFER_SIZE];
   
   int count = 0;
-  for (int i = 0; i < 200; i++) {
+  for (int i = 0; i < EVENT_LOG_BUFFER_SIZE; i++) {
     if (eventLogs[i].eventType != 0) {
       count++;
     }
@@ -575,9 +575,9 @@ void pruneEventLogs(uint32_t maxAgeSeconds) {
 }
 
 /// Экспортирует весь журнал в читаемый текст (строки разделены \n)
-/// Учитывает циклическую природу буфера eventLogs[200].
+/// Учитывает циклическую природу буфера eventLogs[EVENT_LOG_BUFFER_SIZE].
 String exportEventsAsText() {
-  extern EventLog eventLogs[200];
+  extern EventLog eventLogs[EVENT_LOG_BUFFER_SIZE];
   extern uint8_t eventLogIndex; // next write position
   int total = getEventLogCount();
   
@@ -600,15 +600,15 @@ String exportEventsAsText() {
 
   // If buffer never wrapped, entries are packed at [0..total-1].
   // If it wrapped, the oldest entry is at eventLogIndex.
-  int start = (total < 200) ? 0 : eventLogIndex;
+  int start = (total < EVENT_LOG_BUFFER_SIZE) ? 0 : eventLogIndex;
 
   for (int n = 0; n < total; ++n) {
-    int idx = (start + n) % 200;
+    int idx = (start + n) % EVENT_LOG_BUFFER_SIZE;
     EventLog &e = eventLogs[idx];
     if (e.eventType == 0) continue;
     char desc[80];
     getEventTypeLong(e.level, e.eventType, e.eventParam, desc, sizeof(desc));
-    char buf[200];
+    char buf[EVENT_LOG_LINE_LEN];
     // Упрощённый формат: убрали type:XX param:XX lvl:X — они не нужны пользователю
     int len = snprintf(buf, sizeof(buf), "%02d.%02d.%04d %02d:%02d - %s\n",
              e.day, e.month, e.year, e.hour, e.minute, desc);
@@ -624,20 +624,20 @@ String exportEventsAsText() {
 /// без создания промежуточной String. Это предотвращает двойное выделение памяти
 /// и ошибку 500 при нехватке кучи.
 void streamEventsAsText(Print& output) {
-  extern EventLog eventLogs[200];
+  extern EventLog eventLogs[EVENT_LOG_BUFFER_SIZE];
   extern uint8_t eventLogIndex;
   int total = getEventLogCount();
 
-  int start = (total < 200) ? 0 : eventLogIndex;
+  int start = (total < EVENT_LOG_BUFFER_SIZE) ? 0 : eventLogIndex;
   bool anyWritten = false;
 
   for (int n = 0; n < total; ++n) {
-    int idx = (start + n) % 200;
+    int idx = (start + n) % EVENT_LOG_BUFFER_SIZE;
     EventLog &e = eventLogs[idx];
     if (e.eventType == 0) continue;
     char desc[80];
     getEventTypeLong(e.level, e.eventType, e.eventParam, desc, sizeof(desc));
-    char buf[200];
+    char buf[EVENT_LOG_LINE_LEN];
     int len = snprintf(buf, sizeof(buf), "%02d.%02d.%04d %02d:%02d - type:%02d param:%u lvl:%d - %s\n",
              e.day, e.month, e.year, e.hour, e.minute,
              e.eventType, e.eventParam, (int)e.level,
@@ -657,7 +657,7 @@ int getEventCount() {
 
 /// Получает событие по индексу
 EventLog* getEventLog(int index) {
-  extern EventLog eventLogs[200];
+  extern EventLog eventLogs[EVENT_LOG_BUFFER_SIZE];
   
   if (index < 0 || index >= 200) {
     return NULL;
@@ -667,23 +667,23 @@ EventLog* getEventLog(int index) {
 
 /// Получает событие по индексу (возвращает n-ое событие в хронологическом порядке: 0=oldest, N-1=newest)
 EventLog* getEventByIndexSimple(int index) {
-  extern EventLog eventLogs[200];
+  extern EventLog eventLogs[EVENT_LOG_BUFFER_SIZE];
   extern uint8_t eventLogIndex; // next write position
 
   int total = getEventLogCount();
   if (index < 0 || index >= total) return NULL;
 
   // Если буфер ещё не заполнился полностью — записи упакованы в [0..total-1]
-  int start = (total < 200) ? 0 : eventLogIndex; // старейший элемент
+  int start = (total < EVENT_LOG_BUFFER_SIZE) ? 0 : eventLogIndex; // старейший элемент
 
-  int storageIndex = (start + index) % 200;
+  int storageIndex = (start + index) % EVENT_LOG_BUFFER_SIZE;
   // На всякий случай: если слот пустой — пытаемся найти ближайшую непустую запись
   if (eventLogs[storageIndex].eventType == 0) {
     // Ищем вперёд до тех пор, пока не найдём непустой слот
     int i = storageIndex;
     for (int k = 0; k < 200; ++k) {
       if (eventLogs[i].eventType != 0) return &eventLogs[i];
-      i = (i + 1) % 200;
+      i = (i + 1) % EVENT_LOG_BUFFER_SIZE;
     }
     return NULL;
   }
@@ -694,13 +694,13 @@ EventLog* getEventByIndexSimple(int index) {
 
 /// Фильтрует события по кодам
 int filterEventsByCode(uint16_t eventCode, int* outIndices, int maxCount) {
-  extern EventLog eventLogs[200];
+  extern EventLog eventLogs[EVENT_LOG_BUFFER_SIZE];
   extern int filteredEventCount;
-  extern int filteredEventIndices[200];
+  extern int filteredEventIndices[EVENT_LOG_BUFFER_SIZE];
   
   filteredEventCount = 0;
   
-  for (int i = 0; i < 200 && filteredEventCount < maxCount; i++) {
+  for (int i = 0; i < EVENT_LOG_BUFFER_SIZE && filteredEventCount < maxCount; i++) {
     if (eventLogs[i].eventType == (uint8_t)eventCode) {
       filteredEventIndices[filteredEventCount] = i;
       filteredEventCount++;
@@ -737,7 +737,16 @@ const char* getEventText(uint16_t eventCode) {
     case EVENT_WIFI_CONNECTED:     return "Wi-Fi connected";
     case EVENT_WIFI_AP_STARTED:    return "Wi-Fi AP started";
     case EVENT_BACKWASH_DRY_RUN:   return "Backwash dry run detected";
-    default:                      return "Unknown event";
+    // Новые типы событий (добавлены при расширении диагностики):
+    // сухой ход насосов, синхронизация времени по NTP, смена часового пояса,
+    // слабый сигнал Wi-Fi — используются в журнале и push-уведомлениях.
+    case EVENT_PUMP1_DRYRUN:       return "Pump1 dry run";
+    case EVENT_PUMP2_DRYRUN:       return "Pump2 dry run";
+    case EVENT_NTP_SYNC_SUCCESS:   return "NTP sync success";
+    case EVENT_NTP_SYNC_FAILED:    return "NTP sync failed";
+    case EVENT_TIMEZONE_CHANGED:   return "Timezone changed";
+    case EVENT_WIFI_WEAK_SIGNAL:   return "Wi-Fi weak signal";
+    default:                       return "Unknown event";
   }
 }
 
@@ -809,6 +818,46 @@ void getEventTypeLong(LogLevel level, uint8_t eventType, uint16_t param, char* b
       snprintf(extra, sizeof(extra), "; %s", setDesc);
       break;
     }
+    // Параметрические расшифровки для новых событий (добавлены сегодня):
+    // для каждого типа выводим дополнительную интерпретацию значения param.
+    case EVENT_EMERGENCY: {
+      // param==1 -> manually reset, otherwise -> triggered
+      snprintf(extra, sizeof(extra), "; %s", (param == 1) ? "reset" : "triggered");
+      break;
+    }
+    case EVENT_PUMP1_DRYRUN:
+    case EVENT_PUMP2_DRYRUN: {
+      // param хранит разницу уровней/давлений, вызвавшую сухой ход
+      snprintf(extra, sizeof(extra), "; delta=%u", (unsigned)param);
+      break;
+    }
+    case EVENT_NTP_SYNC_SUCCESS: {
+      // param закодирован как (таймзона + 128) — показываем UTC+/-N
+      snprintf(extra, sizeof(extra), "; tz=UTC%+d", (int)param - 128);
+      break;
+    }
+    case EVENT_NTP_SYNC_FAILED: {
+      // param содержит число неудачных попыток синхронизации
+      snprintf(extra, sizeof(extra), "; attempts=%u", (unsigned)param);
+      break;
+    }
+    case EVENT_TIMEZONE_CHANGED: {
+      // param закодирован как (таймзона + 128) — показываем UTC+/-N
+      snprintf(extra, sizeof(extra), "; tz=UTC%+d", (int)param - 128);
+      break;
+    }
+    case EVENT_WIFI_WEAK_SIGNAL: {
+      // param интерпретируется как знаковый RSSI (dBm)
+      snprintf(extra, sizeof(extra), "; rssi=%d dBm", (int)(int8_t)param);
+      break;
+    }
+    case EVENT_RUNTIME_STATE_RESTORED: {
+      // param содержит восстановленное после перезагрузки состояние системы
+      char stateDesc[24];
+      getStateDescription(param, stateDesc, sizeof(stateDesc));
+      snprintf(extra, sizeof(extra), "; state=%s", stateDesc);
+      break;
+    }
     default:
       break;
   }
@@ -868,6 +917,8 @@ void getManualOperationDescription(uint8_t operation, char* buffer, uint8_t size
   if (!buffer || size == 0) return;
   const char* text = "Unknown";
   switch (operation) {
+    // operation==0 означает ручной сброс аварии (добавлено сегодня)
+    case 0: text = "Emergency reset"; break;
     case MANUAL_PUMP1_ON:  text = "Pump1 ON"; break;
     case MANUAL_PUMP1_OFF: text = "Pump1 OFF"; break;
     case MANUAL_PUMP2_ON:  text = "Pump2 ON"; break;
@@ -880,6 +931,11 @@ void getManualOperationDescription(uint8_t operation, char* buffer, uint8_t size
     case MANUAL_FILTER_OFF: text = "Filter OFF"; break;
     case MANUAL_BACKWASH_ON:  text = "Backwash ON"; break;
     case MANUAL_BACKWASH_OFF: text = "Backwash OFF"; break;
+    // Команды переключения режимов и признак отклонённой команды
+    // в автоматическом режиме (добавлены сегодня).
+    case MANUAL_SET_AUTOMATIC: text = "Set Automatic mode"; break;
+    case MANUAL_SET_MANUAL:    text = "Set Manual mode"; break;
+    case MANUAL_COMMAND_REJECTED_AUTO: text = "Rejected (not manual mode)"; break;
     default: text = "Unknown"; break;
   }
   strncpy(buffer, text, size - 1);

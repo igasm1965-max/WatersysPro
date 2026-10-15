@@ -148,7 +148,7 @@
 
 ## 4. Незавершённые задачи (из планов)
 
-### Из [`plans/logs_fix_plan.md`](plans/logs_fix_plan.md)
+### Из [`plans/archive/logs_fix_plan.md`](plans/archive/logs_fix_plan.md)
 - ✅ **Шаг 1**: Backend endpoint исправлен — возвращает JSON
 - ✅ **Шаг 2**: Mobile api.ts исправлен — парсит JSON
 - ✅ **Шаг 3**: LogsScreen.tsx — улучшена обработка ошибок

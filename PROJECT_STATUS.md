@@ -93,7 +93,6 @@
 - ✅ CHANGELOG.md - детальный список всех изменений до v1.3.0
 - ✅ README.md - полный обзор системы
 - ✅ VERSION - обновлено на 1.3.0
-- ✅ RELEASE_NOTES_v1.1.0.md - компетентное резюме релиза
 
 ---
 
@@ -216,9 +215,9 @@ platformio run -t upload # flash
 ```
 
 ### Если нужна документация:
-- `mobile/START_HERE.md` - начните отсюда!
-- `CHANGELOG.md` - подробный список изменений
 - `DOCUMENTATION_INDEX.md` - указатель документации
+- `CHANGELOG.md` - подробный список изменений
+- `docs/ARCHITECTURE.md` - архитектура системы
 
 ---
 
@@ -250,8 +249,8 @@ platformio run -t upload # flash
 - [DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md) - указатель документации
 
 **Для мобильной разработки:**
-- [mobile/START_HERE.md](mobile/START_HERE.md) ⭐ НАЧНИТЕ ЗДЕСЬ!
-- [mobile/BUILD_APK_GUIDE.md](mobile/BUILD_APK_GUIDE.md) - полная инструкция
+- [mobile/README.md](mobile/README.md) - точка входа по приложению
+- [mobile/BUILD.md](mobile/BUILD.md) - сборка APK
 - [mobile/build-apk.bat](mobile/build-apk.bat) - Windows скрипт
 
 **Для прибора:**

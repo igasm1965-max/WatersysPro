@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "start": "node src/server.js",
-    "dev": "nodemon src/server.js"
+    "dev": "nodemon src/server.js",
+    "test": "node --test test/",
+    "test:smoke": "node --test test/smoke.test.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

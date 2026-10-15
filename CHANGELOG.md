@@ -1,315 +1,302 @@
-# Changelog
+# История изменений
 
 ## [1.3.6] - 2026-07-08
 
-### Changed (Mobile App)
-- **Logs screen redesign**: simplified to a single working mode
-  - Removed non-working modes: RAM (direct connection), SD (direct connection), manual IP input for WebView
-  - Removed SegmentedButtons for log source selection
-  - Removed in-app WebView (react-native-webview no longer needed)
-  - Removed all connection mode Chip indicators
-  - Removed `fetchLogs()` function and related direct HTTP requests to device
-- **New log fetching logic**:
-  - On screen entry, automatically subscribes to MQTT topic `watersystem/logs` — receives last ~30 events
-  - Subscribes to MQTT topic `watersystem/logs/event` — new events are appended in real-time
-  - Logs update automatically, no "Load" button needed
-- **"Open Web Interface" button**:
-  - Device IP is taken from global context (set on Dashboard screen from telemetry)
-  - Opens device web interface in browser via `Linking.openURL()`
-  - Button is disabled until IP is received
-- **Global context**: added `deviceIp` and `setDeviceIp` fields to `AppContext`
-  - `DashboardScreen` saves device IP to context when receiving telemetry
-  - `LogsScreen` reads IP from context
+### Изменено (Мобильное приложение)
+- **Редизайн экрана логов**: упрощён до одного работающего режима
+  - Удалены неработающие режимы: RAM (прямое подключение), SD (прямое подключение), ручной ввод IP для WebView
+  - Удалён SegmentedButtons с выбором источника логов
+  - Удалён WebView внутри приложения (react-native-webview больше не требуется)
+  - Удалены все Chip-индикаторы режимов подключения
+  - Удалена функция `fetchLogs()` и связанные HTTP-запросы к устройству
+- **Новая логика получения логов**:
+  - При входе на экран автоматически подписываемся на MQTT топик `watersystem/logs` — получаем последние ~30 событий
+  - Подписываемся на MQTT топик `watersystem/logs/event` — новые события добавляются в реальном времени
+  - Логи обновляются автоматически, без кнопки "Загрузить"
+- **Кнопка "Открыть веб-интерфейс"**:
+  - IP устройства берётся из глобального контекста (устанавливается на главном экране из телеметрии)
+  - Открывает веб-интерфейс устройства в браузере через `Linking.openURL()`
+  - Кнопка неактивна, пока IP не получен
+- **Глобальный контекст**: в `AppContext` добавлено поле `deviceIp` и `setDeviceIp`
+  - `DashboardScreen` сохраняет IP устройства в контекст при получении телеметрии
+  - `LogsScreen` читает IP из контекста
 
 ## [1.3.5] - 2026-07-08
 
-### Fixed (Firmware)
-- **Direct log loading from device**: fixed HTTP 500 error on `/logs.txt` and `/api/sd_file` endpoints
-  - Added `streamEventsAsText()` — streams events directly to `AsyncResponseStream` without intermediate String allocation
-  - Rewrote `/api/sd_file` handler with chunked reading (128-byte blocks) instead of `request->send(SD, path)`
-  - Added automatic Content-Type detection for SD files
-  - Eliminated double memory allocation that caused ESP32 crash under heap fragmentation
+### Исправлено (Прошивка)
+- **Загрузка логов напрямую с устройства**: исправлена ошибка 500 при запросе `/logs.txt` и `/api/sd_file`
+  - Добавлена функция `streamEventsAsText()` — стримит события напрямую в `AsyncResponseStream` без создания промежуточной String
+  - Хендлер `/api/sd_file` переписан на чанковое чтение (блоки по 128 байт) вместо `request->send(SD, path)`
+  - Добавлено автоматическое определение Content-Type для SD-файлов
+  - Устранено двойное выделение памяти, вызывавшее падение ESP32 при фрагментации кучи
 
 ## [1.3.2] - 2026-07-07
 
-### Changed (Firmware)
-- **Simplified "System Logging" menu**: flat structure instead of nested, removed ~300 lines of dead code
-  - Menu now has 3 items: `View Logs`, `Clear Logs`, `Back`
-  - Removed useless features: Event Statistics (ASCII bars), Event Graph (`#` chart), Filter by Type (broken filter UI)
-  - Removed duplicate cleanup functions: Clear Old Events, Prune Event Logs
-  - Removed "Format SD Card" item (unrelated to logging)
-  - Removed dead `buildStatsMenu()` function from display.cpp
-  - Removed global filter variables (`filterType`, `selectedEventType`, `filterStartDate`, `filterEndDate`)
-  - Full change log: see `plans/simplify_system_logging_menu.md`
+### Изменено (Прошивка)
+- **Упрощено меню "System Logging"**: плоская структура вместо вложенной, удалено ~300 строк мёртвого кода
+  - Меню теперь содержит 3 пункта: `View Logs`, `Clear Logs`, `Back`
+  - Удалены бесполезные функции: Event Statistics (ASCII-бары), Event Graph (график из `#`), Filter by Type (кривой фильтр)
+  - Удалены дублирующиеся функции очистки: Clear Old Events, Prune Event Logs
+  - Удалён пункт "Format SD Card" (не относится к логированию)
+  - Удалена мёртвая функция `buildStatsMenu()` из display.cpp
+  - Удалены глобальные переменные фильтра (`filterType`, `selectedEventType`, `filterStartDate`, `filterEndDate`)
 
 ## [1.3.1] - 2026-07-06
 
-### Fixed (Mobile App)
-- **Log loading**: fixed "Network Error" when loading logs via MQTT channel
-  - Backend endpoint `/api/device-logs-db/:deviceId` now returns JSON instead of text/plain
-  - Mobile `api.ts` correctly parses JSON response and handles 404
-  - `LogsScreen.tsx` improved error handling and deviceId diagnostics
-  - Fixed deviceId mismatch between ESP32, backend and mobile app
+### Исправлено (Мобильное приложение)
+- **Загрузка логов**: исправлена ошибка "Network Error" при загрузке логов через MQTT-канал
+  - Backend endpoint `/api/device-logs-db/:deviceId` теперь возвращает JSON вместо text/plain
+  - Mobile `api.ts` корректно парсит JSON-ответ и обрабатывает 404
+  - `LogsScreen.tsx` улучшена обработка ошибок и диагностика deviceId
+  - Устранено несоответствие deviceId между ESP32, backend и мобильным приложением
 
-### Fixed (Documentation)
-- Updated version numbers across all docs: 1.1.0 → 1.3.0
-- Added links to new documents (plans/, monitoring/, scripts/)
-- Updated DOCUMENTATION_INDEX.md, PROJECT_STATUS.md, README.md, README_RU.md, VERSIONING.md
+### Исправлено (Документация)
+- Обновлены версии во всех документах: 1.1.0 → 1.3.0
+- Обновлён DOCUMENTATION_INDEX.md, PROJECT_STATUS.md, README.md, VERSIONING.md
 
 ## [1.3.0] - 2026-04-11
 
-### Added (Backend)
-- **Rate limiting**: API (100 req/15min), auth (5 req/15min), commands (30 req/min) via express-rate-limit
-- **Audit log**: all commands, logins (success/failed) logged to `audit_log` table with IP, user, timestamp
-- **Prometheus metrics endpoint**: `/metrics` with uptime, HTTP/MQTT counters, memory, connection status
-- **Secure OTA**: `/api/firmware/latest` now reads version from VERSION file and returns SHA256 hash of firmware binary
-- **SQL migration runner**: auto-applies `backend/migrations/*.sql` on startup with `schema_migrations` tracking
-- **Grafana + Prometheus**: added to docker-compose with persistent volumes
+### Добавлено (Бэкенд)
+- **Rate limiting**: API (100 запр/15мин), авторизация (5 запр/15мин), команды (30 запр/мин) через express-rate-limit
+- **Аудит-лог**: все команды, логины (успешные/неудачные) сохраняются в таблицу `audit_log` с IP, пользователем, временем
+- **Prometheus метрики**: эндпоинт `/metrics` с uptime, HTTP/MQTT счётчиками, памятью, статусом подключений
+- **Secure OTA**: `/api/firmware/latest` читает версию из VERSION и возвращает SHA256-хеш прошивки
+- **SQL-миграции**: авто-применение `backend/migrations/*.sql` при запуске с трекингом `schema_migrations`
+- **Grafana + Prometheus**: добавлены в docker-compose с персистентными вольюмами
 
-### Added (Mobile)
-- **Secure credential storage**: sensitive data (adminToken, mqttUser, mqttPass) stored in expo-secure-store (Keychain/Keystore) instead of AsyncStorage
+### Добавлено (Мобильное приложение)
+- **Безопасное хранение кредов**: чувствительные данные (adminToken, mqttUser, mqttPass) хранятся в expo-secure-store (Keychain/Keystore) вместо AsyncStorage
 
-### Changed (Infrastructure)
-- **nginx.conf**: full HTTPS/TLS config with HTTP→HTTPS redirect, HSTS, WebSocket proxy for Socket.IO and MQTT
-- **docker-compose**: added Prometheus (port 9090) and Grafana (port 3001) services
+### Изменено (Инфраструктура)
+- **nginx.conf**: полный HTTPS/TLS конфиг с HTTP→HTTPS редиректом, HSTS, WebSocket прокси для Socket.IO и MQTT
+- **docker-compose**: добавлены Prometheus (порт 9090) и Grafana (порт 3001)
 
-### Changed (Firmware)
-- **Watchdog timeout**: increased from 8s to 30s — prevents false resets during TLS handshake and menu operations
+### Изменено (Прошивка)
+- **Watchdog таймаут**: увеличен с 8с до 30с — нет ложных ресетов при TLS handshake и операциях в меню
 
-### Added (Scripts)
-- **Database backup**: `scripts/backup_db.sh` with gzip, S3 upload, 30-day retention policy
+### Добавлено (Скрипты)
+- **Бэкап БД**: `scripts/backup_db.sh` с gzip, загрузкой на S3, 30-дневной ротацией
 
 ## [1.2.2] - 2026-04-11
 
-### Security (P0 Hardening)
-- **MQTT TLS certificate validation**: replaced `setInsecure()` with ISRG Root X1 CA pinning — prevents MITM attacks on MQTT connection
-- **CORS restriction**: backend now only accepts requests from explicitly listed origins (`ALLOWED_ORIGINS` env var) instead of wildcard `*`
-- **Admin token header-only**: token accepted only from `x-admin-token` header; removed query string and body extraction to prevent leakage in logs/URLs
-- **Mosquitto authentication**: disabled anonymous access, added password file requirement (`mosquitto/config/passwd`)
-- **Removed HiveMQ credentials**: cleaned `backend/.env.example` from real broker credentials
+### Безопасность (P0 Hardening)
+- **Валидация TLS-сертификата MQTT**: `setInsecure()` заменён на пиннинг CA ISRG Root X1 — защита от MITM-атак
+- **Ограничение CORS**: бэкенд принимает запросы только с явно указанных ориджинов (`ALLOWED_ORIGINS`) вместо `*`
+- **Токен только из заголовка**: admin-токен принимается только из `x-admin-token` header; убрана передача через query string и body
+- **Аутентификация Mosquitto**: отключён anonymous-доступ, добавлен файл паролей (`mosquitto/config/passwd`)
+- **Удалены креды HiveMQ**: очищен `backend/.env.example` от реальных учётных данных брокера
 
 ## [1.2.1] - 2026-04-11
 
-### Fixed (Firmware)
-- **MQTT keepalive too aggressive**: increased keepalive from 15s to 120s for both plain and TLS clients, reducing spurious disconnects on slow networks
-- **TLS handshake blocking main loop**: reduced TLS/TCP connect timeout from 30s to 5s; reset `loopStartTime` after `loopVQTT()` to prevent watchdog resets
-- **MQTT QoS 0 command loss**: upgraded command topic subscription to QoS 1 for guaranteed delivery
+### Исправлено (Прошивка)
+- **Слишком агрессивный MQTT keepalive**: увеличен keepalive с 15с до 120с для plain и TLS клиентов — меньше ложных отключений на медленных сетях
+- **TLS handshake блокирует основной цикл**: таймаут TLS/TCP подключения уменьшен с 30с до 5с; сброс `loopStartTime` после `loopVQTT()` для предотвращения WDT reset
+- **Потеря MQTT-команд при QoS 0**: подписка на топик команд повышена до QoS 1 (гарантированная доставка)
 
-### Changed (Firmware)
-- **Default admin token**: set to `"admin"` instead of empty string so device is accessible out-of-the-box; should be changed via engineer menu or web UI
-- **Admin token initial setup**: allow setting token without providing current token when none is configured
-- **Removed token check from /control**: relay toggle via HTTP no longer requires admin token (matches MQTT/WS behavior)
+### Изменено (Прошивка)
+- **Дефолтный admin token**: установлен `"admin"` вместо пустой строки — устройство доступно из коробки; сменить через инженерное меню или веб-интерфейс
+- **Начальная настройка admin token**: разрешена установка токена без текущего пароля, если токен ещё не задан
+- **Убрана проверка токена в /control**: ручное управление реле через HTTP больше не требует admin token (аналогично MQTT/WS)
 
-### Fixed (Backend)
-- **MQTT reconnection**: added keepalive 120s, reconnect period 5s, connect timeout 10s, persistent session (`clean: false`)
+### Исправлено (Бэкенд)
+- **Переподключение MQTT**: добавлен keepalive 120с, reconnect 5с, connect timeout 10с, постоянная сессия (`clean: false`)
 
-### Security
-- **Removed hardcoded MQTT credentials**: cleared default user/password from mobile app code and documentation; credentials must now be entered in Settings or loaded from `.env`
+### Безопасность
+- **Убраны захардкоженные MQTT-креды**: очищены дефолтные логин/пароль из кода мобильного приложения и документации; учётные данные необходимо ввести в Настройках или загрузить из `.env`
 
-### Fixed (Mobile App)
-- **MQTT reconnect storm**: implemented exponential backoff (5s → 60s) with reset on successful connect
-- **MQTT keepalive**: increased from 60s to 120s to match broker and firmware settings
-- **Default MQTT settings**: app now ships with default broker/credentials as fallback when AsyncStorage is empty
+### Исправлено (Мобильное приложение)
+- **Шторм переподключений MQTT**: реализован экспоненциальный backoff (5с → 60с) со сбросом при успешном подключении
+- **MQTT keepalive**: увеличен с 60с до 120с для совместимости с брокером и прошивкой
+- **Дефолтные MQTT-настройки**: приложение теперь содержит настройки брокера по умолчанию как fallback при пустом AsyncStorage
 
 ## [1.2.0] - 2026-03-31
 
-### Fixed (Firmware)
-- **Manual mode sync**: MQTT handler now checks manual mode before executing relay commands, matching device behavior
-- **Special relay logic via MQTT/WebSocket**: ozone↔aeration interlock, pump2 auto-toggle for filter/backwash, filter OFF protection during water treatment
-- **Emergency status in MQTT telemetry**: added `emergency` object (active, type, message) to telemetry publishing
-- **State flags in MQTT telemetry**: added `flags` object (tank1Empty, tank2Empty, filterCleaningNeeded, backwashInProgress, manualMode) — fixes wash period timer in mobile app
+### Исправлено (Прошивка)
+- **Синхронизация ручного режима**: MQTT-обработчик теперь проверяет ручной режим перед выполнением команд реле, как на самом устройстве
+- **Специальная логика реле через MQTT/WebSocket**: озон↔аэрация взаимоблокировка, pump2 автовключение при фильтре/промывке, защита фильтра от выключения во время водоподготовки
+- **Аварийный статус в MQTT-телеметрии**: добавлен объект `emergency` (active, type, message) в публикацию телеметрии
+- **Флаги состояния в MQTT-телеметрии**: добавлен объект `flags` (tank1Empty, tank2Empty, filterCleaningNeeded, backwashInProgress, manualMode) — исправляет таймер периода промывки в мобильном приложении
 
-### Fixed (Mobile App)
-- **Relay button colors**: removed `disabled` attribute that was overriding button color; active relays now highlight green in all modes
-- **Emergency card**: red "⚠ АВАРИЯ" banner with reset button, shown only when emergency is active
-- **Wash period timer**: mobile app now correctly displays remaining time and backwash status
+### Исправлено (Мобильное приложение)
+- **Подсветка кнопок реле**: убран атрибут `disabled`, который блокировал отображение цвета; активные реле подсвечиваются зелёным во всех режимах
+- **Карточка аварии**: красная подсветка «⚠ АВАРИЯ» с кнопкой сброса, отображается только при активной аварии
+- **Таймер периода промывки**: мобильное приложение теперь корректно отображает оставшееся время и статус промывки
 
-### Added (Backend)
-- **set_mode and reset_emergency commands**: cloud backend now supports manual/auto mode switching and emergency reset via MQTT
-- **Cloud web interface**: mode toggle buttons, relay disable in auto mode, emergency reset button
+### Добавлено (Бэкенд)
+- **Команды set_mode и reset_emergency**: облачный бэкенд теперь поддерживает переключение ручной/авто режима и сброс аварии через MQTT
+- **Облачный веб-интерфейс**: кнопки переключения режима, блокировка реле в автоматическом режиме, кнопка сброса аварии
 
 ## [1.1.1] - 2026-03-19
 
-### Fixed (Firmware)
-- **Engineer input UI on 20x4 LCD**: fixed hint text overlap/wrapping in input submenus.
-  - Unified short one-line hints for all input editors (password, numeric, string):
+### Исправлено (Прошивка)
+- **UI ввода в инженерном меню на LCD 20x4**: устранено наползание/перенос подсказок в подменю ввода.
+  - Подсказки унифицированы и сокращены для всех экранов ввода (пароль, число, строка):
     - `Turn=chg Click=next`
     - `Turn=chg Click=save`
     - `Turn=chg Click=ok`
-  - Moved dynamic character preview out of the bottom hint line in string editor.
-  - Added explicit tail clearing with spaces for dynamic fields to prevent stale characters.
+  - В строковом редакторе динамический символ вынесен из нижней строки подсказки.
+  - Добавлена явная очистка хвоста динамических строк пробелами, чтобы не оставались артефакты.
 
 ### UX
-- Input screens now use consistent controls wording and fit within LCD width limits without visual artifacts.
+- Экранные подсказки в режиме ввода теперь единообразны и гарантированно помещаются в ширину LCD без визуальных артефактов.
 
 ## [1.1.0] - 2026-03-13
 
-### Major Features
-- **MQTT TLS Support**: Complete migration from AsyncMqttClient to PubSubClient v2.8.0 with full TLS/SSL support
-- **Mobile App Ready**: Full React Native Android application created and ready for APK building
-- **Memory Optimization**: Flash usage reduced from 99.8% to 94.6% through aggressive compilation flags
+### Основные возможности
+- **Поддержка MQTT TLS**: Полная миграция с AsyncMqttClient на PubSubClient v2.8.0 с полной поддержкой TLS/SSL
+- **Мобильное приложение готово**: Полное React Native приложение для Android создано и готово к сборке APK
+- **Оптимизация памяти**: Использование Flash сокращено с 99.8% до 94.6% через агрессивные флаги компилятора
 
-### Added (Firmware)
-- **MQTT Enhancements**:
-  - TLS/SSL encryption support for secure MQTT connections (port 19161 tested with m1.wqpt.ru)
-  - Dual MQTT port configuration (plain and TLS)
-  - Web API for MQTT configuration: `/api/mqtt` (GET/POST)
-  - MQTT menu items in engineer menu: TLS Enable, TLS Port
-  - Automatic TLS client selection based on configuration
-  - WiFi state change detection for proper MQTT initialization
-  - Exponential backoff reconnection (5s → 60s)
-  - Certificate verification skip support via `setInsecure()`
+### Добавлено (Прошивка)
+- **Улучшения MQTT**:
+  - Поддержка TLS/SSL шифрования для безопасных MQTT соединений (порт 19161 протестирован на m1.wqpt.ru)
+  - Двойная конфигурация портов MQTT (plain и TLS)
+  - Web API для конфигурации MQTT: `/api/mqtt` (GET/POST)
+  - Элементы меню MQTT в инженерном меню: TLS Enable, TLS Port
+  - Автоматический выбор TLS клиента на основе конфигурации
+  - Обнаружение изменения состояния WiFi для правильной инициализации MQTT
+  - Экспоненциальная задержка при переподключении (5s → 60s)
 
-- **Configuration**:
-  - New preferences keys: `PREF_KEY_MQTT_SECURE`, `PREF_KEY_MQTT_TLS_PORT`, `PREF_KEY_MQTT_INSECURE`
-  - Default TLS port: 8883
-  - Persistent storage of all MQTT settings
+- **Конфигурация**:
+  - Новые ключи preferences: `PREF_KEY_MQTT_SECURE`, `PREF_KEY_MQTT_TLS_PORT`, `PREF_KEY_MQTT_INSECURE`
+  - Порт TLS по умолчанию: 8883
+  - Постоянное хранилище всех настроек MQTT
 
-- **Web Interface**:
-  - Two HTML versions: main interface and simplified version
-  - Both updated with TLS Port and TLS Enable fields
-  - Form-based MQTT configuration in web UI
-  - Live MQTT status display
+- **Веб-интерфейс**:
+  - Две версии HTML: основной интерфейс и упрощенная версия
+  - Обе обновлены с полями TLS Port и TLS Enable
+  - Конфигурация MQTT на основе форм в веб-интерфейсе
+  - Отображение статуса MQTT в реальном времени
 
-### Added (Mobile App)
-- **Complete React Native Application**:
-  - LoginScreen: Authentication (login/register)
-  - DashboardScreen: Real-time device monitoring
-  - SettingsScreen: User settings and preferences
-  - Complete API service integration
-  - WebSocket support for live updates
-  - Push notification support
-  - Bottom Tab Navigation
+### Добавлено (Мобильное приложение)
+- **Полное React Native приложение**:
+  - LoginScreen: Аутентификация (вход/регистрация)
+  - DashboardScreen: Мониторинг устройства в реальном времени
+  - SettingsScreen: Настройки пользователя и предпочтения
+  - Полная интеграция API сервиса
+  - Поддержка WebSocket для обновлений в реальном времени
+  - Поддержка push-уведомлений
+  - Навигация с нижними вкладками
 
-- **Documentation** (7 comprehensive guides):
-  - START_HERE.md: Quick 5-minute overview
-  - QUICK_START_BUILD.md: Step-by-step APK building
-  - BUILD_APK_GUIDE.md: Complete build documentation
-  - CHECKLIST.md: Pre-build verification checklist
-  - DEVICE_CONTROL_GUIDE.md: Application usage guide
-  - README_BUILD.md: Build summary
-  - FINAL_SUMMARY.md: Final overview
+- **Скрипты сборки**:
+  - build-apk.bat: Windows батник для сборки APK
+  - build-apk.sh: Bash скрипт для Linux/Mac
 
-- **Build Scripts**:
-  - build-apk.bat: Windows batch script for APK building
-  - build-apk.sh: Linux/Mac bash script
-  - COMMANDS.sh: Copy-paste command reference
+- **Обновления конфигурации**:
+  - app.json: Конфигурация Android с разрешениями
+  - eas.json: Конфигурация EAS сборки
+  - tsconfig.json: Конфигурация TypeScript
 
-- **Configuration Updates**:
-  - app.json: Android configuration with permissions
-  - eas.json: EAS build configuration
-  - tsconfig.json: TypeScript configuration
+### Улучшено (Прошивка)
+- **Оптимизация компиляции**:
+  - Изменена оптимизация с `-Os` на `-Oz` (агрессивное сокращение размера)
+  - Добавлены разделы функций/данных: `-ffunction-sections -fdata-sections`
+  - Удалены исключения и RTTI: `-fno-exceptions -fno-rtti`
+  - Добавлены сборка мусора во время линковки и удаление символов: `-Wl,--gc-sections -Wl,--strip-all`
+  - Результат: Освобождено 68 KB памяти Flash
 
-### Improved (Firmware)
-- **Compilation Optimization**:
-  - Changed optimization from `-Os` to `-Oz` (aggressive size reduction)
-  - Added function/data sections: `-ffunction-sections -fdata-sections`
-  - Removed exceptions and RTTI: `-fno-exceptions -fno-rtti`
-  - Added link-time GC and stripping: `-Wl,--gc-sections -Wl,--strip-all`
-  - Result: Freed 68 KB of flash memory
+- **Код MQTT**:
+  - Полная переработка vqtt.cpp (~400 строк)
+  - Синхронный API PubSubClient (проще чем асинхронный)
+  - Лучшие сообщения об ошибках и логирование
+  - Формат ID устройства: `w_sys_XXXX_YYYYYYYY` (WiFi MAC + random)
+  - Правильная синхронизация состояния WiFi/MQTT
 
-- **MQTT Code**:
-  - Complete rewrite of vqtt.cpp (~400 lines)
-  - Synchronous PubSubClient API (simpler than async)
-  - Better error messages and logging
-  - Device ID format: `w_sys_XXXX_YYYYYYYY` (WiFi MAC + random)
-  - Proper WiFi/MQTT state synchronization
+- **Инженерное меню**:
+  - Добавлен переключатель TLS Enable/Disable
+  - Добавлено редактирование TLS Port
+  - Интеграция с существующими настройками MQTT
+  - Clear MQTT теперь удаляет все настройки TLS
 
-- **Engineer Menu**:
-  - Added TLS Enable/Disable toggle
-  - Added TLS Port editing
-  - Integrated with existing MQTT settings
-  - Clear MQTT now removes all TLS settings
+### Исправлено (Прошивка)
+- **Критическая ошибка MQTT**: Исправлен crash с нулевым указателем при отсутствии WiFi во время initVQTT()
+  - Теперь инициализирует стандартный клиент безусловно
+  - Подключается только когда WiFi переходит в состояние подключено
+- **Несовместимость LTO**: Удалена оптимизация Link-Time из-за конфликтов линкера
+  - Переключено на ручное удаление разделов вместо этого
+  - Поддерживает аналогичную экономию памяти без ошибок
 
-### Fixed (Firmware)
-- **Critical MQTT Bug**: Fixed null pointer crash when WiFi not connected during initVQTT()
-  - Now initializes default client unconditionally
-  - Only connects when WiFi transitions to connected state
-- **LTO Incompatibility**: Removed Link-Time Optimization due to linker conflicts
-  - Switched to manual section stripping instead
-  - Maintains similar memory savings without errors
+### Протестировано
+- ✅ Plain MQTT: Подключено к m1.wqpt.ru:19160 с учетными данными (см. .env)
+- ✅ TLS MQTT: Подключено к m1.wqpt.ru:19161 (TLS проверено работает)
+- ✅ Публикация телеметрии: Формат JSON со всеми метриками (uptime, IP, уровни резервуаров, состояния реле)
+- ✅ Подписка на команды: Управление реле MQTT→устройство работает
+- ✅ Web API: Endpoint /api/mqtt функционален
+- ✅ Автоматическое переподключение: Экспоненциальная задержка проверена
+- ✅ Изменения состояния WiFi: Правильная инициализация MQTT при переподключении
 
-### Tested
-- ✅ Plain MQTT: Connected to m1.wqpt.ru:19160 with credentials (see .env)
-- ✅ TLS MQTT: Connected to m1.wqpt.ru:19161 (TLS verified working)
-- ✅ Telemetry publishing: JSON format with all metrics (uptime, IP, tank levels, relay states)
-- ✅ Command subscription: MQTT→device relay control working
-- ✅ Web API: /api/mqtt endpoint functional
-- ✅ Automatic reconnection: Exponential backoff verified
-- ✅ WiFi state changes: Proper MQTT initialization on reconnection
+### Статус устройства
+- IP адрес: 192.168.3.13 (обнаружено)
+- Использование Flash: 94.6% (1,240,256 байт) - безопасный диапазон
+- Использование RAM: 16.3% (53,540 байт)
+- Свободная куча: ~172 KB во время работы
+- Статус MQTT: Оба режима (plain и TLS) работают
 
-### Device Status
-- IP Address: 192.168.3.13 (discovered)
-- Flash Usage: 94.6% (1,240,256 bytes) - safe operating range
-- RAM Usage: 16.3% (53,540 bytes)  
-- Free Heap: ~172 KB during operation
-- MQTT Status: Both plain and TLS modes operational
-
-### Cleanup
-- Removed AsyncMqttClient library dependency
-- Deleted old MQTT implementation references
-- Cleaned up compilation flags (removed failed LTO)
+### Очистка
+- Удалена зависимость библиотеки AsyncMqttClient
+- Удалены ссылки на старую реализацию MQTT
+- Очищены флаги компиляции (удалено неудачное LTO)
 
 ---
 
 ## [1.0.0] - 2026-03-12
 
-### Major Changes
-- **SystemContext Refactor**: Migrated FSM globals into centralized `SystemContext` for better state management and cleaner architecture.
-- **Text-based Event Logging**: Event logs rewritten from binary to human-readable text format with automatic migration.
-- **microSD Support (SPI)**: Initial implementation with automatic fallback to SPIFFS when SD is unavailable.
+### Основные изменения
+- **Рефакторинг SystemContext**: Миграция глобальных переменных FSM в централизованный `SystemContext` для лучшего управления состоянием и более чистой архитектуры.
+- **Логирование на основе текста**: Логи событий переписаны с бинарного на читаемый текстовый формат с автоматической миграцией.
+- **Поддержка microSD (SPI)**: Начальная реализация с автоматическим fallback на SPIFFS при отсутствии SD.
 
-### Added
-- Central state transition helper `changeState()` for simplified FSM logic.
-- New configuration constants: `ADMIN_TOKEN_MAX_LEN`, `ENCODER_POLL_MS`, `SCREEN_WIDTH`, `INFO_SCREEN_PAGES`.
-- MAC address formatting helpers: `getMacString()` / `getMacBytes()`.
-- `prefsIsAvailable()` guards for safe NVS (Preferences) access.
-- Unified admin token validation in both embedded and SPIFFS UI.
-- SD card initialization routine: `initSD()` with SPI pin definitions and automatic mounting.
-- **Event Logging Features**:
-  - Automatic binary-to-text log migration on startup.
-  - Automatic fallback to SPIFFS when SD operations fail.
-  - Log filtering via engineer menu ("Log Filter" item) and REST API (`/api/log_filter`).
-  - Text log format: `DD.MM.YYYY HH:MM - type:XX param:YY lvl:Z`
-- **Web Interface Enhancements**:
-  - WebSocket push updates and intelligent polling (pauses when tab is hidden).
-  - Log management UI: download, rotate, export to SD, list files, clear logs.
-  - New API endpoints:
-    - `GET /api/export_logs` — export logs to SD.
-    - `GET /api/sd_files` — list files on SD card.
-    - `GET /api/sd_file?name=<name>` — download specific file.
-    - `GET /logs.txt` — direct log download.
-    - `POST /api/sd_files` — delete files with admin token.
-    - `POST /api/logs` — rotate/clear logs with admin token.
-  - Status endpoint (`/status`) and WebSocket broadcasts now include SD card presence flag.
-  - MQTT settings and status included in status JSON.
+### Добавлено
+- Центральный помощник переходов состояний `changeState()` для упрощенной логики FSM.
+- Новые константы конфигурации: `ADMIN_TOKEN_MAX_LEN`, `ENCODER_POLL_MS`, `SCREEN_WIDTH`, `INFO_SCREEN_PAGES`.
+- Помощники форматирования MAC адреса: `getMacString()` / `getMacBytes()`.
+- Защита `prefsIsAvailable()` для безопасного доступа к NVS (Preferences).
+- Унифицированная валидация токена администратора в обоих встроенных и SPIFFS интерфейсах.
+- Процедура инициализации SD карты: `initSD()` с определениями SPI пинов и автоматическим монтированием.
+- **Возможности логирования событий**:
+  - Автоматическая миграция бинарных в текстовые логи при запуске.
+  - Автоматический fallback на SPIFFS при сбое операций SD.
+  - Фильтрация логов через инженерное меню ("Log Filter" элемент) и REST API (`/api/log_filter`).
+  - Формат текстового лога: `DD.MM.YYYY HH:MM - type:XX param:YY lvl:Z`
+- **Улучшения Веб-интерфейса**:
+  - WebSocket push обновления и интеллектуальный polling (пауза когда вкладка скрыта).
+  - UI управления логами: загрузка, ротация, экспорт на SD, список файлов, очистка логов.
+  - Новые API endpoints:
+    - `GET /api/export_logs` — экспорт логов на SD.
+    - `GET /api/sd_files` — список файлов на SD карте.
+    - `GET /api/sd_file?name=<name>` — загрузка конкретного файла.
+    - `GET /logs.txt` — прямая загрузка лога.
+    - `POST /api/sd_files` — удаление файлов с токеном администратора.
+    - `POST /api/logs` — ротация/очистка логов с токеном администратора.
+  - Endpoint статуса (`/status`) и WebSocket трансляции теперь включают флаг наличия SD карты.
+  - Параметры и статус MQTT включены в статус JSON.
 
-### Improved
-- Encoder polling frequency configurable and reduced.
-- Code stability and SPIFFS fallback robustness.
-- Documentation: SD integration guide with pinout, testing steps, and future roadmap.
-- UI assets (`data/index.html`) updated to support new log and SD management features.
+### Улучшено
+- Частота опроса энкодера настраивается и сокращена.
+- Стабильность кода и надежность fallback на SPIFFS.
+- Документация: руководство интеграции SD с распиновкой, шагами тестирования и дорожной картой.
+- Активы UI (`data/index.html`) обновлены для поддержки новых возможностей управления логами и SD.
 
-### Fixed
-- Preferences access safety with `prefsIsAvailable()` checks.
-- Admin token validation consistency across UIs.
-- Network stub cleanup for better maintainability.
+### Исправлено
+- Безопасность доступа к Preferences с проверками `prefsIsAvailable()`.
+- Согласованность валидации токена администратора во всех UI.
+- Очистка заглушек сети для лучшей поддерживаемости.
 
-### Cleanup
-- Removed obsolete network stubs and outdated code.
-- Deleted temporary backup files (`.bak`).
-- Ensured all hardcoded values (like `SCREEN_WIDTH`) use constants from `config.h`.
+### Очистка
+- Удалены устаревшие заглушки сети и устаревший код.
+- Удалены временные файлы резервных копий (`.bak`).
+- Убедились что все жесткокодированные значения (как `SCREEN_WIDTH`) используют константы из `config.h`.
 
-### Testing
-- Full build validation: `platformio run` successful.
-- Firmware and SPIFFS upload tested on ESP32 (COM5).
-- Serial logging verified for AP startup and web server initialization.
-- Smoke tests: device boots correctly, IP assignment works, web UI accessible.
+### Тестирование
+- Полная проверка сборки: `platformio run` успешна.
+- Загрузка прошивки и SPIFFS протестирована на ESP32 (COM5).
+- Логирование серийной линии проверено для запуска AP и инициализации веб-сервера.
+- Smoke тесты: устройство загружается правильно, назначение IP работает, веб-интерфейс доступен.
 
 ---
 
-## Notes for Future Versions
-- Dynamic token validation length from API endpoint (avoid desync).
-- Enhanced CI/CD with unit and integration tests.
-- Support for MQTT authentication and secure connections.
-- Full SD-only mode build configuration ready (`env:esp32dev-sdonly`).
+## Заметки для будущих версий
+- Динамическая длина валидации токена из API endpoint (избежать несинхронизации).
+- Улучшенный CI/CD с unit и интеграционными тестами.
+- Поддержка аутентификации MQTT и безопасных соединений.
+- Полная конфигурация сборки режима только SD готова (`env:esp32dev-sdonly`).

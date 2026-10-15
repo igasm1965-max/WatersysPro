@@ -1,99 +1,101 @@
-# WaterSysPro - Water Treatment Control System
+# WaterSysPro - Система управления водоочисткой
 
-WaterSysPro is a full-stack water treatment automation project built around ESP32 firmware, a Node.js backend, and a React Native mobile app.
+WaterSysPro - это full-stack проект автоматизации водоочистки на базе прошивки ESP32, backend-сервиса Node.js и мобильного приложения React Native.
 
-![Version](https://img.shields.io/badge/version-1.3.5-blue)
-![Status](https://img.shields.io/badge/status-active-brightgreen)
-![License](https://img.shields.io/badge/license-MIT-green)
+![Версия](https://img.shields.io/badge/version-1.3.5-blue)
+![Статус](https://img.shields.io/badge/status-active-brightgreen)
+![Лицензия](https://img.shields.io/badge/license-MIT-green)
 
-## Project Scope
+## Область проекта
 
-WaterSysPro combines three layers:
+WaterSysPro включает три уровня:
 
-### 1. ESP32 Firmware
-- Controls 6 relays (pumps, aeration, ozone, filtration,backwash, emergency)
-- Implements an FSM for water treatment operating cycles
-- Reads dual ultrasonic level sensors
-- Exposes a web interface for configuration and diagnostics
-- Publishes telemetry and receives control commands via MQTT
-- Stores human-readable event logs
-- Serves static UI assets from SD card
+### 1. Прошивка ESP32
+- Управление 6 реле (насосы, аэрация, озон, фильтрация, промывка, аварийный канал)
+- FSM (автомат состояний) для циклов водоочистки
+- Поддержка двух ультразвуковых датчиков уровня
+- Веб-интерфейс для настройки и диагностики
+- MQTT телеметрия и прием команд управления (plain и TLS)
+- Логирование событий в читаемом текстовом формате
+- Раздача статических UI-файлов с SD-карты
 
 ### 2. Backend (Node.js)
-- REST API for integration and service workflows
-- WebSocket channel for real-time updates
-- Docker-ready local deployment flow
-- Emergency alerts via Telegram (primary), MAX (messenger) and SMS (backup) — see [docs/NOTIFICATIONS_SETUP_RU.md](docs/NOTIFICATIONS_SETUP_RU.md)
+- REST API для интеграции и сервисных сценариев
+- WebSocket канал обновлений в реальном времени
+- Аварийные уведомления: Telegram (основной), MAX (мессенджер) и SMS (резерв) — см. [docs/NOTIFICATIONS_SETUP_RU.md](docs/NOTIFICATIONS_SETUP_RU.md)
+- Rate limiting, аудит-лог, Prometheus-метрики, SQL-миграции
+- Локальный Docker-сценарий развертывания
 
-### 3. Mobile App (React Native)
-- Login, dashboard, and settings screens
-- API and WebSocket clients
-- Android build scripts and EAS cloud build support
+### 3. Мобильное приложение (React Native)
+- Экраны входа (PIN), дашборда, настроек и логов
+- Клиенты для API и WebSocket
+- Скрипты сборки Android и поддержка EAS cloud build
 
-## High-Level Data Flow
+## Поток данных на верхнем уровне
 
-1. ESP32 collects sensor values and actuator state.
-2. FSM decides transitions between operating modes.
-3. Device publishes telemetry to MQTT and exposes state over web/API endpoints.
-4. Backend and mobile app display status/history and can send control actions.
+1. ESP32 собирает показания датчиков и состояние исполнительных узлов.
+2. FSM выбирает переходы между рабочими режимами.
+3. Контроллер публикует телеметрию в MQTT и отдает состояние через web/API.
+4. Backend и мобильное приложение отображают состояние/историю и отправляют команды.
 
-## Repository Layout
+## Структура репозитория
 
-- src/ - ESP32 firmware source code
-- include/ - firmware headers
-- backend/ - Node.js service and Docker files
-- mobile/ - React Native application
-- docs/ - technical docs, summaries, and trackers
-- mosquitto/ - local broker config/data for containerized runs
-- platformio.ini - PlatformIO build/upload configuration
-- docker-compose.yml - stack startup for backend and infrastructure
+- src/ - исходники прошивки ESP32
+- include/ - заголовки прошивки
+- backend/ - Node.js сервис и Docker-файлы
+- mobile/ - React Native приложение
+- docs/ - техническая документация и справочники
+- plans/ - актуальные руководства по деплою и диагностике
+- mosquitto/ - конфигурация и данные локального брокера для контейнерного запуска
+- platformio.ini - параметры сборки и загрузки в PlatformIO
+- docker-compose.yml - подъем backend и инфраструктуры
 
-## Requirements
+## Требования
 
-### Firmware Environment
-- PlatformIO (CLI or VS Code extension)
-- ESP32 Dev Module board
-- USB connection (default upload port: COM5)
+### Окружение прошивки
+- PlatformIO (CLI или расширение VS Code)
+- Плата ESP32 Dev Module
+- USB-подключение (порт загрузки по умолчанию: COM5)
 
-### Backend Environment
+### Окружение backend
 - Node.js 18+
 - npm
-- Docker + Docker Compose (optional)
+- Docker + Docker Compose (опционально)
 
-### Mobile Environment
+### Окружение mobile
 - Node.js 18+
 - npm
-- EAS CLI (for Android cloud builds)
+- EAS CLI (для облачной Android-сборки)
 
-## Quick Start
+## Быстрый старт
 
-### 1. Build Firmware
+### 1. Сборка прошивки
 
 ```bash
 platformio run
 ```
 
-### 2. Upload Firmware to ESP32
+### 2. Загрузка прошивки в ESP32
 
 ```bash
 platformio run -t upload
 ```
 
-Use explicit port when needed:
+Явное указание порта:
 
 ```bash
 platformio run -t upload -e esp32dev --upload-port COM5
 ```
 
-### 3. Open Serial Monitor
+### 3. Серийный монитор
 
 ```bash
 platformio device monitor
 ```
 
-## Backend Run Modes
+## Запуск backend
 
-### Option A: Local Node.js
+### Вариант A: локально на Node.js
 
 ```bash
 cd backend
@@ -101,13 +103,13 @@ npm install
 npm start
 ```
 
-### Option B: Docker Compose
+### Вариант B: через Docker Compose
 
 ```bash
 docker-compose up -d
 ```
 
-## Mobile App Setup
+## Подготовка мобильного приложения
 
 ```bash
 cd mobile
@@ -120,93 +122,79 @@ Android cloud build:
 eas build -p android
 ```
 
-Windows helper script:
+Сценарий для Windows:
 
 ```bash
 mobile\build-apk.bat
 ```
 
-## Firmware Configuration Notes
+## Примечания по конфигурации прошивки
 
-Primary settings are in platformio.ini:
+Ключевые параметры находятся в platformio.ini:
 - platform: espressif32
 - board: esp32dev
 - framework: arduino
-- monitor speed: 115200
-- default upload port: COM5
-- SPIFFS disabled, SD-first runtime model
+- скорость монитора: 115200
+- порт загрузки по умолчанию: COM5
+- SPIFFS отключен, runtime ориентирован на SD-карту
 
-## MQTT and Remote Control
+## MQTT и удаленное управление
 
-WaterSysPro supports:
-- External MQTT broker connectivity
-- Plain and TLS modes
-- Periodic telemetry publishing
-- Command subscriptions for remote control operations
+В проекте реализовано:
+- Подключение к внешним MQTT-брокерам
+- Работа в plain и TLS режимах (валидация сертификата CA ISRG Root X1)
+- Периодическая публикация телеметрии
+- Подписки на управляющие команды
 
-Security recommendation:
-- Keep real MQTT credentials outside source control
-- Avoid publishing live credentials in documentation/screenshots
+Рекомендации по безопасности:
+- Хранить реальные MQTT-учетные данные вне репозитория
+- Не публиковать действующие секреты в документации и скриншотах
 
-## Web Interface and API
+## Веб-интерфейс и API
 
-On-device web interface supports:
-- Live status review
-- Parameter configuration
-- Service operations and maintenance actions
+Веб-интерфейс на устройстве позволяет:
+- Смотреть актуальное состояние
+- Настраивать параметры системы
+- Выполнять сервисные и эксплуатационные действия
 
-The backend exposes API endpoints for external clients and integrations.
+Backend предоставляет API-точки для внешних клиентов и интеграций.
 
-## Typical Operating Workflows
+## Типовые рабочие сценарии
 
-### First Bring-Up
+### Первичный запуск
 
-1. Build and upload firmware.
-2. Connect to the device web UI.
-3. Validate sensors and relay switching in manual checks.
-4. Configure network and MQTT parameters.
-5. Confirm telemetry and logs are being generated.
+1. Собрать и загрузить прошивку.
+2. Подключиться к web UI устройства.
+3. Проверить датчики и реле в ручных тестах.
+4. Настроить сеть и MQTT.
+5. Убедиться, что телеметрия и логи формируются корректно.
 
-### Diagnostics
+### Диагностика
 
-1. Inspect boot/runtime output in serial monitor.
-2. Verify ESP32 web interface availability.
-3. Check MQTT broker connection and topic traffic.
-4. Compare device logs with backend-side observations.
+1. Проверить boot/runtime сообщения в серийном мониторе.
+2. Убедиться, что web UI ESP32 доступен.
+3. Проверить соединение с MQTT-брокером и трафик по темам.
+4. Сопоставить логи устройства и backend.
 
-## Development and Maintenance
+## Индекс документации
 
-### Useful VS Code Tasks
+Полный указатель — [DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md). Ключевые документы:
 
-- PlatformIO: Build
-- PlatformIO: Upload
-- PlatformIO: Upload (COM5)
-- PlatformIO: Device List
-- PlatformIO: Upload FS (COM5)
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - архитектура системы
+- [CHANGELOG.md](CHANGELOG.md) - история версий (v1.3.5, v1.3.0, v1.2.2, v1.2.1, v1.2.0, v1.1.0, v1.0.0)
+- [plans/DEPLOY_INSTRUCTIONS.md](plans/DEPLOY_INSTRUCTIONS.md) - деплой на VPS и сборка APK
+- [docs/SD_INTEGRATION.md](docs/SD_INTEGRATION.md) - детали SD-интеграции
+- [NTP_SYNC_IMPLEMENTATION.md](NTP_SYNC_IMPLEMENTATION.md) - синхронизация времени через NTP
+- [VERSIONING.md](VERSIONING.md) - управление версиями
 
-### Change Management Guidelines
+## Текущее состояние
 
-1. Prefer small and focused commits.
-2. Validate firmware and backend behavior before commit.
-3. Test FSM and sensor logic changes on hardware.
-4. Avoid mixing broad formatting updates with functional changes.
+- **Текущая версия: 1.3.5**
+- Проект финализирован: прошивка, backend и мобильное приложение работают.
+- Production hardening выполнен (v1.2.2): TLS-валидация, CORS, аутентификация Mosquitto.
+- Добавлен мониторинг: Prometheus + Grafana (v1.3.0).
+- Rate limiting, аудит-лог, SQL-миграции — все внедрено.
 
-## Documentation Index
+## Лицензия
 
-Key documents in this repository:
-- README_RU.md - detailed Russian overview
-- CHANGELOG.md and CHANGELOG_RU.md - release history
-- RELEASE_NOTES_v1.1.0.md and RELEASE_NOTES_v1.1.0_RU.md - release details
-- DOCUMENTATION_INDEX.md - documentation navigation map
-- docs/SD_INTEGRATION.md - SD integration details
-- docs/PRODUCTION_HARDENING_TRACKER.md - production hardening tasks
-
-## Current State
-
-- Active development repository.
-- Main stack: ESP32 + Node.js + React Native.
-- Production rollouts should include hardening and secret-review steps.
-
-## License
-
-MIT. See LICENSE for details.
+MIT. Подробности в [LICENSE](LICENSE).

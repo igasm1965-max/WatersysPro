@@ -162,8 +162,8 @@ unsigned long manualModeEntryTime = 0;
 
 // ============ ЖУРНАЛ СОБЫТИЙ ============
 
-/// Массив событий (последние 200 записей в ОЗУ)
-EventLog eventLogs[200];
+/// Массив событий (последние EVENT_LOG_BUFFER_SIZE записей в ОЗУ)
+EventLog eventLogs[EVENT_LOG_BUFFER_SIZE];
 /// Индекс текущего события в циклическом буфере
 uint8_t eventLogIndex = 0;
 
@@ -242,7 +242,7 @@ int menuLen = 0;
 // ============ ФИЛЬТРОВАННЫЕ СОБЫТИЯ ============
 
 int filteredEventCount = 0;
-int filteredEventIndices[200];
+int filteredEventIndices[EVENT_LOG_BUFFER_SIZE];
 
 // ============ ПИНЫ И ТАЙМЕРЫ НАСОСОВ ============
 
@@ -477,13 +477,6 @@ void setup() {
     }
     #endif
 #endif
-
-    // ...existing code...
-
-    // Флаги инициализации завершены
-    flags.backlightOn = true;
-    flags.displayOn = true;
-    flags.setupComplete = true;
 
     // RTC (инициализация уже выполнена ранее)
 

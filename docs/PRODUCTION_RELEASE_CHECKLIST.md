@@ -28,7 +28,7 @@
 
 ## 5. Docs/Release Gate
 - [ ] Обновлены release notes и changelog.
-- [ ] Обновлен `docs/PRODUCTION_HARDENING_TRACKER.md` по факту.
+- [ ] Обновлен `docs/archive/PRODUCTION_HARDENING_TRACKER.md` по факту.
 - [ ] Зафиксированы результаты smoke-проверок (с датой).
 
 ## Sign-off

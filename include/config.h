@@ -280,6 +280,10 @@ enum eEncoderState {
 #define PREF_KEY_WQTT_AUTO "wqtt_auto"
 #define DEFAULT_WQTT_AUTO 0
 
+// ============ ЖУРНАЛ СОБЫТИЙ ============
+#define EVENT_LOG_BUFFER_SIZE 200  ///< Максимальное количество событий в ОЗУ-буфере
+#define EVENT_LOG_LINE_LEN 200     ///< Длина буфера строки журнала
+
 // ============ LOGGING FILTERS FOR SPIFFS ============
 #define LOG_FILTER_WIFI           (1UL << 0)  ///< Wi-Fi/connect events
 #define LOG_FILTER_MANUAL         (1UL << 1)  ///< Manual operations
