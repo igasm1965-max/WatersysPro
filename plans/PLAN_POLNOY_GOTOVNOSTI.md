@@ -106,11 +106,12 @@
 - [ ] Проверить [`plans/DEPLOY_INSTRUCTIONS.md`](../plans/DEPLOY_INSTRUCTIONS.md) на реальном сервере (нужен SSH к VPS). Инструкция и [`docker-compose.cloud.yml`](../docker-compose.cloud.yml) проверены и согласованы.
 - **Критерий готовности:** backend доступен по HTTPS, MQTT/WS работают. Выполняется оператором с доступом к серверу.
 
-### 4.4. Сборка и тест APK ⏳ (требует внешнего доступа)
+### 4.4. Сборка и тест APK ⏳ Blocked (требует внешнего доступа)
 - [ ] Собрать APK (EAS — нужен аккаунт на expo.dev, или `mobile/build-apk.bat`).
 - [ ] Настроить Firebase FCM (`google-services.json`, credentials в EAS) — файл предоставляется out-of-band.
 - [ ] Протестировать push-уведомления на реальном устройстве.
 - **Критерий готовности:** приложение устанавливается, push-уведомления приходят. Выполняется оператором с облачными аккаунтами.
+- **Статус (2026-10-15):** Blocked — требуются аккаунт expo.dev и FCM-файлы (`google-services.json`, service-account) извне репозитория.
 
 ---
 

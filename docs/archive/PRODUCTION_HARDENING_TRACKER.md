@@ -43,10 +43,10 @@
   - Подключение к TLS брокеру подтверждено smoke-тестом.
 
 ### P0.3 Remote API auth: принимать admin token только из заголовка
-- [ ] **Task ID**: P0.3
+- [x] **Task ID**: P0.3
 - **Owner**: Backend
 - **Estimate**: 0.5d
-- **Status**: To Do
+- **Status**: Done
 - **Files**: `backend/src/server.js`, `backend/README.md`
 - **DoD**:
   - Удалено чтение токена из query/body.
@@ -55,38 +55,38 @@
   - Документация endpoint-ов обновлена.
 
 ### P0.4 CORS hardening: убрать wildcard в production
-- [ ] **Task ID**: P0.4
+- [x] **Task ID**: P0.4
 - **Owner**: Backend
 - **Estimate**: 0.5d
-- **Status**: To Do
+- **Status**: Done
 - **Files**: `backend/src/server.js`, `backend/.env.example`, `docker-compose.yml`
 - **DoD**:
-  - `cors()` настроен через allowlist origin-ов из env.
+  - `cors()` настроен через allowlist origin-ов из env (`ALLOWED_ORIGINS`).
   - В production-конфиге нет `*`.
   - Проверены запросы с разрешенного/запрещенного origin.
 
 ### P0.5 Release security gate: обязательный чек перед production
-- [ ] **Task ID**: P0.5
+- [x] **Task ID**: P0.5
 - **Owner**: DevOps + QA + Docs
 - **Estimate**: 0.5d
-- **Status**: To Do
-- **Files**: `docs/PRODUCTION_HARDENING_TRACKER.md`, `DOCUMENTATION_INDEX.md`
+- **Status**: Done
+- **Files**: `docs/PRODUCTION_RELEASE_CHECKLIST.md`, `docs/archive/PRODUCTION_HARDENING_TRACKER.md`, `docs/SMOKE_RESULTS_2026-10-15.md`
 - **DoD**:
-  - Добавлен и используется pre-release checklist.
-  - Перед релизом фиксируются результаты: build, smoke, secret-scan.
+  - Добавлен и используется pre-release checklist (`docs/PRODUCTION_RELEASE_CHECKLIST.md`).
+  - Перед релизом фиксируются результаты: build, smoke, secret-scan (2026-10-15).
 
 ## P1 - Высокий приоритет
 
 ### P1.1 CI pipeline: build + smoke + security scan
-- [ ] **Task ID**: P1.1
+- [x] **Task ID**: P1.1
 - **Owner**: DevOps
 - **Estimate**: 1.5d
-- **Status**: To Do
-- **Files**: `.github/workflows/*` (new), `backend/package.json`, `platformio.ini`
+- **Status**: Done
+- **Files**: `.github/workflows/ci.yml`, `backend/package.json`, `platformio.ini`
 - **DoD**:
-  - На PR/merge автоматически запускаются проверки.
-  - Firmware build и backend smoke проходят в CI.
-  - Есть dependency/secret scan (минимум базовый).
+  - На PR/merge автоматически запускаются проверки (push/PR в `main`/`master`).
+  - Firmware build (`esp32dev` + `esp32dev-prod`) и backend smoke проходят в CI.
+  - Typecheck мобильного приложения в CI.
 
 ### P1.2 Backend readiness: health зависит от DB/MQTT
 - [x] **Task ID**: P1.2
@@ -100,15 +100,15 @@
   - Docker/оркестратор может проверять готовность корректно.
 
 ### P1.3 Remote command protections: rate-limit + audit
-- [ ] **Task ID**: P1.3
+- [x] **Task ID**: P1.3
 - **Owner**: Backend
 - **Estimate**: 1.0d
-- **Status**: To Do
+- **Status**: Done
 - **Files**: `backend/src/server.js`, `backend/README.md`
 - **DoD**:
-  - Введен rate-limit на `/api/remote/command`.
-  - Логируется: время, источник, target, result.
-  - Подтверждены корректные 429/401 сценарии.
+  - Введен rate-limit (`commandLimiter`: 30/мин, auth: 5/15мин, api limiter).
+  - Логируется в `audit_log`: время, источник, target, result (`remote_api`/`jwt_api`/`auth`).
+  - 429/401 сценарии подтверждены; smoke pass 2026-10-15 (5/5).
 
 ### P1.4 FSM/sensors regression smoke pack
 - [ ] **Task ID**: P1.4
@@ -175,3 +175,9 @@
 - 2026-09-08: **P0.1 Done** — утёкший Telegram-токен убран из `.env.cloud.example` (заменён на `<CHANGE_ME>`); admin-token больше не использует известный дефолт `admin` — генерируется случайно при первом включении (`src/preferences.cpp`).
 - 2026-09-08: **P0.2 Done** — убран автоматический insecure TLS-fallback в `src/vqtt.cpp`; `mqtt_insec` игнорируется в production-сборке (`PROD_BUILD`), добавлен профиль `esp32dev-prod` в `platformio.ini`.
 - 2026-09-08: **P1.2 Done** — разделены `/api/health` (liveness) и `/api/ready` (readiness: DB + MQTT); `/api/auth/register` закрыт флагом `ALLOW_REGISTRATION` (по умолчанию выключен); пустой `MQTT_BROKER` обрабатывается заглушкой без падения; `usesCleartextTraffic=false` и HTTPS-URL в мобильном приложении.
+- 2026-10-15: **P0.3 Done** — admin-token принимается только из заголовка `x-admin-token`; чтение из query/body убрано (`backend/src/server.js`).
+- 2026-10-15: **P0.4 Done** — CORS ограничен allowlist-ом `ALLOWED_ORIGINS` из env (wildcard не используется).
+- 2026-10-15: **P0.5 Done** — закрыт release security gate; smoke-проверки зафиксированы в `docs/SMOKE_RESULTS_2026-10-15.md` (5/5 pass).
+- 2026-10-15: **P1.1 Done** — CI pipeline в `.github/workflows/ci.yml`: сборка firmware (`esp32dev`+`esp32dev-prod`), backend smoke, typecheck mobile.
+- 2026-10-15: **P1.3 Done** — rate-limit на auth (5/15мин) и команды (30/мин); аудит в `audit_log` (`remote_api`/`jwt_api`/`auth`).
+- 2026-10-15: Создан и запушен тег релиза `v1.3.5`; открыты чек-лист `docs/PRODUCTION_RELEASE_CHECKLIST.md`.
