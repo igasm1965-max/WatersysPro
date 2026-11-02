@@ -1,7 +1,8 @@
 # EAS Build ignore rules.
 # This file overrides .gitignore for the EAS Build archive.
-# IMPORTANT: google-services.json is intentionally NOT listed here so that
-# EAS Build includes it (Firebase push notifications need it).
+# NOTE: google-services.json / google-services-config.json are NOT listed here
+# so that EAS Build includes them if local FCM resolution is used. Production
+# builds get the file from the EAS file env var GOOGLE_SERVICES_JSON instead.
 
 # Dependencies & tooling
 node_modules/
@@ -10,12 +11,18 @@ dist/
 web-build/
 android/
 ios/
+inspect_out/
 
 # Logs / artifacts
 *.log
 metro.log
 *.orig
 *.rej
+
+# Build artifacts (do not upload local APK/AAB outputs to EAS)
+*.apk
+*.aab
+builds/
 
 # Local env
 .env
