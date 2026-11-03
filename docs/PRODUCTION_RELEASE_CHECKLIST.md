@@ -33,9 +33,9 @@
 - [x] Зафиксированы результаты smoke-проверок с датой (см. `docs/SMOKE_RESULTS_2026-10-15.md`).
 
 ## Открытые (внешние) пункты
-- [ ] Сборка production APK (EAS / `mobile/build-apk.bat`) — требуется аккаунт expo.dev.
-- [ ] Настройка Firebase FCM (`google-services.json`, credentials в EAS) — файлы out-of-band.
-- [ ] Тест push-уведомлений на реальном устройстве.
+- [x] Сборка production APK (EAS) — выполнена 2026-11-03: build #71 (`versionCode` 71, v1.1.0, commit `d1da261`), статус FINISHED. `google-services.json` подаётся через file env-секрет `GOOGLE_SERVICES_JSON` + динамический [`mobile/app.config.js`](../mobile/app.config.js).
+- [x] Настройка Firebase FCM (`google-services.json`, credentials в EAS) — секрет `GOOGLE_SERVICES_JSON` загружен в EAS (production environment).
+- [ ] Тест push-уведомлений на реальном устройстве (остаётся за оператором).
 
 ## Sign-off
 - Tech Lead: ____________________

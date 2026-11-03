@@ -106,12 +106,13 @@
 - [ ] Проверить [`plans/DEPLOY_INSTRUCTIONS.md`](../plans/DEPLOY_INSTRUCTIONS.md) на реальном сервере (нужен SSH к VPS). Инструкция и [`docker-compose.cloud.yml`](../docker-compose.cloud.yml) проверены и согласованы.
 - **Критерий готовности:** backend доступен по HTTPS, MQTT/WS работают. Выполняется оператором с доступом к серверу.
 
-### 4.4. Сборка и тест APK ⏳ Blocked (требует внешнего доступа)
-- [ ] Собрать APK (EAS — нужен аккаунт на expo.dev, или `mobile/build-apk.bat`).
-- [ ] Настроить Firebase FCM (`google-services.json`, credentials в EAS) — файл предоставляется out-of-band.
-- [ ] Протестировать push-уведомления на реальном устройстве.
-- **Критерий готовности:** приложение устанавливается, push-уведомления приходят. Выполняется оператором с облачными аккаунтами.
-- **Статус (2026-10-15):** Blocked — требуются аккаунт expo.dev и FCM-файлы (`google-services.json`, service-account) извне репозитория.
+### 4.4. Сборка и тест APK ⏳ (остался тест push)
+- [x] Собрать APK (EAS): **2026-11-03 build #71** (`versionCode` 71, v1.1.0, commit `d1da261`) — статус FINISHED, APK доступен по ссылке из `eas build:list`.
+- [x] Настроить Firebase FCM: `google-services.json` подаётся на билдер через file env-секрет `GOOGLE_SERVICES_JSON` (production environment) + динамический [`mobile/app.config.js`](../mobile/app.config.js) (`process.env.GOOGLE_SERVICES_JSON`).
+- [x] Устранены замечания expo-doctor: добавлен peer `expo-font`, удалён неиспользуемый `react-native-webview`, версии выровнены с Expo SDK 55 ([`mobile/package.json`](../mobile/package.json)).
+- [ ] Протестировать push-уведомления на реальном устройстве (остаётся за оператором).
+- **Критерий готовности:** приложение устанавливается ✅; push-уведомления приходят — проверка на устройстве.
+- **Статус (2026-11-03):** APK собран успешно; осталось проверить push на реальном устройстве.
 
 ---
 
