@@ -617,6 +617,11 @@ void loopESP32() {
         wifi_clearNTPSyncFlag();
     }
 
+    // Неблокирующий опрос NTP (Stage A fix): главный цикл больше не
+    // замирает на 30 секунд при Wi-Fi без интернета.
+    extern bool ntpSyncLoop();
+    ntpSyncLoop();
+
     webServerPeriodic();
     // Handle MQTT client periodic tasks
     // (connectToBroker может блокировать 5-15с при TLS handshake — сбрасываем loopStartTime после)

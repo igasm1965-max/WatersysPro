@@ -15,6 +15,9 @@
 #include <WiFi.h>
 #include <NetworkClientSecure.h>
 #include <esp_task_wdt.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <freertos/semphr.h>
 
 extern Preferences preferences;
 
@@ -40,6 +43,14 @@ static unsigned long lastLogsPublishMs = 0;
 static unsigned long logsPublishIntervalMs = 60000; // publish logs every 60s
 static String mqttTopicBase = DEFAULT_MQTT_TOPIC_BASE;
 static String mqttClientId;
+
+// --- Уведомления в MAX через WQTT-мост (без backend) -------------------------
+// Тревожные события (LOG_WARNING/LOG_ERROR) дублируются текстом в топик
+// maxmsg — бот WQTT пересылает их в чат MAX на телефоне.
+// Отключить рассылку: закомментировать строку MAX_NOTIFY_ENABLED.
+#define MAX_NOTIFY_ENABLED 1
+static const char* MAX_NOTIFY_TOPIC = "maxmsg";
+static const uint32_t MAX_NOTIFY_MIN_INTERVAL_MS = 15000; // антифлуд: не чаще 1 сообщения / 15 с
 static unsigned long lastConnectAttempt = 0;
 // Base reconnect delay (before jitter). Raised from 5s to 8s so a burst of
 // aborted TLS handshakes no longer hits the broker every few seconds — that
@@ -59,6 +70,33 @@ static bool mqttConnecting = false;        // Re-entry guard for connectToBroker
 static unsigned long mqttGiveupUntilMs = 0; // Timestamp until which we give up
 static const int MQTT_MAX_RECONNECT_ATTEMPTS = 5;
 static const unsigned long MQTT_GIVEUP_INTERVAL_MS = 300000; // 5 min pause after exhausting attempts
+
+// ============ Stage B: MQTT в фоновой задаче ============
+static void vqttTask(void *pv);   // forward: создаётся в initVQTT()
+// TLS/DNS/connect к брокеру выполняются в отдельной FreeRTOS-задаче на ядре 0.
+// Главный loop на ядре 1 больше НИКОГДА не блокируется сетевыми операциями —
+// таймеры, реле и дисплей идут даже при Wi-Fi без интернета.
+static SemaphoreHandle_t mqttMutex = nullptr;   // recursive: callback может публиковать внутри loop()
+static TaskHandle_t vqttTaskHandle = nullptr;
+
+// Блокировка PubSubClient. Таймаут короткий: вызовы из главного цикла /
+// async-web-задачи при занятой mutex (идёт connect) просто пропускают
+// публикацию вместо блокировки вызывающего потока на 20 секунд.
+static bool mqttLock(TickType_t ticks = pdMS_TO_TICKS(250)) {
+  return mqttMutex && xSemaphoreTakeRecursive(mqttMutex, ticks) == pdTRUE;
+}
+static void mqttUnlock() { xSemaphoreGiveRecursive(mqttMutex); }
+
+// Неблокирующая проверка соединения (вызывается в контексте vqtt-задачи)
+static bool mqttConnectedNow() {
+  if (!activeMqtt) return false;
+  if (mqttLock()) {
+    bool c = activeMqtt->connected();
+    mqttUnlock();
+    return c;
+  }
+  return false;
+}
 
 // Helper function
 static String safeGetPref(const char *key, const String &def = "") {
@@ -263,6 +301,36 @@ static String makeDeviceId() {
   return String(id);
 }
 
+// Stage A fix: быстрая pre-flight проверка доступности интернета.
+// Раньше при Wi-Fi без интернета connect к брокеру блокировал главный цикл
+// на 20-30+ секунд (DNS-таймаут + SYN-таймаут TCP) на каждой попытке —
+// таймеры останавливались "пока не прервёшь соединение". Теперь перед
+// любой попыткой подключения делаем короткий TCP probe (2 с на хост)
+// к публичным DNS-серверам; если интернета нет — attempt пропускается.
+static const IPAddress PROBE_HOSTS[] = {
+  IPAddress(77, 88, 8, 8),  // Yandex DNS
+  IPAddress(8, 8, 8, 8),    // Google DNS
+  IPAddress(1, 1, 1, 1)     // Cloudflare DNS
+};
+static const int PROBE_HOST_COUNT = sizeof(PROBE_HOSTS) / sizeof(PROBE_HOSTS[0]);
+static const uint16_t PROBE_PORT = 53;
+static const int32_t PROBE_TIMEOUT_MS = 2000;
+
+static bool internetReachable() {
+  // Выполняется в vqtt-задаче (не подписана на TWDT) — WDT_RESET() здесь
+  // не нужен: esp_task_wdt_reset() для неподписанной задачи пишет
+  // "task not found" в лог.
+  for (int i = 0; i < PROBE_HOST_COUNT; i++) {
+    WiFiClient probe;
+    int rc = probe.connect(PROBE_HOSTS[i], PROBE_PORT, PROBE_TIMEOUT_MS);
+    probe.stop();
+    if (rc == 1) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // MQTT Connection routine
 static void connectToBroker() {
   // Re-entry guard: prevent concurrent connect attempts
@@ -285,6 +353,20 @@ static void connectToBroker() {
   if (mqttGiveupUntilMs > 0 && now < mqttGiveupUntilMs) {
     Serial.printf("[VQTT] In give-up period until +%lums, skipping\n",
                   mqttGiveupUntilMs - now);
+    return;
+  }
+
+  // Stage A fix: pre-flight проверка интернета. Wi-Fi подключён, но маршрута
+  // в интернет нет — не тратим 20-30 секунд на DNS/SYN-таймауты, просто
+  // пропускаем попытку и ждём следующего окна переподключения.
+  if (!internetReachable()) {
+    Serial.println("[VQTT] No internet reachable — skipping connect attempt (pre-flight check)");
+    mqttReconnectCount++;
+    if (mqttReconnectCount >= MQTT_MAX_RECONNECT_ATTEMPTS) {
+      mqttReconnectCount = 0;
+      mqttGiveupUntilMs = millis() + MQTT_GIVEUP_INTERVAL_MS;
+      Serial.printf("[VQTT] No internet, giving up until +%lums\n", MQTT_GIVEUP_INTERVAL_MS);
+    }
     return;
   }
 
@@ -394,8 +476,10 @@ static void connectToBroker() {
   const String user = safeGetPref(PREF_KEY_MQTT_USER, DEFAULT_MQTT_USER);
   const String pass = safeGetPref(PREF_KEY_MQTT_PASS, DEFAULT_MQTT_PASS);
   
-  // TLS handshake может занять 15+ секунд — снимаем задачу с WDT на время connect
-  esp_task_wdt_delete(NULL);
+  // Stage A fix: задача ОСТАЁТСЯ под контролем watchdog. TLS connect ограничен
+  // setTimeout(20 c), а WDT-таймаут 60 c — запас достаточен. Раньше
+  // esp_task_wdt_delete(NULL) позволял зависанию при отсутствии интернета
+  // жить неограниченно долго без перезагрузки.
   
   bool connectOk = false;
   auto tryConnect = [&](void) -> bool {
@@ -421,8 +505,7 @@ static void connectToBroker() {
                   tlsCode, tlsErr[0] ? tlsErr : "n/a");
   }
 
-  // Возвращаем задачу под контроль WDT
-  esp_task_wdt_add(NULL);
+  // Задача не снималась с WDT — просто сбрасываем счётчик после connect
   esp_task_wdt_reset();
   
   if (connectOk) {
@@ -467,6 +550,14 @@ static void connectToBroker() {
       char tlsErr[128] = {0};
       int tlsCode = wifiClientSecure.lastError(tlsErr, sizeof(tlsErr));
       Serial.printf("[VQTT] TLS lastError=%d (%s)\n", tlsCode, tlsErr[0] ? tlsErr : "n/a");
+      // ФИКС: сброс неконсистентного состояния сокета после неудачного
+      // TLS-хендшейка. Без stop() клиент остаётся в "полуповисшем" состоянии и
+      // каждый опрос connected() в loopVQTT генерирует ошибки сокета
+      // ("setSocketOption(): fail on 0, errno: 9, Bad file number") — спам в
+      // Serial забивает главный цикл и устройство выглядит зависшим.
+      wifiClientSecure.stop();
+    } else {
+      wifiClient.stop();
     }
     mqttConnected = false;
 
@@ -535,16 +626,30 @@ void initVQTT() {
   mqttClientSecure.setKeepAlive(120);
   activeMqtt = &mqttClient;
   
-  // Initial connection attempt only if WiFi is ready
-  if (preferences.getBool(PREF_KEY_MQTT_ENABLED, DEFAULT_MQTT_ENABLED) && 
-      WiFi.status() == WL_CONNECTED) {
-    connectToBroker();
+  // Stage B: стартуем фоновую задачу MQTT на ядре 0. Она сама обнаружит
+  // подключение Wi-Fi и выполнит первое соединение — setup() не блокируется.
+  mqttMutex = xSemaphoreCreateRecursiveMutex();
+  if (xTaskCreatePinnedToCore(vqttTask, "vqtt_task", 12288, nullptr, 1,
+                              &vqttTaskHandle, 0 /* core 0 */) == pdPASS) {
+    Serial.println("[VQTT] Background task started on core 0 (stack 12288B)");
+  } else {
+    Serial.println("[VQTT] ERROR: failed to create background task");
   }
 }
 
+// Точка входа сохранена для совместимости — вся логика теперь в vqttTask.
+// Главный цикл НЕ должен вызывать сетевые операции напрямую.
 void loopVQTT() {
+}
+
+static void loopVQTTCore() {
   if (!preferences.getBool(PREF_KEY_MQTT_ENABLED, DEFAULT_MQTT_ENABLED)) return;
   if (!activeMqtt) return;
+
+  // ФИКС: кэш состояния MQTT-соединения — опрос connected() не чаще 1 раза в
+  // секунду (см. комментарий у блока переподключения ниже).
+  static unsigned long lastConnPollMs = 0;
+  static bool lastConnState = false;
 
   bool wifiConnected = (WiFi.status() == WL_CONNECTED);
   
@@ -557,6 +662,9 @@ void loopVQTT() {
     mqttGiveupUntilMs = 0;
     lastConnectAttempt = 0;  // Force immediate connection
     connectToBroker();
+    lastConnPollMs = millis();
+    lastConnState = mqttConnectedNow();
+    mqttConnected = lastConnState;
     return;
   }
   
@@ -568,13 +676,27 @@ void loopVQTT() {
   
   if (!wifiConnected) return;
 
-  // Reconnect if needed
-  if (!activeMqtt->connected()) {
+  // Reconnect if needed.
+  // ФИКС: опрос connected() выполняется не чаще 1 раза в секунду — на
+  // полуповисшем TLS-клиенте каждый опрос генерирует ошибки сокета (errno 9),
+  // при частоте опроса ~каждый проход цикла это создаёт непрерывный спам в
+  // Serial и подтормаживает главный цикл.
+  // lastConnPollMs/lastConnState объявлены в начале функции.
+  unsigned long pollNow = millis();
+  if (pollNow - lastConnPollMs >= 1000) {
+    lastConnPollMs = pollNow;
+    lastConnState = mqttConnectedNow();
+    mqttConnected = lastConnState;
+  }
+  if (!lastConnState) {
     unsigned long now = millis();
     
     if (now - lastConnectAttempt >= jitterMs(reconnectIntervalMs)) {
       Serial.printf("[VQTT] Reconnecting (wifi=%s)...\n", wifiConnected ? "OK" : "DOWN");
       connectToBroker();
+      lastConnPollMs = millis();
+      lastConnState = mqttConnectedNow();
+      mqttConnected = lastConnState;
       lastConnectAttempt = now;
       
       // Exponential backoff
@@ -586,7 +708,11 @@ void loopVQTT() {
   }
 
   // Process pending MQTT messages only when connected.
-  activeMqtt->loop();
+  // Mutex защищает от гонок с publish() из главного цикла / web-задачи.
+  if (mqttLock(pdMS_TO_TICKS(2000))) {
+    activeMqtt->loop();
+    mqttUnlock();
+  }
 
   // Reset backoff on successful connection
   if (reconnectIntervalMs > 8000) {
@@ -606,8 +732,21 @@ void loopVQTT() {
   }
 }
 
+// Stage B: фоновая задача MQTT на ядре 0. Вся блокирующая сетевая работа
+// (DNS, TCP, TLS handshake до ~20 с на попытку) выполняется здесь —
+// главный цикл на ядре 1 продолжает крутить таймеры и реле без пауз.
+static void vqttTask(void *pv) {
+  (void)pv;
+  for (;;) {
+    loopVQTTCore();
+    vTaskDelay(pdMS_TO_TICKS(20));
+  }
+}
+
 bool vqtt_isConnected() {
-  return activeMqtt ? activeMqtt->connected() : false;
+  // Кэшированное состояние — НЕ вызываем activeMqtt->connected() из чужих
+  // задач: на полуповисшем сокете это генерирует ошибки сокета и спам.
+  return mqttConnected;
 }
 
 String vqtt_getBroker() {
@@ -619,15 +758,19 @@ String vqtt_getTopicBase() {
 }
 
 bool vqtt_testPublish(const char* payload) {
-  if (!activeMqtt || !activeMqtt->connected()) return false;
+  if (!activeMqtt || !mqttConnectedNow()) return false;
   String topic = mqttTopicBase + "/test";
-  bool ok = activeMqtt->publish(topic.c_str(), payload);
+  bool ok = false;
+  if (mqttLock()) {
+    ok = activeMqtt->publish(topic.c_str(), payload);
+    mqttUnlock();
+  }
   Serial.printf("[VQTT] Test publish to %s: %s\n", topic.c_str(), ok ? "OK" : "FAILED");
   return ok;
 }
 
 void vqtt_publishTelemetry() {
-  if (!activeMqtt || !activeMqtt->connected()) {
+  if (!activeMqtt || !mqttConnectedNow()) {
     Serial.println("[VQTT] Not connected, skipping telemetry");
     return;
   }
@@ -687,13 +830,17 @@ void vqtt_publishTelemetry() {
   serializeJson(doc, out);
   String topic = mqttTopicBase + "/telemetry";
   
-  bool ok = activeMqtt->publish(topic.c_str(), out.c_str());
+  bool ok = false;
+  if (mqttLock()) {
+    ok = activeMqtt->publish(topic.c_str(), out.c_str());
+    mqttUnlock();
+  }
   Serial.printf("[VQTT] Published telemetry to %s (%d bytes): %s\n",
                 topic.c_str(), out.length(), ok ? "OK" : "FAILED");
 }
 
 void vqtt_publishLogs() {
-  if (!activeMqtt || !activeMqtt->connected()) {
+  if (!activeMqtt || !mqttConnectedNow()) {
     Serial.println("[VQTT] Not connected, skipping logs publish");
     return;
   }
@@ -720,7 +867,11 @@ void vqtt_publishLogs() {
   }
 
   String topic = mqttTopicBase + "/logs";
-  bool ok = activeMqtt->publish(topic.c_str(), logsText.c_str());
+  bool ok = false;
+  if (mqttLock()) {
+    ok = activeMqtt->publish(topic.c_str(), logsText.c_str());
+    mqttUnlock();
+  }
   Serial.printf("[VQTT] Published logs to %s (%d bytes): %s\n",
                 topic.c_str(), logsText.length(), ok ? "OK" : "FAILED");
 }
@@ -729,7 +880,7 @@ void vqtt_publishLogs() {
 /// Используется для ответа на команду getlogs — мобильное приложение
 /// получает подтверждение, что логи были опубликованы.
 void vqtt_publishLogsWithAck() {
-  if (!activeMqtt || !activeMqtt->connected()) {
+  if (!activeMqtt || !mqttConnectedNow()) {
     Serial.println("[VQTT] Cannot publish logs with ack: MQTT not connected");
     return;
   }
@@ -740,7 +891,11 @@ void vqtt_publishLogsWithAck() {
   // Публикуем подтверждение в топик watersystem/logs/ack
   String ackTopic = mqttTopicBase + "/logs/ack";
   String ackPayload = "ok";
-  bool ackOk = activeMqtt->publish(ackTopic.c_str(), ackPayload.c_str());
+  bool ackOk = false;
+  if (mqttLock()) {
+    ackOk = activeMqtt->publish(ackTopic.c_str(), ackPayload.c_str());
+    mqttUnlock();
+  }
   Serial.printf("[VQTT] Published log ack to %s: %s\n",
                 ackTopic.c_str(), ackOk ? "OK" : "FAILED");
 }
@@ -748,7 +903,7 @@ void vqtt_publishLogsWithAck() {
 /// Publish a single log event to watersystem/logs/event for real-time streaming.
 /// Called from saveEventLog() each time a new event is recorded.
 void vqtt_publishSingleEvent(const EventLog& event) {
-  if (!activeMqtt || !activeMqtt->connected()) {
+  if (!activeMqtt || !mqttConnectedNow()) {
     return;
   }
 
@@ -764,17 +919,45 @@ void vqtt_publishSingleEvent(const EventLog& event) {
   doc["level"] = (int)event.level;
   doc["desc"] = desc;
 
+#if MAX_NOTIFY_ENABLED
+  // Дублируем тревожные события в топик MAX-моста WQTT: бот пересылает
+  // сообщения из этого топика в чат MAX на телефоне (уведомления без backend).
+  if (event.level >= LOG_WARNING) {
+    static uint32_t lastMaxNotifyMs = 0;
+    uint32_t nowMs = millis();
+    if (nowMs - lastMaxNotifyMs >= MAX_NOTIFY_MIN_INTERVAL_MS) {
+      String notifyMsg = String(event.level == LOG_ERROR ? "[АВАРИЯ] " : "[ВНИМАНИЕ] ");
+      notifyMsg += ts;
+      notifyMsg += ' ';
+      notifyMsg += desc;
+      bool notified = false;
+      if (mqttLock()) {
+        notified = activeMqtt->publish(MAX_NOTIFY_TOPIC, notifyMsg.c_str());
+        mqttUnlock();
+      }
+      if (notified) {
+        lastMaxNotifyMs = nowMs; // обновляем метку только при успешной публикации
+        Serial.printf("[VQTT] Alarm notified to %s: %s\n", MAX_NOTIFY_TOPIC, notifyMsg.c_str());
+      }
+    }
+  }
+#endif
+
   String out;
   serializeJson(doc, out);
   String topic = mqttTopicBase + "/logs/event";
-  bool ok = activeMqtt->publish(topic.c_str(), out.c_str());
+  bool ok = false;
+  if (mqttLock()) {
+    ok = activeMqtt->publish(topic.c_str(), out.c_str());
+    mqttUnlock();
+  }
   if (!ok) {
     Serial.printf("[VQTT] Failed to publish single event to %s\n", topic.c_str());
   }
 }
 
 void vqtt_publishState() {
-  if (!activeMqtt || !activeMqtt->connected()) {
+  if (!activeMqtt || !mqttConnectedNow()) {
     Serial.println("[VQTT] Not connected, skipping state");
     return;
   }
@@ -787,7 +970,11 @@ void vqtt_publishState() {
   serializeJson(doc, out);
   String topic = mqttTopicBase + "/state";
   
-  bool ok = activeMqtt->publish(topic.c_str(), out.c_str());
+  bool ok = false;
+  if (mqttLock()) {
+    ok = activeMqtt->publish(topic.c_str(), out.c_str());
+    mqttUnlock();
+  }
   Serial.printf("[VQTT] Published state to %s (%d bytes): %s\n",
                 topic.c_str(), out.length(), ok ? "OK" : "FAILED");
 }

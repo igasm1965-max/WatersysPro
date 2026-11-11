@@ -115,17 +115,31 @@ time_t localToUTC(const DateTime& localTime, int8_t tzOffsetHours) {
 
 // ============ СИНХРОНИЗАЦИЯ ВРЕМЕНИ (NTP) ============
 
+// Неблокирующая FSM NTP-синхронизации (Stage A fix).
+// Раньше syncTimeWithNTP() содержал while + delay(500) на 30 секунд прямо в
+// главном цикле: при Wi-Fi без интернета SNTP не отвечал, loop замирал и
+// таймеры останавливались. Теперь syncTimeWithNTP() только конфигурирует
+// SNTP и взводит флаг, а опрос выполняет ntpSyncLoop() из главного цикла.
+static bool ntpSyncActive = false;
+static unsigned long ntpSyncStartMs = 0;
+static unsigned long ntpSyncLastPollMs = 0;
+static unsigned int ntpSyncPolls = 0;
+static const unsigned long NTP_SYNC_POLL_MS = 500;
+static const unsigned long NTP_SYNC_TIMEOUT_MS = 30000;
+
 /// Синхронизирует время с NTP сервером после подключения WiFi
 void syncTimeWithNTP() {
-  extern RTC_DS3231 rtc;
   extern SafetySettings safetySettings;
-  extern void saveEventLog(LogLevel level, uint8_t eventType, uint16_t param);
-  
+
+  if (ntpSyncActive) {
+    return; // сессия уже идёт — не перезапускаем таймер сессии
+  }
+
   Serial.println("[NTP] Requesting time synchronization...");
-  
+
   // Строим строку часового пояса на основе safetySettings.timeZoneOffset
   char tzString[32];
-  
+
   // POSIX TZ strings use inverted sign for fixed offsets:
   // UTC+5 (east) is encoded as "UTC-5".
   if (safetySettings.timeZoneOffset == 0) {
@@ -135,29 +149,43 @@ void syncTimeWithNTP() {
   } else {
     snprintf(tzString, sizeof(tzString), "UTC+%d", -safetySettings.timeZoneOffset);
   }
-  
+
   Serial.printf("[NTP] Using timezone: %s\n", tzString);
-  
+
   // Настраиваем динамический часовой пояс с NTP серверами
   configTzTime(tzString, "pool.ntp.org", "time.nist.gov", "time.google.com");
-  
-  // Даем время SNTP клиенту на синхронизацию (макс 30 сек)
-  time_t nowUtc = time(nullptr);  // UTC время из NTP
-  int attempts = 0;
-  const int maxAttempts = 60; // 30 сек при 500 мс задержке
-  
-  while (nowUtc < 24 * 3600 && attempts < maxAttempts) {
-    delay(500);
-    time(&nowUtc);
-    attempts++;
+
+  ntpSyncActive = true;
+  ntpSyncStartMs = millis();
+  ntpSyncLastPollMs = 0;
+  ntpSyncPolls = 0;
+  Serial.println("[NTP] SNTP configured, waiting for sync (non-blocking, max 30s)...");
+}
+
+/// Неблокирующий опрос NTP-сессии. Вызывать из главного цикла.
+/// @return true — сессия завершена (успех или таймаут), false — ещё идёт
+bool ntpSyncLoop() {
+  if (!ntpSyncActive) return true;
+
+  unsigned long now = millis();
+  if (ntpSyncLastPollMs != 0 && now - ntpSyncLastPollMs < NTP_SYNC_POLL_MS) {
+    return false;
   }
-  
+  ntpSyncLastPollMs = now;
+  ntpSyncPolls++;
+
+  extern SafetySettings safetySettings;
+  extern RTC_DS3231 rtc;
+  extern void saveEventLog(LogLevel level, uint8_t eventType, uint16_t param);
+
+  time_t nowUtc = time(nullptr);  // UTC время из NTP
+
   if (nowUtc > 24 * 3600) {
     // Время успешно синхронизировано
     // nowUtc содержит UTC время
     struct tm timeinfo_utc = *gmtime(&nowUtc);  // UTC
     struct tm timeinfo_local = *localtime(&nowUtc);  // Локальное время
-    
+
     Serial.printf("[NTP] UTC time: %04d-%02d-%02d %02d:%02d:%02d\n",
                   timeinfo_utc.tm_year + 1900,
                   timeinfo_utc.tm_mon + 1,
@@ -165,7 +193,7 @@ void syncTimeWithNTP() {
                   timeinfo_utc.tm_hour,
                   timeinfo_utc.tm_min,
                   timeinfo_utc.tm_sec);
-    
+
     Serial.printf("[NTP] Local time: %04d-%02d-%02d %02d:%02d:%02d (TZ: %+d)\n",
                   timeinfo_local.tm_year + 1900,
                   timeinfo_local.tm_mon + 1,
@@ -174,7 +202,7 @@ void syncTimeWithNTP() {
                   timeinfo_local.tm_min,
                   timeinfo_local.tm_sec,
                   safetySettings.timeZoneOffset);
-    
+
     // ВАЖНО: Теперь сохраняем ЛОКАЛЬНОЕ время в RTC (не UTC!)
     // Это позволяет коду отображения работать без коррекций
     DateTime localDateTime(
@@ -186,13 +214,23 @@ void syncTimeWithNTP() {
       timeinfo_local.tm_sec
     );
     rtc.adjust(localDateTime);
-    
+
     Serial.println("[NTP] RTC updated with LOCAL time");
     saveEventLog(LOG_INFO, EVENT_NTP_SYNC_SUCCESS, safetySettings.timeZoneOffset + 128);
-  } else {
-    Serial.println("[NTP] Time synchronization failed");
-    saveEventLog(LOG_WARNING, EVENT_NTP_SYNC_FAILED, attempts);
+
+    ntpSyncActive = false;
+    return true;
   }
+
+  // Даем время SNTP клиенту на синхронизацию (макс 30 сек)
+  if (now - ntpSyncStartMs >= NTP_SYNC_TIMEOUT_MS) {
+    Serial.println("[NTP] Time synchronization failed");
+    saveEventLog(LOG_WARNING, EVENT_NTP_SYNC_FAILED, (uint16_t)ntpSyncPolls);
+    ntpSyncActive = false;
+    return true;
+  }
+
+  return false;
 }
 
 /// Пересчитывает время в RTC при смене часового пояса
